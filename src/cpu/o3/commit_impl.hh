@@ -103,6 +103,8 @@ DefaultCommit<Impl>::DefaultCommit(O3CPU *_cpu, DerivO3CPUParams *params)
              commitWidth, static_cast<int>(Impl::MaxWidth));
 
     _status = Active;
+    prevRSPValue = 0;
+    NumOfStackPointers = 0; StackAdd=0; StackRemove=0; NumOfAllocations=0;
     _nextStatus = Inactive;
     std::string policy = params->smtCommitPolicy;
 
@@ -160,7 +162,8 @@ void
 DefaultCommit<Impl>::regProbePoints()
 {
     ppCommit = new ProbePointArg<DynInstPtr>(cpu->getProbeManager(), "Commit");
-    ppCommitStall = new ProbePointArg<DynInstPtr>(cpu->getProbeManager(), "CommitStall");
+    ppCommitStall =
+          new ProbePointArg<DynInstPtr>(cpu->getProbeManager(), "CommitStall");
     ppSquash = new ProbePointArg<DynInstPtr>(cpu->getProbeManager(), "Squash");
 }
 
@@ -851,7 +854,7 @@ DefaultCommit<Impl>::commit()
 
             if (fromIEW->mispredictInst[tid]) {
                 DPRINTF(Commit,
-                    "[tid:%i]: Squashing due to branch mispred PC:%#x [sn:%i]\n",
+                  "[tid:%i]: Squashing due to branch mispred PC:%#x [sn:%i]\n",
                     tid,
                     fromIEW->mispredictInst[tid]->instAddr(),
                     fromIEW->squashedSeqNum[tid]);
@@ -1115,7 +1118,7 @@ DefaultCommit<Impl>::commitInsts()
                 // pipeline reached a place to handle the interrupt. In that
                 // case squash now to make sure the interrupt is handled.
                 //
-                // If we don't do this, we might end up in a live lock situation
+              // If we don't do this, we might end up in a live lock situation
                 if (!interrupt && avoidQuiesceLiveLock &&
                     onInstBoundary && cpu->checkInterrupts(cpu->tcBase(0)))
                     squashAfter(tid, head_inst);
@@ -1273,30 +1276,52 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         }
     }
 
-    
 
 
-    DPRINTF(Commit, "Committing instruction with [sn:%lli] PC %s  --- NextPC: %#lx  EDI: %#lx\n",
-            head_inst->seqNum, head_inst->pcState(),head_inst->pcState().npc(), cpu->readArchIntReg(X86ISA::INTREG_EDI, tid));
+
+    DPRINTF(Commit, "Committing instruction with [sn:%lli] PC %s  \
+                    --- NextPC: %#lx  EDI: %#lx\n",
+                    head_inst->seqNum, head_inst->pcState(),
+                    head_inst->pcState().npc(),
+                    cpu->readArchIntReg(X86ISA::INTREG_EDI, tid));
 
     //const StaticInstPtr si = head_inst->staticInst;
     //DPRINTF(Capability,"%s\n",  si->disassemble(head_inst->pcState().pc()));
-
+    #define ENABLE_CAPABILITY_DEBUG 0
     ThreadContext * tc = cpu->tcBase(tid);
 
     if (tc->enableCapability){
+        uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
+        if (prevRSPValue < newRSPValue){
 
-        updateRegTrackTable(tid, head_inst);
+            for (auto mtt_it = tc->MemTrackTable.cbegin();
+                  mtt_it != tc->MemTrackTable.cend(); /* no increment */)
+            {
+                if (mtt_it->first < newRSPValue &&
+                    mtt_it->first >= prevRSPValue)
+                {
 
+                    if (ENABLE_CAPABILITY_DEBUG)
+                    {
+                      std::cout << "Deleted from MemTrackTable! Mem[" <<
+                      mtt_it->first <<"][" << mtt_it->second << "]"<<'\n';
+                    }
+                    mtt_it = tc->MemTrackTable.erase(mtt_it);
+                    StackRemove++;
+                }
+                else {
+                  ++mtt_it;
+                }
+            }
+
+        }
+        prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
     }
 
-    if (tc->enableCapability){
-        // this function is just used in developing phase 
-        // it is used to check whether or not our commit level pointer tracker is working or not and finds the possible bugs
-        validateRegTrackTable(tid, head_inst);
 
-    }
-   
+    collector(tid, head_inst);
+
+
 
     if (head_inst->traceData) {
         head_inst->traceData->setFetchSeq(head_inst->seqNum);
@@ -1307,82 +1332,40 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (head_inst->isReturn()) {
-
-        DPRINTF(Commit,"Return Instruction Committed [sn:%lli] PC %s  --- NextPC: %#lx RAX: %#lx \n",
-                        head_inst->seqNum, head_inst->pcState(), head_inst->pcState().npc() , cpu->readArchIntReg(X86ISA::INTREG_RAX, tid));
+        DPRINTF(Commit,"Return Instruction Committed [sn:%lli] PC %s  \
+                        --- NextPC: %#lx RAX: %#lx \n",
+                        head_inst->seqNum, head_inst->pcState(),
+                        head_inst->pcState().npc() ,
+                        cpu->readArchIntReg(X86ISA::INTREG_RAX, tid));
     }
 
-
-
-
-    
-
-   
     if (tc->enableCapability){
-        if (head_inst->isBaseCollectorMicroop()){
+        //validateRegTrackTable(tid, head_inst);
+        //updateRegTrackTable(tid, head_inst);
+        //RefreshRegTrackTable(tid, head_inst);
+        RefreshMemTrackTable(tid, head_inst);
 
-            ThreadContext::CapabilityRegistersFileIter crf_it = tc->CapRegsFile.find(tc->PID);
+        if ((uint64_t)cpu->thread[tid]->numInsts.value() % 100000 == 0 &&
+            !head_inst->isNop() &&
+            !head_inst->isInstPrefetch() &&
+            head_inst->isLastMicroop()
+           )
+        {
+            std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
+            " MemTrackTable Size: " <<
+            tc->MemTrackTable.size() <<
+            " NumOfMemTrackAccess: " <<
+            NumOfStackPointers <<
+            " StackAdd: " <<
+            StackAdd <<
+            " StackRemove: " <<
+            StackRemove <<
+            " NumOfAllocations: " <<
+            NumOfAllocations <<
+            std::endl;
 
-            panic_if(crf_it == tc->CapRegsFile.end(), "Invalid Base Collector Entry!");
-
-            crf_it->second.setBaseAddr(cpu->readArchIntReg(X86ISA::INTREG_RAX, tid));
-            crf_it->second.setCSRBit(0);  // this cap is valid now 
-
-            DPRINTF(Capability,"Base Collector Microop Committed [sn:%lli] PC %s  --- NextPC: %#lx Base: %#lx %s\n",
-                        head_inst->seqNum, head_inst->pcState(), head_inst->pcState().npc() , cpu->readArchIntReg(X86ISA::INTREG_RAX, tid), tc->PID);
-
-            // insert the capability in out infinite range based cache. This will be used for validation
-            //tc->RangeCapCache.insert(std::pair<TheISA::Range, TheISA::PointerID>( TheISA::Range(crf_it->second.getBaseAddr() , crf_it->second.getEndAddr()) , crf_it->first));
-
-            tc->LRUCapCache.LRUCache_Access((Addr)cpu->readArchIntReg(X86ISA::INTREG_RAX, tid));
-
-            // for (auto& elem: tc->CapRegsFile){
-            //     DPRINTF(Capability, "Commited Capability: %s Base Address(%llx) Size(%llx)\n", elem.first, elem.second.getBaseAddr() ,elem.second.getSize());
-            // }
-
-            tc->RegTrackTable[X86ISA::INTREG_RAX] = tc->PID;
-
-            printf("ARC: ");
-            for (int i = 0; i < X86ISA::NUM_INTREGS; i++)
-                std::cout << X86ISA::IntRegIndexStr(i) << ":" <<  tc->RegTrackTable[(X86ISA::IntRegIndex)i]<< " ";
-            printf("\nINT: ");
-            for (int i = X86ISA::NUM_INTREGS; i < X86ISA::NUM_INTREGS + 16; i++)
-                std::cout  << "INT" << i-16 << ":" <<  tc->RegTrackTable[(X86ISA::IntRegIndex)i] << " ";
-            printf("\n");
-
-
-
+            NumOfStackPointers=0; StackAdd=0; StackRemove=0;
         }
-        else if (head_inst->isSizeCollectorMicroop()){
-            /*Insert into the capability regs file */
-            TheISA::PointerID  _pid = tc->PID + 1;
-            tc->CapRegsFile.insert(std::pair<TheISA::PointerID, TheISA::Capability>(_pid, TheISA::Capability(cpu->readArchIntReg(X86ISA::INTREG_RDI, tid))));
-
-            DPRINTF(Capability,"Size Collector Microop Committed [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
-                        head_inst->seqNum, head_inst->pcState(), head_inst->pcState().npc() , cpu->readArchIntReg(X86ISA::INTREG_RDI, tid));
-        }
-        else if (head_inst->isFreeCallMicroop()){
-
-            uint64_t _base_addr = cpu->readArchIntReg(X86ISA::INTREG_RDI, tid);
-            TheISA::PointerID _pid = TheISA::PointerID(0);
-            //int _begin = 0,_end = 0;
-            for (auto& capElem: tc->CapRegsFile){
-                if (capElem.second.getBaseAddr() == _base_addr){
-                    _pid = capElem.first;
-                    //_begin = capElem.second.getBaseAddr();
-                    //_end   = capElem.second.getEndAddr();
-                }
-            }
-            if (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end()){
-                DPRINTF(Capability,"Free Called for Base Address: %llx\n", _base_addr);
-                tc->CapRegsFile.erase(_pid);
-                //tc->RangeCapCache.erase(TheISA::Range(_begin,_end));
-            }
-            else{
-                panic("tried to erase invalid PID from cap reg");
-            }
-
-        }   
     }
 
     // Update the commit rename map
@@ -1393,7 +1376,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     // Finally clear the head ROB entry.
     rob->retireHead(tid);
-    
+
 
 #if TRACING_ON
     if (DTRACE(O3PipeView)) {
@@ -1412,10 +1395,346 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
 template <class Impl>
 void
+DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
+{
+  ThreadContext * tc = cpu->tcBase(tid);
+
+  if (tc->enableCapability){
+
+    if (head_inst->isReallocBaseCollectorMicroop()){
+
+        ThreadContext::CapabilityRegistersFileIter crf_it =
+                                                 tc->CapRegsFile.find(tc->PID);
+
+        panic_if(crf_it == tc->CapRegsFile.end(),
+                                      "Invalid Realloc Base Collector Entry!");
+
+       crf_it->second.setBaseAddr(
+              cpu->readArchIntReg(X86ISA::INTREG_RAX, tid)
+       );
+       crf_it->second.setCSRBit(0);  // this cap is valid now
+
+
+       DPRINTF(Capability,
+          "Realloc Base Collector Microop Committed [sn:%lli] PC %s  \
+          --- NextPC: %#lx Base: %#lx %s\n",
+          head_inst->seqNum,
+          head_inst->pcState(),
+          head_inst->pcState().npc() ,
+          cpu->readArchIntReg(X86ISA::INTREG_RAX, tid), tc->PID
+       );
+
+
+       for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
+          TheISA::PointerID _pid = TheISA::PointerID(0);
+          for (auto& capElem : tc->CapRegsFile){
+             if (capElem.second.contains(
+                cpu->readArchIntReg((X86ISA::IntRegIndex)i, tid))
+              ){
+                    _pid = capElem.first;
+                    break;
+                }
+          }
+
+          // if (ENABLE_CAPABILITY_DEBUG){
+          //     if (_pid != TheISA::PointerID(0))
+          //         std::cout << std::hex << X86ISA::IntRegIndexStr(i) <<
+          //         " : " << _pid << " " <<
+          //         cpu->readArchIntReg((X86ISA::IntRegIndex)i, tid) << " " <<
+          //         tc->CapRegsFile[_pid].getBaseAddr() << " <------> " <<
+          //         tc->CapRegsFile[_pid].getEndAddr() <<
+          //         std::endl;
+          // }
+          tc->RegTrackTable[(X86ISA::IntRegIndex)i] = _pid;
+        }
+
+        tc->RegTrackTable[X86ISA::INTREG_RAX] = tc->PID;
+
+        tc->stopTracking = false;
+
+    }
+    else if (head_inst->isReallocSizeCollectorMicroop()){
+
+      uint64_t _base_addr = cpu->readArchIntReg(X86ISA::INTREG_RDI, tid);
+      TheISA::PointerID _pid = TheISA::PointerID(0);
+      //int _begin = 0,_end = 0;
+      for (auto& capElem: tc->CapRegsFile){
+          if (capElem.second.getBaseAddr() == _base_addr){
+              _pid = capElem.first;
+          }
+      }
+
+      if (_pid != TheISA::PointerID(0) /*&&
+          (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
+        )
+      {
+
+          tc->CapRegsFile.erase(_pid);
+
+          // erase from RegTrackTable
+          for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++) {
+            if (tc->RegTrackTable[(X86ISA::IntRegIndex)i] == _pid){
+              tc->RegTrackTable[(X86ISA::IntRegIndex)i] = TheISA::PointerID(0);
+            }
+          }
+          // erase from MemTrackTable
+          for (auto mtt_it = tc->MemTrackTable.cbegin();
+              mtt_it != tc->MemTrackTable.cend(); /* no increment */)
+          {
+              if (mtt_it->second.getPID() == _pid.getPID()) {
+                std::cout << "called! from realloc" << std::endl;
+                mtt_it = tc->MemTrackTable.erase(mtt_it);
+              }
+              else {
+                ++mtt_it;
+              }
+          }
+
+      }
+      // else {
+      //   panic("Realloc without allocation!");
+      // }
+
+
+      _pid = tc->PID + 1;
+      tc->CapRegsFile.insert(
+        std::pair<TheISA::PointerID,
+        TheISA::Capability>(
+          _pid,
+          TheISA::Capability(
+            cpu->readArchIntReg(X86ISA::INTREG_RSI, tid)
+          )
+        )
+      );
+
+      tc->stopTracking = true;
+      DPRINTF(Capability,"Realloc Size Collector Microop Committed \
+                          [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
+                  head_inst->seqNum,
+                  head_inst->pcState(),
+                  head_inst->pcState().npc() ,
+                  cpu->readArchIntReg(X86ISA::INTREG_RSI, tid)
+      );
+    }
+    else if (head_inst->isCallocBaseCollectorMicroop()){
+
+        ThreadContext::CapabilityRegistersFileIter crf_it =
+                                                tc->CapRegsFile.find(tc->PID);
+
+        panic_if(crf_it == tc->CapRegsFile.end(),
+                                      "Invalid Calloc Base Collector Entry!");
+
+        crf_it->second.setBaseAddr(
+                                  cpu->readArchIntReg(X86ISA::INTREG_RAX, tid)
+                                  );
+        crf_it->second.setCSRBit(0);  // this cap is valid now
+
+
+        DPRINTF(Capability,
+          "Calloc Base Collector Microop Committed [sn:%lli] PC %s \
+           --- NextPC: %#lx Base: %#lx %s\n",
+          head_inst->seqNum,
+          head_inst->pcState(),
+          head_inst->pcState().npc() ,
+          cpu->readArchIntReg(X86ISA::INTREG_RAX, tid), tc->PID
+        );
+
+
+        for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
+
+              TheISA::PointerID _pid = TheISA::PointerID(0);
+              for (auto& capElem : tc->CapRegsFile){
+                  if (capElem.second.contains(
+                      cpu->readArchIntReg((X86ISA::IntRegIndex)i, tid))
+                      )
+                  {
+                      _pid = capElem.first;
+                      break;
+                  }
+              }
+
+              // if (ENABLE_CAPABILITY_DEBUG){
+              //     if (_pid != TheISA::PointerID(0))
+              //       std::cout << std::hex << X86ISA::IntRegIndexStr(i) <<
+              //       " : " << _pid << " " <<
+              //       cpu->readArchIntReg((X86ISA::IntRegIndex)i, tid) <<
+              //       " " <<
+              //       tc->CapRegsFile[_pid].getBaseAddr() << " <------> " <<
+              //       tc->CapRegsFile[_pid].getEndAddr() <<
+              //       std::endl;
+              // }
+              tc->RegTrackTable[(X86ISA::IntRegIndex)i] = _pid;
+        }
+
+        //tc->LRUCapCache.LRUCache_Access(
+        //(Addr)cpu->readArchIntReg(X86ISA::INTREG_RAX, tid)
+                                        //);
+
+        tc->RegTrackTable[X86ISA::INTREG_RAX] = tc->PID;
+
+        tc->stopTracking = false;
+    }
+    else if (head_inst->isCallocSizeCollectorMicroop()){
+        /*Insert into the capability regs file */
+        NumOfAllocations++;
+        TheISA::PointerID  _pid = tc->PID + 1;
+        tc->CapRegsFile.insert(
+          std::pair<TheISA::PointerID,
+          TheISA::Capability>(
+            _pid,
+            TheISA::Capability(
+              cpu->readArchIntReg(X86ISA::INTREG_RDI, tid) *
+              cpu->readArchIntReg(X86ISA::INTREG_RSI, tid)
+            )
+          )
+        );
+
+        tc->stopTracking = true;
+        DPRINTF(Capability,"Calloc Size Collector Microop Committed \
+                            [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
+                    head_inst->seqNum,
+                    head_inst->pcState(),
+                    head_inst->pcState().npc() ,
+                    cpu->readArchIntReg(X86ISA::INTREG_RDI, tid) *
+                    cpu->readArchIntReg(X86ISA::INTREG_RSI, tid)
+        );
+    }
+    else if (head_inst->isMallocBaseCollectorMicroop()){
+
+          ThreadContext::CapabilityRegistersFileIter crf_it =
+                                              tc->CapRegsFile.find(tc->PID);
+
+          panic_if(crf_it == tc->CapRegsFile.end(),
+                                          "Invalid Base Collector Entry!");
+
+          crf_it->second.setBaseAddr(
+                                  cpu->readArchIntReg(X86ISA::INTREG_RAX, tid)
+                                    );
+          crf_it->second.setCSRBit(0);  // this cap is valid now
+
+
+            DPRINTF(Capability,"Malloc Base Collector Microop Committed \
+                          [sn:%lli] PC %s  --- NextPC: %#lx Base: %#lx %s\n",
+                      head_inst->seqNum, head_inst->pcState(),
+                      head_inst->pcState().npc() ,
+                      cpu->readArchIntReg(X86ISA::INTREG_RAX, tid), tc->PID);
+
+
+          for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
+
+                TheISA::PointerID _pid = TheISA::PointerID(0);
+                for (auto& capElem : tc->CapRegsFile){
+                    if (capElem.second.contains(
+                        cpu->readArchIntReg((X86ISA::IntRegIndex)i, tid))
+                        )
+                    {
+                        _pid = capElem.first;
+                        break;
+                    }
+                }
+
+                // if (ENABLE_CAPABILITY_DEBUG){
+                //     if (_pid != TheISA::PointerID(0))
+                //       std::cout << std::hex << X86ISA::IntRegIndexStr(i) <<
+                //       " : " << _pid << " " <<
+                //       cpu->readArchIntReg((X86ISA::IntRegIndex)i, tid) <<
+                //       " " << tc->CapRegsFile[_pid].getBaseAddr() <<
+                //       " <------> " << tc->CapRegsFile[_pid].getEndAddr() <<
+                //       std::endl;
+                // }
+
+                tc->RegTrackTable[(X86ISA::IntRegIndex)i] = _pid;
+          }
+
+          //tc->LRUCapCache.LRUCache_Access(
+            //(Addr)cpu->readArchIntReg(X86ISA::INTREG_RAX, tid)
+                                          //);
+
+          tc->RegTrackTable[X86ISA::INTREG_RAX] = tc->PID;
+
+          tc->stopTracking = false;
+
+      }
+    else if (head_inst->isMallocSizeCollectorMicroop()){
+          /*Insert into the capability regs file */
+          TheISA::PointerID  _pid = tc->PID + 1;
+          NumOfAllocations++;
+          tc->CapRegsFile.insert(
+                          std::pair<TheISA::PointerID, TheISA::Capability>
+                          (_pid,
+                          TheISA::Capability(
+                            cpu->readArchIntReg(X86ISA::INTREG_RDI, tid)))
+                          );
+          tc->stopTracking = true;
+          DPRINTF(Capability,"Malloc Size Collector Microop Committed \
+                              [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
+                              head_inst->seqNum, head_inst->pcState(),
+                              head_inst->pcState().npc() ,
+                              cpu->readArchIntReg(X86ISA::INTREG_RDI, tid));
+      }
+    else if (head_inst->isFreeCallMicroop()){
+
+          uint64_t _base_addr = cpu->readArchIntReg(X86ISA::INTREG_RDI, tid);
+          TheISA::PointerID _pid = TheISA::PointerID(0);
+          //int _begin = 0,_end = 0;
+          // for (auto& capElem: tc->CapRegsFile){
+          //     if (capElem.second.getBaseAddr() == _base_addr){
+          //         _pid = capElem.first;
+          //     }
+          // }
+          _pid = SearchCapReg(tid, _base_addr);
+          if (_pid != TheISA::PointerID(0) /*&&
+          (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
+          ){
+             NumOfAllocations--;
+             DPRINTF(Capability,"Free Called for Base Address: \
+                                %llx\n", _base_addr);
+              tc->CapRegsFile.erase(_pid);
+
+              // erase from RegTrackTable
+            for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++) {
+             if (tc->RegTrackTable[(X86ISA::IntRegIndex)i] == _pid){
+               tc->RegTrackTable[(X86ISA::IntRegIndex)i] =TheISA::PointerID(0);
+             }
+            }
+              // erase from MemTrackTable
+              for (auto mtt_it = tc->MemTrackTable.cbegin();
+                    mtt_it != tc->MemTrackTable.cend(); /* no increment */)
+              {
+                  if (mtt_it->second.getPID() == _pid.getPID()) {
+                    //std::cout << "Deleted from MemTrackTable! Mem[" <<
+                    //mtt_it->first <<"][" << mtt_it->second << "]"<<'\n';
+                    std::cout << "called from free!" << std::endl;
+                    mtt_it = tc->MemTrackTable.erase(mtt_it);
+                  }
+                  else {
+                    ++mtt_it;
+                  }
+              }
+
+          }
+          tc->stopTracking  = true;
+    }
+    else if (head_inst->isFreeRetMicroop()){
+          DPRINTF(Capability,"Free Ret\n");
+          tc->stopTracking  = false;
+    }
+
+  }
+
+}
+
+
+template <class Impl>
+void
 DefaultCommit<Impl>::validateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
 {
     ThreadContext * tc = cpu->tcBase(tid);
     const StaticInstPtr si = head_inst->staticInst;
+
+    // sanitization
+    if (head_inst->isMicroopInjected()) return;
+    if (tc->stopTracking) return;
 
     TheISA::PointerID _pid = TheISA::PointerID(0);
     for (auto& capElem : tc->CapRegsFile){
@@ -1424,42 +1743,169 @@ DefaultCommit<Impl>::validateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
             break;
         }
     }
-    
-    
-    if ( _pid == TheISA::PointerID(0) ) return;  // not a heap access
-    
 
-    ThreadContext::CapabilityRegistersFileIter crf_it =  tc->CapRegsFile.find(_pid);
+
+    if ( _pid == TheISA::PointerID(0) ) return;  // not a heap access
+
+
+    ThreadContext::CapabilityRegistersFileIter crf_it =
+                                              tc->CapRegsFile.find(_pid);
 
     if (!crf_it->second.getCSRBit(0)) return;  //cap is not valid yet
 
-    
+
 
     if ((si->getName().compare("st") == 0))
-    { 
-    
-        X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
-        X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
-        TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+    {
+
+        X86ISA::IntRegIndex   src2 =
+              (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
 
-        std::cout << std::hex << "Instruction " << head_inst->effAddr << " tries to access with addr " << head_inst->effAddr << " with  " << crf_it->first << std::endl;
-        std::cout << "Src #1: " << _pid_src1 << "Src #2: " << _pid_src2 << std::endl;
+        if (ENABLE_CAPABILITY_DEBUG){
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": St Access           " << head_inst->effAddr << " " <<
+            crf_it->second.getBaseAddr() << " <------> " <<
+            crf_it->second.getEndAddr() << " / " << crf_it->first <<
+            " / " << "Src #2: " << _pid_src2 << std::endl;
+        }
+
+        if (crf_it->first.getPID()!=_pid_src2.getPID())
+          panic("hell no st!");
 
     }
 
     else if ((si->getName().compare("ld") == 0))
     {
-        X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
-        X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
-        TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+
+        X86ISA::IntRegIndex   src2 =
+              (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
 
-        std::cout << std::hex << "Instruction " << head_inst->effAddr << " tries to access with addr " << head_inst->effAddr << " with  " << crf_it->first << std::endl;
-        std::cout << "Src #1: " << _pid_src1 << "Src #2: " << _pid_src2 << std::endl;
-    }
-}        
+        if (ENABLE_CAPABILITY_DEBUG){
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": Ld Access           " << head_inst->effAddr << " " <<
+             crf_it->second.getBaseAddr() << " <------> " <<
+             crf_it->second.getEndAddr() << " / " << crf_it->first <<
+             " / " << "Src #2: " << _pid_src2 << std::endl;
+        }
 
+        if (crf_it->first.getPID() != _pid_src2.getPID()){
+          panic("hell no ld!");
+        }
+    }
+
+    else if ((si->getName().compare("ldfp") == 0))
+    {
+
+        X86ISA::IntRegIndex   src2 =
+                (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
+        TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+
+        if (ENABLE_CAPABILITY_DEBUG){
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": Ldfp Access         " << head_inst->effAddr << " " <<
+            crf_it->second.getBaseAddr() << " <------> " <<
+            crf_it->second.getEndAddr() << " / " << crf_it->first <<
+            " / " << "Src #2: " << _pid_src2 << std::endl;
+        }
+
+        if (crf_it->first.getPID() != _pid_src2.getPID()){
+          panic("hell no ldfp!");
+        }
+    }
+
+    else if ((si->getName().compare("stfp") == 0))
+    {
+
+        X86ISA::IntRegIndex   src2 =
+              (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
+        TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+
+        if (ENABLE_CAPABILITY_DEBUG){
+          std::cout << std::hex << head_inst->pcState().pc() <<
+          ": Stfp Access         " << head_inst->effAddr << " " <<
+          crf_it->second.getBaseAddr() << " <------> " <<
+          crf_it->second.getEndAddr() << " / " << crf_it->first <<
+          " / " << "Src #2: " << _pid_src2 << std::endl;
+        }
+
+        if (crf_it->first.getPID() != _pid_src2.getPID()){
+          panic("hell no stfp!");
+        }
+    }
+}
+
+template <class Impl>
+TheISA::PointerID
+DefaultCommit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
+{
+  ThreadContext * tc = cpu->tcBase(tid);
+
+  TheISA::PointerID _pid = TheISA::PointerID(0);
+  for (auto& capElem : tc->CapRegsFile){
+      if (capElem.second.contains(_addr)){
+          _pid = capElem.first;
+          break;
+      }
+  }
+
+  return _pid;
+}
+
+
+template <class Impl>
+void
+DefaultCommit<Impl>::RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
+{
+
+  ThreadContext * tc = cpu->tcBase(tid);
+  const StaticInstPtr si = head_inst->staticInst;
+
+  // sanitization
+  if (head_inst->isMicroopInjected()) return;
+  if (tc->stopTracking) return;
+
+  std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+  std::cout << std::hex << head_inst->pcState().pc();
+
+  for (size_t srcNum = 0; srcNum < head_inst->numSrcRegs(); srcNum++) {
+      if (head_inst->srcRegIdx(srcNum).isIntReg())
+      {
+        X86ISA::IntRegIndex   archReg =
+                    (X86ISA::IntRegIndex)head_inst->srcRegIdx(srcNum).index();
+        uint64_t  archRegContent =  cpu->readArchIntReg(archReg, tid);
+        TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+        tc->RegTrackTable[archReg] = _pid;
+
+
+        std::cout << ": SRC OPERAND("  << srcNum << ") = "  <<
+        archRegContent << " <= " << _pid;
+      }
+  }
+
+  std::cout << std::endl;
+
+  std::cout << std::hex << head_inst->pcState().pc();
+
+  for (size_t destNum = 0; destNum < head_inst->numDestRegs(); destNum++) {
+      if (head_inst->destRegIdx(destNum).isIntReg())
+      {
+        X86ISA::IntRegIndex   archReg =
+                  (X86ISA::IntRegIndex)head_inst->destRegIdx(destNum).index();
+        uint64_t  archRegContent =  cpu->readArchIntReg(archReg, tid);
+        TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+        tc->RegTrackTable[archReg] = _pid;
+
+
+        std::cout << ": DEST OPERAND("  << destNum << ") = "  <<
+        archRegContent << " <= " << _pid;
+      }
+  }
+  std::cout << std::endl <<"<--------------------------------------->" <<
+  std::endl;
+
+}
 
 template <class Impl>
 void
@@ -1468,130 +1914,396 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
     ThreadContext * tc = cpu->tcBase(tid);
     const StaticInstPtr si = head_inst->staticInst;
 
-    // debugging information 
-    DPRINTF(Capability,"%s\n",  si->disassemble(head_inst->pcState().pc()));
+    // debugging information
+
+
 
 
     // sanitization
     if (head_inst->isMicroopInjected()) return;
+    if (tc->stopTracking) {
+      //std::cout << std::hex << "Not Tracking Inst. " <<
+      //head_inst->pcState().pc() << '\n';
+      return;
+    }
 
     int _src = 0, _dest = 0;
     for (uint8_t i = 0; i < head_inst->numSrcRegs(); ++i)
     {
         if (head_inst->srcRegIdx(i).isIntReg()) { _src++; }
-    }  
+    }
 
     for (uint8_t i = 0; i < head_inst->numDestRegs(); ++i)
     {
         if (head_inst->destRegIdx(i).isIntReg()){ _dest++; }
 
-    } 
-
-
-    for (uint8_t i = 0; i < head_inst->numSrcRegs(); ++i)
-    {
-        RegId  _src_reg_id  =  head_inst->srcRegIdx(i);
-        if (_src_reg_id.isIntReg())
-        {
-             RegIndex   _src_reg_idx    =   _src_reg_id.index();
-             DPRINTF(Capability, "SRC REGS: %u\n", _src_reg_idx);
-        }
-    }  
-    for (uint8_t i = 0; i < head_inst->numDestRegs(); ++i)
-    {
-        RegId  _dest_reg_id  =  head_inst->destRegIdx(i);
-        if (_dest_reg_id.isIntReg())
-        {
-             RegIndex   _dest_reg_idx    =   _dest_reg_id.index();
-             DPRINTF(Capability, "DEST REGS: %u\n", _dest_reg_idx);
-        }
-    } 
-
-    DPRINTF(Capability,"\n");
+    }
 
     // actual tracking
-    if (
-        (si->getName().compare("add") == 0) || 
-        (si->getName().compare("adc") == 0) || 
-        (si->getName().compare("sub") == 0) ||
-        (si->getName().compare("sbb") == 0) ||
-        (si->getName().compare("or") == 0)  ||
-        (si->getName().compare("and") == 0) ||
-        (si->getName().compare("xor") == 0) 
-        )
-    {
-        X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
-        X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
-        X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-        TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-        TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+    if ((si->getName().compare("limm") == 0))  {
+        X86ISA::IntRegIndex   dest =
+                (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
         TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
-        
-        
 
-        if (_pid_src1 != TheISA::PointerID(0)){
-
-            std::cout << std::hex << head_inst->pcState().pc() <<
-                ": " << si->getName() << "                 "<< 
-                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
-                X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 << "]" <<
-                " " << si->getName() << " " <<
-                X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" << std::endl; 
-
-            tc->RegTrackTable[dest] = _pid_src1;
-
+        if (_pid_dest != TheISA::PointerID(0))
+        {
+          std::cout << si->disassemble(head_inst->pcState().pc()) <<
+          std::endl;
+          std::cout << std::hex << head_inst->pcState().pc() <<
+          ": " << si->getName() << "                 "<<
+          X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+          " = "  <<  TheISA::PointerID(0) <<
+          " " << si->getName() << " " << "immidate" << std::endl;
+          std::cout << "<--------------------------------------->" <<std::endl;
         }
-        else if (_pid_src2 != TheISA::PointerID(0)){
+        tc->RegTrackTable[dest] = TheISA::PointerID(0);
+    }
+    else if ((si->getName().compare("or") == 0)){
+      X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(0).index();
+      X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(1).index();
+      X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                    head_inst->destRegIdx(0).index();
+      TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+      TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+      TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
 
-            
+      //we still dont know how we should handle or
+        if (_pid_src1 != TheISA::PointerID(0) ||
+            _pid_src2 != TheISA::PointerID(0))
+        {
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
 
+          panic("OR MICROOP WITH AT LEAST ONE NO ZERO PID!");
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+    }
+    else if ((si->getName().compare("and") == 0) ||
+             (si->getName().compare("xor") == 0))
+    {
+
+      X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(0).index();
+      X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(1).index();
+      X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                    head_inst->destRegIdx(0).index();
+      TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+      TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+      TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+      if (_pid_src1 != TheISA::PointerID(0) &&
+          _pid_src2 != TheISA::PointerID(0) &&
+          src1 != src2)
+      {
+        std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+        std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+        "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+
+        panic("AND or XOR OPERATION WITH UNEVEN PIDs!");
+        std::cout << "<--------------------------------------->" << std::endl;
+      }
+
+      //now handel the output of "and" and "xor"
+      // we suppose that these operations are used only for null testing!
+
+      if ( _pid_src1 != TheISA::PointerID(0) && (src1 == src2))
+      {
+        if (ENABLE_CAPABILITY_DEBUG) {
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
             std::cout << std::hex << head_inst->pcState().pc() <<
-                ": " << si->getName() << "                 "<< 
-                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
-                X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 << "]" <<
-                " " << si->getName() << " " <<
-                X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" << std::endl; 
+            ": " << si->getName() << "                 "<<
+            X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+            " = " <<X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+            "]" <<" " << si->getName() << " " <<
+            X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+            std::endl;
+        }
+        std::cout << "<--------------------------------------->" << std::endl;
+        //tc->RegTrackTable[src1] = TheISA::PointerID(0);
+        tc->RegTrackTable[dest] = TheISA::PointerID(0);
+      }
+      else if (_pid_src1 != TheISA::PointerID(0) ||
+               _pid_src2 != TheISA::PointerID(0))
+      {
 
-            tc->RegTrackTable[dest] = _pid_src2;
-        }   
-
-        else if (_pid_dest != TheISA::PointerID(0)){      
-
+        if (ENABLE_CAPABILITY_DEBUG) {
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
             std::cout << std::hex << head_inst->pcState().pc() <<
-                ": " << si->getName() << "                 "<< 
-                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
-                X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 << "]" <<
-                " " << si->getName() << " " <<
-                X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" << std::endl; 
+            ": " << si->getName() << "                 "<<
+            X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+            " = " <<X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+            "]" <<" " << si->getName() << " " <<
+            X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+            std::endl;
+        }
+        std::cout << "<--------------------------------------->" << std::endl;
 
-            tc->RegTrackTable[dest] = _pid_src1;
-        }    
+        //tc->RegTrackTable[src1] = TheISA::PointerID(0);
+        if (_pid_src1 != TheISA::PointerID(0))
+          tc->RegTrackTable[dest] = _pid_src1;
+        else
+          tc->RegTrackTable[dest] = _pid_src2;
 
-        //panic_if(_pid_src1 != TheISA::PointerID(0) && _pid_src2 != TheISA::PointerID(0) && _pid_src1 != _pid_src2, "add microop with different PIDs!");
+      }
+
+    }
+    else if ((si->getName().compare("sub") == 0) ||
+             (si->getName().compare("sbb") == 0))
+    {
+
+      X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(0).index();
+      X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(1).index();
+      X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                    head_inst->destRegIdx(0).index();
+      TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+      TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+      TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+      if (_pid_src1 != TheISA::PointerID(0) &&
+          _pid_src2 != TheISA::PointerID(0) &&
+          _pid_src1 != _pid_src2)
+      {
+
+        std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+        std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+        "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+
+        panic("SUB OPERATION WITH BOTH NON PID(0) and EQUAL OPERANDS!");
+        std::cout << "<--------------------------------------->" << std::endl;
+      }
+      else if (_pid_src1 != TheISA::PointerID(0) &&
+               _pid_src2 != TheISA::PointerID(0) &&
+              _pid_src1 == _pid_src2)
+      {
+        if (ENABLE_CAPABILITY_DEBUG) {
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": " << si->getName() << "                 "<<
+            X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+            " = " <<X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+            "]" <<" " << si->getName() << " " <<
+            X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+            std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+          tc->RegTrackTable[dest] = TheISA::PointerID(0);
+      }
+      else if (_pid_src1 != TheISA::PointerID(0)){
+
+        if (ENABLE_CAPABILITY_DEBUG) {
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+          std::cout << std::hex << head_inst->pcState().pc() <<
+          ": " << si->getName() << "                 "<<
+          X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+          " = " <<X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+          "]" <<" " << si->getName() << " " <<
+          X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+          std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+          tc->RegTrackTable[dest] = _pid_src1;
+
+      }
+      else if (_pid_src2 != TheISA::PointerID(0)){
+
+        if (ENABLE_CAPABILITY_DEBUG){
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": " << si->getName() << "                 "<<
+            X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+            " = " << X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+            "]" << " " << si->getName() << " " <<
+            X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+            std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+          tc->RegTrackTable[dest] = _pid_src2;
+
+      }
+
+      else if (_pid_dest != TheISA::PointerID(0)){
+
+        if (ENABLE_CAPABILITY_DEBUG){
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": " << si->getName() << "                 "<<
+            X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+            " = " << X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+            "]" << " " << si->getName() << " " <<
+            X86ISA::IntRegIndexStr(src2)<< "[" <<  _pid_src2 << "]" <<
+            std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+          tc->RegTrackTable[dest] = _pid_src1;
+
+      }
+
+    }
+    else if ((si->getName().compare("add") == 0) ||
+             (si->getName().compare("adc") == 0))
+    {
+
+      X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(0).index();
+      X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                    head_inst->srcRegIdx(1).index();
+      X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                    head_inst->destRegIdx(0).index();
+      TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+      TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+      TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+      if (_pid_src1 != TheISA::PointerID(0) &&
+          _pid_src2 != TheISA::PointerID(0))
+      {
+
+        std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+        std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+        "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+
+        panic("ADD OPERATION WITH BOTH NON PID(0) OPERANDS!");
+        std::cout << "<--------------------------------------->" << std::endl;
+      }
+      else if (_pid_src1 != TheISA::PointerID(0))
+      {
+
+        if (ENABLE_CAPABILITY_DEBUG) {
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+          std::cout << std::hex << head_inst->pcState().pc() <<
+          ": " << si->getName() << "                 "<<
+          X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+          " = " <<X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+          "]" <<" " << si->getName() << " " <<
+          X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+          std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+          tc->RegTrackTable[dest] = _pid_src1;
+
+      }
+      else if (_pid_src2 != TheISA::PointerID(0)){
+
+        if (ENABLE_CAPABILITY_DEBUG){
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": " << si->getName() << "                 "<<
+            X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+            " = " << X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+            "]" << " " << si->getName() << " " <<
+            X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+            std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+          tc->RegTrackTable[dest] = _pid_src2;
+
+      }
+
+      else if (_pid_dest != TheISA::PointerID(0)){
+
+        if (ENABLE_CAPABILITY_DEBUG){
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src2, tid)<< '\n';
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": " << si->getName() << "                 "<<
+            X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+            " = " << X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+            "]" << " " << si->getName() << " " <<
+            X86ISA::IntRegIndexStr(src2)<< "[" <<  _pid_src2 << "]" <<
+            std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
+          tc->RegTrackTable[dest] = _pid_src1;
+
+      }
+
+    }
+    else if ((si->getName().compare("ori") == 0)  ||
+            (si->getName().compare("andi") == 0) ||
+            (si->getName().compare("xori") == 0))
+    {
+        X86ISA::IntRegIndex   src1 =
+                (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
+        X86ISA::IntRegIndex   dest =
+                (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+        TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+        if (_pid_src1 != TheISA::PointerID(0))
+        {
+          std::cout << si->disassemble(head_inst->pcState().pc()) <<
+          std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src1, tid)<< '\n';
+
+          panic("LOGICAL IMMIDIATE MICROOPS WITH NON-ZERO PID!");
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+
 
     }
 
-    else if ((si->getName().compare("addi") == 0) || 
-            (si->getName().compare("adci") == 0) || 
+    else if ((si->getName().compare("addi") == 0) ||
+            (si->getName().compare("adci") == 0) ||
             (si->getName().compare("subi") == 0) ||
-            (si->getName().compare("sbbi") == 0) || 
-            (si->getName().compare("ori") == 0)  ||
-            (si->getName().compare("andi") == 0) ||
-            (si->getName().compare("xori") == 0) 
-            ) 
+            (si->getName().compare("sbbi") == 0)
+            )
     {
-        X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
-        X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        X86ISA::IntRegIndex   src1 =
+                (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
+        X86ISA::IntRegIndex   dest =
+                (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
         TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
 
-        if (_pid_dest != TheISA::PointerID(0) || _pid_src1 != TheISA::PointerID(0)){
-            std::cout << std::hex << head_inst->pcState().pc() <<
-                ": " << si->getName() << "                 "<< 
-                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
-                X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 << "]" <<
-                " " << si->getName() << " " <<
-                "immidate" << std::endl; 
+
+
+        if (ENABLE_CAPABILITY_DEBUG){
+          if (_pid_dest != TheISA::PointerID(0) ||
+              _pid_src1 != TheISA::PointerID(0))
+          {
+            std::cout << si->disassemble(head_inst->pcState().pc()) <<
+            std::endl;
+            std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+            std::endl;
+
+              std::cout << std::hex << head_inst->pcState().pc() <<
+              ": " << si->getName() << "                 "<<
+              X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+              " = " << X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 <<
+              "]" << " " << si->getName() << " " << "immidate" << std::endl;
+          std::cout << "<--------------------------------------->" <<std::endl;
+          }
         }
 
         tc->RegTrackTable[dest] = _pid_src1;
@@ -1600,116 +2312,273 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
     else if ((si->getName().compare("mov") == 0))
     {
 
-        X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
-        X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        X86ISA::IntRegIndex   src1 =
+                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
+        X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
         TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
 
-        if (_pid_dest != TheISA::PointerID(0) || _pid_src1 != TheISA::PointerID(0)){
-            std::cout << std::hex << head_inst->pcState().pc() <<
-                ": Move                " << 
-                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
-                X86ISA::IntRegIndexStr(src1) << "[" <<  _pid_src1 << "]" << std::endl;
+        if (ENABLE_CAPABILITY_DEBUG){
+
+            if (_pid_dest != TheISA::PointerID(0) ||
+                _pid_src1 != TheISA::PointerID(0))
+            {
+              std::cout << si->disassemble(head_inst->pcState().pc()) <<
+              std::endl;
+              std::cout << "OPERAND(1): " << cpu->readArchIntReg(src1, tid) <<
+              std::endl;
+              std::cout << std::hex << head_inst->pcState().pc() <<
+              ": Move                " <<
+              X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]"
+              << " = " << X86ISA::IntRegIndexStr(src1) << "[" <<
+              _pid_src1 << "]" << std::endl;
+              std::cout <<
+              "<--------------------------------------->" << std::endl;
+            }
         }
 
         tc->RegTrackTable[dest] = _pid_src1;
 
     }
-    else if ((si->getName().compare("stfp") == 0) ||
-            (si->getName().compare("ldfp") == 0))
-    {
-        //these two wil load and save from a pointer, so wee need to inject bounds check for them 
-        DPRINTF(Capability, "ST/LD EA: %llx\n", head_inst->effAddr);
-    }
 
     else if ((si->getName().compare("st") == 0))
     {
-        //these two wil load and save from a pointer, so wee need to inject bounds check for them 
-        // these two also can be used to load/save a pointer from/to memory 
-        // here we need to update the MTT 
-    
+        //these two wil load and save from a pointer, so wee need to inject
+        //bounds check for them
+        // these two also can be used to load/save a pointer from/to memory
+        // here we need to update the MTT
 
-        X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
+
+        X86ISA::IntRegIndex   src2 =
+                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
         TheISA::PointerID     _pid_src2 = tc->RegTrackTable[src2];
         if (_pid_src2 != TheISA::PointerID(0)){
+          std::cout << si->disassemble(head_inst->pcState().pc()) <<
+          std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src2, tid) <<
+          std::endl;
 
             tc->MemTrackTable[head_inst->effAddr] = tc->RegTrackTable[src2];
 
-            std::cout << std::hex << head_inst->pcState().pc() <<
-                ": St                  " << 
-                 "Mem[" <<  head_inst->effAddr << "]" << " = " <<
-                X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" << std::endl;
-          
+            if (ENABLE_CAPABILITY_DEBUG){
+                std::cout << std::hex << head_inst->pcState().pc() <<
+                ": St                  " <<
+                "Mem[" <<  head_inst->effAddr << "]" << " = " <<
+                X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+                std::endl;
+                std::cout <<
+                "<--------------------------------------->" << std::endl;
+            }
         }
 
     }
 
     else if ((si->getName().compare("ld") == 0))
     {
-        //these two wil load and save from a pointer, so wee need to inject bounds check for them 
-        // these two also can be used to load/save a pointer from/to memory 
-        // here we need to update the MTT 
+        //these two wil load and save from a pointer, so wee need to inject
+        //bounds check for them
+        // these two also can be used to load/save a pointer from/to memory
+        // here we need to update the MTT
 
 
-        X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
         TheISA::PointerID    _pid_dest = tc->RegTrackTable[dest];
 
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
+
             tc->RegTrackTable[dest] = mtt_it->second;
 
-            std::cout << std::hex << head_inst->pcState().pc() <<
-                ": Ld                  " << 
-                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
-                "Mem[" <<  head_inst->effAddr << "][" << mtt_it->second << "]" << std::endl;
+            if (ENABLE_CAPABILITY_DEBUG){
+                std::cout << std::hex << head_inst->pcState().pc() <<
+                ": Ld                  " <<
+                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+                " = " << "Mem[" <<  head_inst->effAddr << "][" <<
+                mtt_it->second << "]" << std::endl;
+                std::cout <<
+                "<--------------------------------------->" << std::endl;
+            }
 
         }
         else{
+
+            if (ENABLE_CAPABILITY_DEBUG){
+                if (_pid_dest != TheISA::PointerID(0)){
+                  std::cout << std::hex << head_inst->pcState().pc() <<
+                  ": Ld                  " <<
+                  X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+                  " = " << "Mem[" <<  head_inst->effAddr << "][" <<
+                  TheISA::PointerID(0) << "]" << std::endl;
+                  std::cout << "<--------------------------------------->" <<
+                  std::endl;
+                }
+            }
+
             tc->RegTrackTable[dest] = TheISA::PointerID(0);
         }
 
-       
+
     }
 
     else if ((si->getName().compare("ldis") == 0))
     {
 
-        X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
         TheISA::PointerID    _pid_dest = tc->RegTrackTable[dest];
 
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
             tc->RegTrackTable[dest] = mtt_it->second;
 
-            std::cout << std::hex << head_inst->pcState().pc() <<
-                ": Ldis                " << 
-                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
-                "Mem[" <<  head_inst->effAddr << "][" << mtt_it->second << "]" << std::endl;
+            if (ENABLE_CAPABILITY_DEBUG){
+                std::cout << std::hex << head_inst->pcState().pc() <<
+                ": Ldis                " <<
+                X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" <<
+                " = " <<
+                "Mem[" <<  head_inst->effAddr << "][" <<
+                mtt_it->second << "]" << std::endl;
+                std::cout << "<--------------------------------------->" <<
+                 std::endl;
+            }
+
         }
         else{
             tc->RegTrackTable[dest] = TheISA::PointerID(0);
         }
-        // here we need to update the MTT 
-        // we need to write a simple pointer to pointer to pointer and see how we can handle that easily
-        // here we need to check if we are loading/saving a pointer address to the memory using the RTT
+
     }
-    
+
     else if ((si->getName().compare("stis") == 0))
-    {   
-        X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
+    {
+        X86ISA::IntRegIndex   src2 =
+                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
         TheISA::PointerID     _pid_src2 = tc->RegTrackTable[src2];
         if (_pid_src2 != TheISA::PointerID(0)){
             tc->MemTrackTable[head_inst->effAddr] = tc->RegTrackTable[src2];
 
-            std::cout << std::hex << head_inst->pcState().pc() <<
-                ": Stis                " << 
-                 "Mem[" <<  head_inst->effAddr << "]" << " = " <<
-                X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" << std::endl;
+            if (ENABLE_CAPABILITY_DEBUG){
+
+              std::cout << si->disassemble(head_inst->pcState().pc()) <<
+              std::endl;
+              std::cout << "OPERAND(1): " << cpu->readArchIntReg(src2, tid) <<
+              std::endl;
+
+              std::cout << std::hex << head_inst->pcState().pc() <<
+              ": Stis                " <<
+              "Mem[" <<  head_inst->effAddr << "]" << " = " <<
+              X86ISA::IntRegIndexStr(src2) << "[" <<  _pid_src2 << "]" <<
+              std::endl;
+              std::cout << "<--------------------------------------->" <<
+              std::endl;
+            }
 
         }
     }
 
+    else if ((si->getName().compare("lea") == 0)){
+      //lea dest = (src0, src1, )
+      // printf("ARC: ");
+      // for (int i = 0; i < X86ISA::NUM_INTREGS; i++)
+      //     std::cout << X86ISA::IntRegIndexStr(i) << ":" <<
+      //        tc->RegTrackTable[(X86ISA::IntRegIndex)i]<< " ";
+      // printf("\n");
+      X86ISA::IntRegIndex   src;
+      X86ISA::IntRegIndex   src0 =
+                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
+      X86ISA::IntRegIndex   src1 =
+                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
+      X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+      TheISA::PointerID _pid_src  = TheISA::PointerID(0);
+      TheISA::PointerID _pid_src0 = tc->RegTrackTable[src0];
+      TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+      TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
 
+      if (_pid_src1 != TheISA::PointerID(0) &&
+          _pid_src0 != TheISA::PointerID(0))
+      {
+            std::cout << si->disassemble(head_inst->pcState().pc());
+            panic("LEA WITH BOTH OPERANDS NON PID(0)!");
+      }
+
+      if (_pid_src1 != TheISA::PointerID(0))
+      {
+          src = src1;
+          _pid_src = _pid_src1;
+      }
+      else
+      {
+          src = src0;
+          _pid_src = _pid_src0;
+      }
+
+      if (ENABLE_CAPABILITY_DEBUG)
+      {
+          if (_pid_dest != TheISA::PointerID(0) ||
+              _pid_src1 != TheISA::PointerID(0) ||
+              _pid_src0 != TheISA::PointerID(0))
+        {
+
+          std::cout << std::hex << head_inst->pcState().pc() <<
+          ": Lea                " <<
+          X86ISA::IntRegIndexStr(dest) << "[" <<  _pid_dest << "]" << " = " <<
+          X86ISA::IntRegIndexStr(src) << "[" <<  _pid_src << "]" << std::endl;
+        std::cout << "<--------------------------------------->" << std::endl;
+        }
+      }
+
+      tc->RegTrackTable[dest] = _pid_src;
+    }
+    else if ((si->getName().compare("srl") == 0) ||
+             (si->getName().compare("sll") == 0))
+    {
+      X86ISA::IntRegIndex   src0 =
+                      (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
+      X86ISA::IntRegIndex   src1 =
+                      (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
+      X86ISA::IntRegIndex   dest =
+                      (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+      TheISA::PointerID _pid_src0 = tc->RegTrackTable[src0];
+      TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+      TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+        if (_pid_src1 != TheISA::PointerID(0) ||
+            _pid_src0 != TheISA::PointerID(0))
+        {
+          std::cout << si->disassemble(head_inst->pcState().pc()) << std::endl;
+          std::cout << "OPERAND(1): " << cpu->readArchIntReg(src0, tid) <<
+          "\t\tOPERAND(2): " << cpu->readArchIntReg(src1, tid)<< '\n';
+        std::cout << "<--------------------------------------->" << std::endl;
+            panic("SRL/SLL WITH NON PID(0) SRC or DEST!");
+        }
+
+        //tc->RegTrackTable[dest] = _pid_src0;
+
+    }
+
+    else if ((si->getName().compare("srli") == 0) ||
+             (si->getName().compare("slli") == 0)
+          )
+    {
+      X86ISA::IntRegIndex   src0 =
+                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(0).index();
+      X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+      TheISA::PointerID _pid_src0 = tc->RegTrackTable[src0];
+      TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+      if (_pid_src0 != TheISA::PointerID(0) ||
+          _pid_dest != TheISA::PointerID(0))
+      {
+          panic("SRLI/SLLI WITH NON PID(0) SRC or DEST!");
+      }
+
+        //tc->RegTrackTable[dest] = _pid_src0;
+
+    }
 
 
     if (head_inst->isLastMicroop()){
@@ -1719,15 +2588,142 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
         }
     }
 
-    // printf("ARC: ");
-    // for (int i = 0; i < X86ISA::NUM_INTREGS; i++)
-    //     std::cout << X86ISA::IntRegIndexStr(i) << ":" <<  tc->RegTrackTable[(X86ISA::IntRegIndex)i]<< " ";
-    // printf("\nINT: ");
-    //     for (int i = X86ISA::NUM_INTREGS; i < X86ISA::NUM_INTREGS + 16; i++)
-    //     std::cout  << "INT" << i-16 << ":" <<  tc->RegTrackTable[(X86ISA::IntRegIndex)i] << " ";
-    // printf("\n");
+
 }
 
+template <class Impl>
+void
+DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
+{
+
+  ThreadContext * tc = cpu->tcBase(tid);
+  const StaticInstPtr si = head_inst->staticInst;
+
+  // sanitization
+  if (head_inst->isMicroopInjected()) return;
+  if (tc->stopTracking) return;
+
+
+
+  if ((si->getName().compare("st") == 0)){
+
+      if (head_inst->srcRegIdx(2).isIntReg()){
+
+        X86ISA::IntRegIndex   src2 =
+                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
+        if (src2 <= X86ISA::INTREG_RAX || src2 >= X86ISA::NUM_INTREGS)
+            return;
+
+        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
+        TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+
+        if (_pid != TheISA::PointerID(0)){
+
+            tc->MemTrackTable[head_inst->effAddr] = _pid;
+
+            if (ENABLE_CAPABILITY_DEBUG){
+              std::cout << si->disassemble(head_inst->pcState().pc()) <<
+              std::endl;
+              std::cout << "OPERAND(1): " << cpu->readArchIntReg(src2, tid) <<
+              std::endl;
+              std::cout << std::hex << head_inst->pcState().pc() <<
+              ": St                  " <<
+              "Mem[" <<  head_inst->effAddr << "]" << " = " <<
+              X86ISA::IntRegIndexStr(src2) << "[" <<  _pid << "]" <<
+              std::endl;
+              std::cout << "<--------------------------------------->" <<
+              std::endl;
+          }
+
+        }
+      }
+  }
+  else if ((si->getName().compare("ld") == 0)){
+
+    if (head_inst->destRegIdx(0).isIntReg()){
+        X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        if (dest <= X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
+            return;
+        auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
+        if (mtt_it != tc->MemTrackTable.end()){
+          NumOfStackPointers++;
+          if (ENABLE_CAPABILITY_DEBUG){
+            std::cout << si->disassemble(head_inst->pcState().pc()) <<
+            std::endl;
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": Ld                  " <<
+            X86ISA::IntRegIndexStr(dest) <<
+            " = " << "Mem[" <<  head_inst->effAddr << "][" <<
+            mtt_it->second << "]" << std::endl;
+            std::cout << "<--------------------------------------->" <<
+            std::endl;
+          }
+
+        }
+    }
+  }
+  else if ((si->getName().compare("ldis") == 0)){
+
+    if (head_inst->destRegIdx(0).isIntReg()){
+        X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+       if (dest <= X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
+          return;
+
+        auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
+        if (mtt_it != tc->MemTrackTable.end()){
+          NumOfStackPointers++;
+          if (ENABLE_CAPABILITY_DEBUG){
+            std::cout << si->disassemble(head_inst->pcState().pc()) <<
+            std::endl;
+            std::cout << std::hex << head_inst->pcState().pc() <<
+            ": Ldis                " <<
+            X86ISA::IntRegIndexStr(dest)  <<
+            " = " << "Mem[" <<  head_inst->effAddr << "][" <<
+            mtt_it->second << "]" << std::endl;
+            std::cout << "<--------------------------------------->" <<
+            std::endl;
+          }
+
+        }
+    }
+  }
+  else if ((si->getName().compare("stis") == 0)){
+
+    if (head_inst->srcRegIdx(2).isIntReg()){
+        X86ISA::IntRegIndex   src2 =
+                    (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
+        if (src2 <= X86ISA::INTREG_RAX || src2 >= X86ISA::NUM_INTREGS)
+           return;
+        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
+        TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+
+        if (_pid != TheISA::PointerID(0)){
+            tc->MemTrackTable[head_inst->effAddr] = _pid;
+            StackAdd++;
+            if (ENABLE_CAPABILITY_DEBUG){
+
+              std::cout << si->disassemble(head_inst->pcState().pc()) <<
+              std::endl;
+              std::cout << "OPERAND(1): " << cpu->readArchIntReg(src2, tid) <<
+              std::endl;
+
+              std::cout << std::hex << head_inst->pcState().pc() <<
+              ": Stis                " <<
+              "Mem[" <<  head_inst->effAddr << "]" << " = " <<
+              X86ISA::IntRegIndexStr(src2) << "[" <<  _pid << "]" <<
+              std::endl;
+              std::cout << "<--------------------------------------->" <<
+              std::endl;
+            }
+
+        }
+    }
+
+  }
+
+}
 
 template <class Impl>
 void

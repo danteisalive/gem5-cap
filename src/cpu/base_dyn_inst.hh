@@ -112,7 +112,7 @@ class BaseDynInst : public ExecContext, public RefCounted
         Squashed,                /// Instruction is squashed
         SquashedInIQ,            /// Instruction is squashed in the IQ
         SquashedInLSQ,           /// Instruction is squashed in the LSQ
-        SquashedInROB,           /// Instruction is squashed in the ROB          
+        SquashedInROB,           /// Instruction is squashed in the ROB
         RecoverInst,             /// Is a recover instruction
         BlockingInst,            /// Is a blocking instruction
         ThreadsyncWait,          /// Is a thread synchronization instruction
@@ -544,14 +544,34 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool isFirstMicroop() const { return staticInst->isFirstMicroop(); }
     bool isMicroBranch() const { return staticInst->isMicroBranch(); }
 
+    bool isNotTrackMicroop() const {return staticInst->isNotTrackMicroop();}
     bool isMicroopInjected() const {return staticInst->isMicroopInjected();}
-    bool isBaseCollectorMicroop() const {return staticInst->isBaseCollectorMicroop();}
-    bool isSizeCollectorMicroop() const {return staticInst->isSizeCollectorMicroop();}
-    bool isFreeCallMicroop() const {return staticInst->isFreeCallMicroop();}
-    bool isBoundsCheckMicroop() const {return staticInst->isBoundsCheckMicroop();}
-    bool isBoundsCheckNeeded() const {return staticInst->isBoundsCheckNeeded();}
 
-    bool isCapabilityChecked() const {return staticInst->isCapabilityChecked() ;}
+    bool isMallocBaseCollectorMicroop() const
+    {return staticInst->isMallocBaseCollectorMicroop();}
+    bool isMallocSizeCollectorMicroop() const
+    {return staticInst->isMallocSizeCollectorMicroop();}
+
+    bool isCallocBaseCollectorMicroop() const
+    {return staticInst->isCallocBaseCollectorMicroop();}
+    bool isCallocSizeCollectorMicroop() const
+    {return staticInst->isCallocSizeCollectorMicroop();}
+
+    bool isReallocBaseCollectorMicroop() const
+    {return staticInst->isReallocBaseCollectorMicroop();}
+    bool isReallocSizeCollectorMicroop() const
+    {return staticInst->isReallocSizeCollectorMicroop();}
+
+    bool isFreeCallMicroop() const {return staticInst->isFreeCallMicroop();}
+    bool isFreeRetMicroop() const {return staticInst->isFreeRetMicroop();}
+
+    bool isBoundsCheckMicroop() const
+    {return staticInst->isBoundsCheckMicroop();}
+    bool isBoundsCheckNeeded() const
+    {return staticInst->isBoundsCheckNeeded();}
+
+    bool isCapabilityChecked() const
+    {return staticInst->isCapabilityChecked() ;}
     bool isCapFetched() const {return  staticInst->isCapFetched(); }
     void setFlag(StaticInstFlags::Flags f) { staticInst->setFlag(f); }
     void resetFlag(StaticInstFlags::Flags f) { staticInst->resetFlag(f); }

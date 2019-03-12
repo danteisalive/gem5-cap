@@ -127,10 +127,19 @@ public:
 
 
     void injectMicroops( ThreadContext * _tc, PCState &nextPC, TheISA::CheckType _sym);
-    
-    void injectAPBaseCollector(ThreadContext * _tc,PCState &nextPC);
-    void injectAPSizeCollector(ThreadContext * _tc,PCState &nextPC);
+
+    void injectAPMallocBaseCollector(ThreadContext * _tc,PCState &nextPC);
+    void injectAPMallocSizeCollector(ThreadContext * _tc,PCState &nextPC);
+
+    void injectAPCallocBaseCollector(ThreadContext * _tc,PCState &nextPC);
+    void injectAPCallocSizeCollector(ThreadContext * _tc,PCState &nextPC);
+
+    void injectAPReallocBaseCollector(ThreadContext * _tc,PCState &nextPC);
+    void injectAPReallocSizeCollector(ThreadContext * _tc,PCState &nextPC);
+
     void injectAPFreeCall(ThreadContext * _tc,PCState &nextPC);
+    void injectAPFreeRet(ThreadContext * _tc,PCState &nextPC);
+
     void injectBoundsCheck(PCState &nextPC);
     void undoInjecttion();
 

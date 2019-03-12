@@ -53,7 +53,7 @@
 namespace X86ISA
 {
 
-    
+
     class Range
     {
         private:
@@ -62,7 +62,7 @@ namespace X86ISA
 
         public:
 
-            explicit Range(uint64_t item): 
+            explicit Range(uint64_t item):
             mLow(item),mHigh(item)  // [item,item]
             {
 
@@ -72,7 +72,7 @@ namespace X86ISA
             mLow(low), mHigh(high)
             {
 
-            } 
+            }
 
             bool operator < (const Range& rhs) const
             {
@@ -84,7 +84,7 @@ namespace X86ISA
                 return false;
             } // operator<
 
-            Range(const Range& _range) 
+            Range(const Range& _range)
             {
                 this->mLow  = _range.low();
                 this->mHigh = _range.high();
@@ -134,18 +134,22 @@ namespace X86ISA
         uint64_t                     total_misses;
 
     public:
-        LRUCapabilityCache(uint64_t _num_ways, uint64_t _cache_block_size, uint64_t _cache_size) : 
-            NumWays(_num_ways), CacheSize(_cache_size), CacheBlockSize(_cache_block_size),  total_accesses(0), total_hits(0), total_misses(0)
+        LRUCapabilityCache(uint64_t _num_ways,
+                            uint64_t _cache_block_size,
+                            uint64_t _cache_size) :
+            NumWays(_num_ways), CacheSize(_cache_size),
+            CacheBlockSize(_cache_block_size),
+            total_accesses(0), total_hits(0), total_misses(0)
             {
 
-                NumSets = (CacheSize / CacheBlockSize) / (NumWays); //Get the number of sets in the cache
-                NumEntriesInCache = NumSets * NumWays; //The total number of "entries" in the cache
-                BitsPerSet = std::log2(NumSets); //num of bits taking up set number (5)
-                BitsPerBlock = std::log2(CacheBlockSize); //num of bits taking up data stuff (the right part) //6
-                ShiftAmount = BitsPerSet + BitsPerBlock; //
+                NumSets = (CacheSize / CacheBlockSize) / (NumWays);
+                NumEntriesInCache = NumSets * NumWays;
+                BitsPerSet = std::log2(NumSets);
+                BitsPerBlock = std::log2(CacheBlockSize);
+                ShiftAmount = BitsPerSet + BitsPerBlock;
 
                 TheCache = new CacheEntry[NumEntriesInCache];
-                
+
             }
 
         ~LRUCapabilityCache(){
@@ -159,9 +163,13 @@ namespace X86ISA
             Addr thisIsTheTag = v_addr >> (ShiftAmount); //tag of the VA
 
             //Extract the set from the VA
-            Addr thisIsTheSet = ((v_addr - ( thisIsTheTag << (BitsPerBlock + BitsPerSet))) >> BitsPerBlock);
-            int setLoopLow = thisIsTheSet * NumWays; //Get the lower bound to loop for the certain set in the cache array
-            int setLoopHigh = setLoopLow + (NumWays - 1); //Get the upper bound to loop for the certain set in the cache array
+            Addr thisIsTheSet =
+                    ((v_addr -
+                          ( thisIsTheTag <<
+                            (BitsPerBlock + BitsPerSet))) >> BitsPerBlock
+                    );
+            int setLoopLow = thisIsTheSet * NumWays;
+            int setLoopHigh = setLoopLow + (NumWays - 1);
             int j;
             int hit = 0;
             for(j = setLoopLow; j <= setLoopHigh; j++){
@@ -177,7 +185,7 @@ namespace X86ISA
                         TheCache[k].lruAge++;
                     }
 
-                    TheCache[j].lruAge = 0; //Set the age of the thing we hit to 0
+                    TheCache[j].lruAge = 0;
                     TheCache[j].t_access_nums++;
                     break;
 
@@ -195,8 +203,8 @@ namespace X86ISA
                 for(m = setLoopLow; m <= setLoopHigh; m++){
 
                     if(TheCache[m].lruAge>highestAge){
-                        highestAge = TheCache[m].lruAge; //This is the oldest age
-                        highestSpot = m; //This is the location of the oldest thing
+                        highestAge = TheCache[m].lruAge;
+                        highestSpot = m;
                     }
 
                 }
@@ -209,7 +217,7 @@ namespace X86ISA
                     TheCache[m].lruAge++;
                 }
 
-                TheCache[highestSpot].lruAge = 0; //reset the age of the thing we just added to 0
+                TheCache[highestSpot].lruAge = 0;
                 TheCache[highestSpot].t_access_nums++;
                 TheCache[highestSpot].t_num_replaced++;
                 //tl_assert(n_guest_instrs < g_guest_instrs_executed);
@@ -227,10 +235,13 @@ namespace X86ISA
 
         }
 
-        void LRUCachePrintStats() {
-            DPRINTF(Capability, "Capability Cache Stats: %llu, %llu, %llu, %f \n", total_accesses, total_hits, total_misses, (double)total_hits/total_accesses);
-        }
-        
+      void LRUCachePrintStats() {
+        DPRINTF(Capability, "Capability Cache Stats: %llu, %llu, %llu, %f \n",
+        total_accesses, total_hits, total_misses,
+        (double)total_hits/total_accesses
+        );
+      }
+
     };
 
 
@@ -241,7 +252,7 @@ namespace X86ISA
     public:
 
         PointerID(){
-            
+
         }
 
         PointerID(uint64_t _id){
@@ -268,25 +279,25 @@ namespace X86ISA
                 // self-assignment guard
                 if (this == &_pid)
                     return *this;
-             
+
                 // do the copy
                 this->id = _pid.id;
-             
+
                 // return the existing object so we can chain this operator
                 return *this;
-        }        
+        }
 
         bool operator < (const PointerID& rhs) const {
 
             return (this->id < rhs.id);
         }
-        
-        PointerID operator + (uint64_t _val) 
-        { 
+
+        PointerID operator + (uint64_t _val)
+        {
             this->id += _val;
             PointerID temp(*this);
             //temp.id += _val;
-            
+
             return temp;
 
         }
@@ -297,7 +308,7 @@ namespace X86ISA
             return *this;
         }
 
-        PointerID(const PointerID& _PID) 
+        PointerID(const PointerID& _PID)
         {
             this->id = _PID.id;
         }
@@ -312,10 +323,10 @@ namespace X86ISA
             operator << (std::ostream & os, const PointerID & _pid)
     {
         ccprintf(os, "PID(%llu)",
-                _pid.getPID()                         
+                _pid.getPID()
                 );
         return os;
-    } 
+    }
 
     class EmitterID: public PointerID
     {
@@ -324,7 +335,7 @@ namespace X86ISA
         EmitterID(): PointerID(){}
         ~EmitterID(){}
         uint64_t getEID() {return getPID();}
-        
+
     };
 
     class Capability
@@ -333,7 +344,7 @@ namespace X86ISA
             uint64_t begin;
             uint64_t end;
             uint64_t size;
-            std::bitset<16> CSR; 
+            std::bitset<16> CSR;
             uint64_t  stack_addr;
 
 
@@ -346,7 +357,7 @@ namespace X86ISA
             {
                 size = _size;
                 CSR.reset();
-                //CSR.set(0, 1);   
+                //CSR.set(0, 1);
             }
             ~Capability(){
 
@@ -358,19 +369,19 @@ namespace X86ISA
                 // self-assignment guard
                 if (this == &cap)
                     return *this;
-             
+
                 // do the copy
                 begin = cap.begin;
                 end = cap.end;
                 size = cap.size;
                 stack_addr = cap.stack_addr;
                 CSR = cap.CSR;
-             
+
                 // return the existing object so we can chain this operator
                 return *this;
             }
 
-            Capability(const Capability& _cap) 
+            Capability(const Capability& _cap)
             {
                 begin = _cap.begin;
                 end = _cap.end;
@@ -389,7 +400,8 @@ namespace X86ISA
             void            clearCSRBit(int bit_num){ CSR.set(bit_num, 0);}
             bool            getCSRBit(int bit_num){ return CSR.test(bit_num);}
             std::bitset<16> getCSR(){return CSR;}
-            void            setStackAddr(uint64_t _stack_addr){ stack_addr = _stack_addr; }
+            void            setStackAddr(uint64_t _stack_addr){
+                                                  stack_addr = _stack_addr; }
             uint64_t        getStackAddr(){ return stack_addr; }
             void            reset(){ CSR.reset(); };
 
@@ -416,8 +428,10 @@ namespace X86ISA
     {
 
     public:
-        typedef std::map<RegIndex, std::tuple<EmitterID, PointerID, Capability>>    RegisterTrackingTable;
-        typedef std::tuple<EmitterID, PointerID, Capability>                        RTTEntry;
+        typedef std::map<RegIndex,
+                    std::tuple<EmitterID, PointerID, Capability>>
+                                                      RegisterTrackingTable;
+        typedef std::tuple<EmitterID, PointerID, Capability> RTTEntry;
     private:
         RegisterTrackingTable RTT ;
         std::vector<Addr> stack_pointers_addr ;
@@ -427,16 +441,18 @@ namespace X86ISA
         StackID(): PointerID() {}
         StackID(uint64_t _sid): PointerID(_sid){}
         StackID(Addr _stack_addr, StackType _stack_type):
-                PointerID(), stack_type(_stack_type), stack_addr(_stack_addr) {}
+            PointerID(), stack_type(_stack_type), stack_addr(_stack_addr)
+        {}
 
         ~StackID(){}
 
         uint64_t    getSID() const { return getPID();}
-        void        setStackType(StackType _stack_type){ stack_type = _stack_type;}
+        void        setStackType(StackType _stack_type){
+                                              stack_type = _stack_type;}
         void        setStackAddr(Addr _stack_addr){ stack_addr = _stack_addr; }
         StackType   getStackType() const {return stack_type;}
         Addr        getStackAddr() const {return stack_addr;}
-        
+
 
 
         StackID& operator = (const StackID& _sid)
@@ -444,24 +460,24 @@ namespace X86ISA
                 // self-assignment guard
                 if (this == &_sid)
                     return *this;
-             
+
                 // do the copy
                 this->stack_addr = _sid.stack_addr;
                 this->stack_type = _sid.stack_type;
                 this->RTT                   = _sid.RTT;
                 this->stack_pointers_addr   = _sid.stack_pointers_addr;
                 this->setPID(_sid.getPID());
-             
+
                 // return the existing object so we can chain this operator
                 return *this;
-        }        
-        
-        StackID operator + (uint64_t _val) 
-        { 
+        }
+
+        StackID operator + (uint64_t _val)
+        {
             setPID(getPID() + _val);
             StackID temp(*this);
             //temp.id += _val;
-            
+
             return temp;
 
         }
@@ -475,7 +491,7 @@ namespace X86ISA
         }
 
 
-      
+
 
     };
 
@@ -485,10 +501,10 @@ namespace X86ISA
         ccprintf(os, "STACK CREATED FOR STACK ADDR: %#lx  TYPE: %d ID: %s\n",
                 _sid.getStackAddr(),
                 _sid.getStackType(),
-                _sid.getSID()                          
+                _sid.getSID()
                 );
         return os;
-    }  
+    }
 
     enum CheckType {
         BOUNDS = 0,
@@ -501,14 +517,18 @@ namespace X86ISA
         AP_MALLOC = 7,
         STACK = 8,
         DP = 9,
-        AP_CALLOC = 10,
-        AP_BASE_COLLECT = 0xb,
-        AP_SIZE_COLLECT = 0xc,
-        AP_BOUNDS_INJECT = 0xd,
-        AP_FREE_CALL    = 0xe
+        AP_BOUNDS_INJECT        = 0xd,
+        AP_MALLOC_BASE_COLLECT  = 0xb,
+        AP_MALLOC_SIZE_COLLECT  = 0xc,
+        AP_FREE_CALL            = 0xe,
+        AP_FREE_RET             = 0xf,
+        AP_CALLOC_BASE_COLLECT  = 0x10,
+        AP_CALLOC_SIZE_COLLECT  = 0x11,
+        AP_REALLOC_BASE_COLLECT = 0x12,
+        AP_REALLOC_SIZE_COLLECT  = 0x13
     };
 
-    
+
     static inline std::string
     CheckTypeToStr(CheckType type)
     {
@@ -529,20 +549,28 @@ namespace X86ISA
             return "ALLOC SIZE PICK";
           case AP_MALLOC:
             return "AP_MALLOC";
-          case AP_CALLOC:
-            return "AP_CALLOC";
           case STACK:
             return "STACK";
           case DP:
             return "DP";
-          case AP_BASE_COLLECT:
-            return "AP_BASE_COLLECT";
-          case AP_SIZE_COLLECT:
-            return "AP_SIZE_COLLECT";
+          case AP_MALLOC_BASE_COLLECT:
+            return "AP_MALLOC_BASE_COLLECT";
+          case AP_MALLOC_SIZE_COLLECT:
+            return "AP_MALLOC_SIZE_COLLECT";
           case AP_BOUNDS_INJECT:
             return "AP_BOUNDS_INJECT";
           case AP_FREE_CALL:
             return "AP_FREE_CALL";
+          case AP_FREE_RET:
+            return "AP_FREE_RET";
+          case AP_CALLOC_BASE_COLLECT:
+            return "AP_CALLOC_BASE_COLLECT";
+          case AP_CALLOC_SIZE_COLLECT:
+            return "AP_CALLOC_SIZE_COLLECT";
+          case AP_REALLOC_BASE_COLLECT:
+            return "AP_REALLOC_BASE_COLLECT";
+          case AP_REALLOC_SIZE_COLLECT:
+            return "AP_REALLOC_SIZE_COLLECT";
           default:
           {
             assert(0);

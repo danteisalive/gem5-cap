@@ -185,20 +185,31 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isLastMicroop() const { return flags[IsLastMicroop]; }
     bool isFirstMicroop() const { return flags[IsFirstMicroop]; }
 
-
+    bool isNotTrackMicroop() const {return flags[IsNotTrackMicroop];}
     bool isMicroopInjected() const {return flags[IsMicroopInjected];}
-    bool isBaseCollectorMicroop() const {return flags[IsBaseCollectorMicroop];}
-    bool isSizeCollectorMicroop() const {return flags[IsSizeCollectorMicroop];}
+    bool isMallocBaseCollectorMicroop() const
+    {return flags[IsMallocBaseCollectorMicroop];}
+    bool isMallocSizeCollectorMicroop() const
+    {return flags[IsMallocSizeCollectorMicroop];}
+    bool isCallocBaseCollectorMicroop() const
+    {return flags[IsCallocBaseCollectorMicroop];}
+    bool isCallocSizeCollectorMicroop() const
+    {return flags[IsCallocSizeCollectorMicroop];}
+    bool isReallocBaseCollectorMicroop() const
+    {return flags[IsReallocBaseCollectorMicroop];}
+    bool isReallocSizeCollectorMicroop() const
+    {return flags[IsReallocSizeCollectorMicroop];}
     bool isFreeCallMicroop() const {return flags[IsFreeCallMicroop];}
+    bool isFreeRetMicroop() const {return flags[IsFreeRetMicroop];}
     bool isBoundsCheckMicroop() const {return flags[IsBoundsCheckMicroop];}
     bool isBoundsCheckNeeded() const {return flags[IsBoundsCheckNeeded];}
-    
+
     //This flag doesn't do anything yet
     bool isMicroBranch() const { return flags[IsMicroBranch]; }
     //@}
     bool isCapabilityChecked() const {return flags[IsCapabilityChecked]; }
     bool isCapFetched() const {return flags[IsCapFetched];}
-    
+
     void setFirstMicroop() { flags[IsFirstMicroop] = true; }
     void clearFirstMicroop(){flags[IsFirstMicroop] = false;}
     void setLastMicroop() { flags[IsLastMicroop] = true; }

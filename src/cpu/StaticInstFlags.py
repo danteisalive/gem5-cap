@@ -112,12 +112,28 @@ class StaticInstFlags(Enum):
                             # a macroop
         'IsDspOp',
         'IsSquashAfter',     # Squash all uncommitted state after executed
-        'IsCapabilityChecked',  # whether capability cheks are done for this instruction or not
+        'IsCapabilityChecked',
+        # whether capability cheks are done for this instruction or not
         'IsCapFetched',          # whether the cap is fetched for this ld/st
         'IsMicroopInjected',   #Is this an injected microop
-        'IsBaseCollectorMicroop',   #Is this an injected microop to collect Base Address of an AP
-        'IsSizeCollectorMicroop',  #Is this an injected microop to collect Size of an AP
-        'IsBoundsCheckMicroop',   #Is this an injected microop to bounds and permission check for an AP
-        'IsBoundsCheckNeeded',   #Does this microop need to get checked for bounds
-        'IsFreeCallMicroop'   #Is this an injected microop to free an AP
+        'IsMallocBaseCollectorMicroop',
+        #Is this an injected microop to collect Base Address of an AP
+        'IsMallocSizeCollectorMicroop',
+         #Is this an injected microop to collect Size of an AP
+        'IsCallocBaseCollectorMicroop',
+        #Is this an injected microop to collect Base Address of an AP
+        'IsCallocSizeCollectorMicroop',
+        #Is this an injected microop to collect Size of an AP
+        'IsReallocBaseCollectorMicroop',
+        #Is this an injected microop to collect Base Address of an AP
+        'IsReallocSizeCollectorMicroop',
+        #Is this an injected microop to collect Size of an AP
+        'IsBoundsCheckMicroop',
+        #Is this an injected microop to bounds and permission check for an AP
+        'IsBoundsCheckNeeded',
+        #Does this microop need to get checked for bounds
+        'IsFreeCallMicroop',   #Is this an injected microop to free an AP
+        'IsFreeRetMicroop',   #Is this an injected microop to free an AP
+        'IsNotTrackMicroop'
+        # Is this a micropop that should not be tracked
         ]

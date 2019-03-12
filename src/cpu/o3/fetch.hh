@@ -428,7 +428,6 @@ class DefaultFetch
      * cycle. Used to tell CPU if there is activity this cycle.
      */
     bool wroteToTimeBuffer;
-
     /** Tracks how many instructions has been fetched this cycle. */
     int numInst;
 

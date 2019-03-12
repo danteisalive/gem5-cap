@@ -137,6 +137,11 @@ class DefaultCommit
     /** Commit policy used in SMT mode. */
     CommitPolicy commitPolicy;
 
+    uint64_t prevRSPValue;
+    uint64_t NumOfStackPointers;
+    uint64_t StackAdd;
+    uint64_t StackRemove;
+    uint64_t NumOfAllocations;
     /** Probe Points. */
     ProbePointArg<DynInstPtr> *ppCommit;
     ProbePointArg<DynInstPtr> *ppCommitStall;
@@ -305,7 +310,11 @@ class DefaultCommit
     /** Marks completed instructions using information sent from IEW. */
     void markCompletedInsts();
 
+    void collector(ThreadID tid, DynInstPtr &head_inst);
     void updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
+    void RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
+    void RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst);
+    TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
     void validateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
     /** Gets the thread to commit, based on the SMT policy. */
     ThreadID getCommittingThread();

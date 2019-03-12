@@ -399,8 +399,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         o3_tc->enableCapability = params->enable_capability;
         o3_tc->symbolsFile = params->symbol_file;
+        o3_tc->stopTracking = false;
 
-        //std::tupele<TheISA::Capability, TheISA::CheckType>(pcAddr, TheISA::Capability(begin, end), checkType)
 
         DPRINTF(Capability, "SymbolFile[%i] process is %s\n",
                         tid, params->symbol_file);
@@ -414,19 +414,19 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
                 while ( std::getline (myfile,line) ){
                     std::istringstream iss(line);
                     iss >> std::hex >> pcAddr  >> checkType ;
-                    (o3_tc->syms_cache).insert(std::pair<Addr, TheISA::CheckType>(pcAddr, (TheISA::CheckType)checkType));
-                    DPRINTF(Capability, "line:'%s' PCAddr: %#lx CheckType: %s\n",line, pcAddr, TheISA::CheckTypeToStr((TheISA::CheckType)checkType));
+                    (o3_tc->syms_cache).insert(
+                      std::pair<Addr, TheISA::CheckType>
+                      (pcAddr, (TheISA::CheckType)checkType));
+                    DPRINTF(Capability,
+                      "line:'%s' PCAddr: %#lx CheckType: %s\n",
+                      line, pcAddr,
+                      TheISA::CheckTypeToStr((TheISA::CheckType)checkType));
                 }
                 myfile.close();
             }
             else fatal("Can't open symbols file");
         }
 
-
-        /* Initilize the Capability Cache */
-        
-        
-        //initilize the RTT, how many entrys should we have? NUM_INTREG + NUM_INTERFACE_REG ?
         for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++)
            o3_tc->RegTrackTable[(X86ISA::IntRegIndex)i] = TheISA::PointerID(0);
 

@@ -106,19 +106,22 @@ class ThreadContext
     using VecElem = TheISA::VecElem;
   public:
 
-    typedef std::map<Addr,  TheISA::CheckType> SymbolCache; //Addr here is the AP/DP point address
-    //typedef std::map<TheISA::Range, TheISA::PointerID> RangeCapabilityCache; 
-    typedef std::map<TheISA::PointerID, TheISA::Capability> CapabilityRegistersFile;
-    typedef std::map<X86ISA::IntRegIndex, TheISA::PointerID> RegisterTrackTable;
+    //Addr here is the AP/DP point address
+    typedef std::map<Addr,  TheISA::CheckType> SymbolCache;
+    //typedef std::map<TheISA::Range, TheISA::PointerID> RangeCapabilityCache;
+    typedef std::map<TheISA::PointerID, TheISA::Capability>
+                                                    CapabilityRegistersFile;
+    typedef std::map<X86ISA::IntRegIndex, TheISA::PointerID>
+                                                    RegisterTrackTable;
     typedef std::map<Addr, TheISA::PointerID> MemoryTrackTable;
     typedef SymbolCache::iterator   SymbolCacheIter;
     //typedef RangeCapabilityCache::iterator RangeCapCacheIter;
-    
+
     typedef CapabilityRegistersFile::iterator   CapabilityRegistersFileIter;
     //temprory
     typedef std::map<Addr, TheISA::Capability> CapabilityData;
-    
 
+    bool stopTracking;
     bool enableCapability;
     std::string symbolsFile;
 
@@ -130,6 +133,7 @@ class ThreadContext
     //RangeCapabilityCache                        RangeCapCache;
     CapabilityRegistersFile                     CapRegsFile;
     TheISA::LRUCapabilityCache                  LRUCapCache{2, 16, 2048};
+
 
     enum Status
     {
@@ -568,7 +572,7 @@ class ProxyThreadContext : public ThreadContext
 
     void pcState(const TheISA::PCState &val) { actualTC->pcState(val); }
 
-    void pcStateNoRecord(const TheISA::PCState &val) { actualTC->pcState(val); }
+    void pcStateNoRecord(const TheISA::PCState &val) { actualTC->pcState(val);}
 
     Addr instAddr() { return actualTC->instAddr(); }
     Addr nextInstAddr() { return actualTC->nextInstAddr(); }

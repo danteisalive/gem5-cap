@@ -1154,11 +1154,12 @@ template<class Impl>
 void
 DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, StaticInstPtr& si) {
 
- 
+
         ThreadContext * tc = cpu->tcBase(tid);
         ThreadContext::SymbolCacheIter syms_it = (tc->syms_cache).find(thisPC.instAddr());
         if (syms_it != (tc->syms_cache).end())
             si->injectMicroops(tc, thisPC, syms_it->second);
+
 
 }
 
@@ -1313,16 +1314,12 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (!(curMacroop || inRom)) {
 
                 if (decoder[tid]->instReady()) {
-                   // if (thisPC.instAddr() == 0x400b67)
-                     //   (decoder[tid]->emi).displacement = 0xfffffffffffffff0;
-
 
 
                     staticInst = decoder[tid]->decode(thisPC);
                     ThreadContext * tc = cpu->tcBase(tid);
                     if (staticInst->isMacroop() && tc->enableCapability)
                         capabilityCheck(thisPC, tid, staticInst);
-
 
                     // Increment stat of fetched instructions.
                     ++fetchedInsts;
@@ -1350,9 +1347,6 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                             thisPC.microPC(), curMacroop);
                 } else {
                     staticInst = curMacroop->fetchMicroop(thisPC.microPC());
-                    //if (thisPC.instAddr() == 0x400b67){
-                    //    printf("displacement: %#lx\n", (staticInst->machInst).displacement);
-                    //}
 
                 }
                 newMacro |= staticInst->isLastMicroop();
@@ -1371,7 +1365,9 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             }
 #endif
             instruction->fetchTick = curTick();
-            
+
+
+
             nextPC = thisPC;
 
             // If we're branching after this instruction, quit fetching
