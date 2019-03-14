@@ -417,10 +417,10 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
                     (o3_tc->syms_cache).insert(
                       std::pair<Addr, TheISA::CheckType>
                       (pcAddr, (TheISA::CheckType)checkType));
-                    DPRINTF(Capability,
-                      "line:'%s' PCAddr: %#lx CheckType: %s\n",
-                      line, pcAddr,
-                      TheISA::CheckTypeToStr((TheISA::CheckType)checkType));
+                    // DPRINTF(Capability,
+                    //   "line:'%s' PCAddr: %#lx CheckType: %s\n",
+                    //   line, pcAddr,
+                    //   TheISA::CheckTypeToStr((TheISA::CheckType)checkType));
                 }
                 myfile.close();
             }

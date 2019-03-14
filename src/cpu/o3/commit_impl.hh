@@ -1345,12 +1345,44 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         //RefreshRegTrackTable(tid, head_inst);
         RefreshMemTrackTable(tid, head_inst);
 
-        if ((uint64_t)cpu->thread[tid]->numInsts.value() % 100000 == 0 &&
+        if ((uint64_t)cpu->thread[tid]->numInsts.value() % 1000000 == 0 &&
             !head_inst->isNop() &&
             !head_inst->isInstPrefetch() &&
             head_inst->isLastMicroop()
            )
         {
+
+            // for (auto& elem: tc->MemTrackTable){
+            //     std::cout << std::hex << elem.first << " <----> " <<
+            //     elem.second << std::endl;
+            // }
+
+            uint64_t _pid = 0;
+            uint64_t num = 0;
+            for (size_t i = 1; i < tc->PID.getPID(); i++) {
+              uint64_t _num = 0;
+              for (auto& elem: tc->MemTrackTable){
+                  if (elem.second.getPID() == i){
+                      _num++;
+                  }
+              }
+              if (_num >= num){
+                num = _num;
+                _pid = i;
+              }
+            }
+
+            uint64_t _allocs = 0;
+            for (size_t i = 1; i < tc->PID.getPID(); i++) {
+
+              for (auto& elem: tc->MemTrackTable){
+                  if (elem.second.getPID() == i){
+                      _allocs++;
+                      break;
+                  }
+              }
+            }
+
             std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
             " MemTrackTable Size: " <<
             tc->MemTrackTable.size() <<
@@ -1362,9 +1394,13 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             StackRemove <<
             " NumOfAllocations: " <<
             NumOfAllocations <<
+            " Highest Number of Element: " <<
+            " PID(" << _pid << ")" << "[" << num << "]" <<
+            " Allocs: " << _allocs <<
             std::endl;
 
             NumOfStackPointers=0; StackAdd=0; StackRemove=0;
+
         }
     }
 
@@ -1414,16 +1450,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
        );
        crf_it->second.setCSRBit(0);  // this cap is valid now
 
-
-       DPRINTF(Capability,
-          "Realloc Base Collector Microop Committed [sn:%lli] PC %s  \
-          --- NextPC: %#lx Base: %#lx %s\n",
-          head_inst->seqNum,
-          head_inst->pcState(),
-          head_inst->pcState().npc() ,
-          cpu->readArchIntReg(X86ISA::INTREG_RAX, tid), tc->PID
-       );
-
+       DPRINTF(Capability,"REALLOC (%lu) = %#lx ---> %s\n",
+                                       crf_it->second.getSize() ,
+                                       crf_it->second.getBaseAddr(),
+                                       tc->PID);
 
        for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
           TheISA::PointerID _pid = TheISA::PointerID(0);
@@ -1436,15 +1466,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
                 }
           }
 
-          // if (ENABLE_CAPABILITY_DEBUG){
-          //     if (_pid != TheISA::PointerID(0))
-          //         std::cout << std::hex << X86ISA::IntRegIndexStr(i) <<
-          //         " : " << _pid << " " <<
-          //         cpu->readArchIntReg((X86ISA::IntRegIndex)i, tid) << " " <<
-          //         tc->CapRegsFile[_pid].getBaseAddr() << " <------> " <<
-          //         tc->CapRegsFile[_pid].getEndAddr() <<
-          //         std::endl;
-          // }
           tc->RegTrackTable[(X86ISA::IntRegIndex)i] = _pid;
         }
 
@@ -1456,44 +1477,52 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
     else if (head_inst->isReallocSizeCollectorMicroop()){
 
       uint64_t _base_addr = cpu->readArchIntReg(X86ISA::INTREG_RDI, tid);
-      TheISA::PointerID _pid = TheISA::PointerID(0);
-      //int _begin = 0,_end = 0;
-      for (auto& capElem: tc->CapRegsFile){
-          if (capElem.second.getBaseAddr() == _base_addr){
-              _pid = capElem.first;
-          }
-      }
 
-      if (_pid != TheISA::PointerID(0) /*&&
-          (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
-        )
-      {
+      TheISA::PointerID _pid{0};
+      do {
 
-          tc->CapRegsFile.erase(_pid);
-
-          // erase from RegTrackTable
-          for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++) {
-            if (tc->RegTrackTable[(X86ISA::IntRegIndex)i] == _pid){
-              tc->RegTrackTable[(X86ISA::IntRegIndex)i] = TheISA::PointerID(0);
+        _pid = TheISA::PointerID(0);
+        for (auto& capElem: tc->CapRegsFile){
+            if (capElem.second.contains(_base_addr)){
+                _pid = capElem.first;
+                break;
             }
-          }
-          // erase from MemTrackTable
-          for (auto mtt_it = tc->MemTrackTable.cbegin();
-              mtt_it != tc->MemTrackTable.cend(); /* no increment */)
-          {
-              if (mtt_it->second.getPID() == _pid.getPID()) {
-                std::cout << "called! from realloc" << std::endl;
-                mtt_it = tc->MemTrackTable.erase(mtt_it);
-              }
-              else {
-                ++mtt_it;
-              }
-          }
+        }
 
-      }
-      // else {
-      //   panic("Realloc without allocation!");
-      // }
+        if (_pid != TheISA::PointerID(0) /*&&
+            (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
+          )
+        {
+
+          DPRINTF(Capability,"REALLOC CALLED for (%lu)  ---> %s\n",
+                                          _base_addr ,
+                                          _pid);
+
+            tc->CapRegsFile.erase(_pid);
+
+            // erase from RegTrackTable
+            for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++) {
+              if (tc->RegTrackTable[(X86ISA::IntRegIndex)i] == _pid){
+                tc->RegTrackTable[(X86ISA::IntRegIndex)i] =
+                                                  TheISA::PointerID(0);
+              }
+            }
+            // erase from MemTrackTable
+            for (auto mtt_it = tc->MemTrackTable.cbegin();
+                mtt_it != tc->MemTrackTable.cend(); /* no increment */)
+            {
+                if (mtt_it->second.getPID() == _pid.getPID()) {
+                  //std::cout << "called! from realloc" << std::endl;
+                  mtt_it = tc->MemTrackTable.erase(mtt_it);
+                }
+                else {
+                  ++mtt_it;
+                }
+            }
+
+        }
+      } while (_pid != TheISA::PointerID(0));
+
 
 
       _pid = tc->PID + 1;
@@ -1508,13 +1537,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
       );
 
       tc->stopTracking = true;
-      DPRINTF(Capability,"Realloc Size Collector Microop Committed \
-                          [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
-                  head_inst->seqNum,
-                  head_inst->pcState(),
-                  head_inst->pcState().npc() ,
-                  cpu->readArchIntReg(X86ISA::INTREG_RSI, tid)
-      );
+
     }
     else if (head_inst->isCallocBaseCollectorMicroop()){
 
@@ -1530,14 +1553,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
         crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-        DPRINTF(Capability,
-          "Calloc Base Collector Microop Committed [sn:%lli] PC %s \
-           --- NextPC: %#lx Base: %#lx %s\n",
-          head_inst->seqNum,
-          head_inst->pcState(),
-          head_inst->pcState().npc() ,
-          cpu->readArchIntReg(X86ISA::INTREG_RAX, tid), tc->PID
-        );
+        DPRINTF(Capability,"CALLOC(%lu) = %#lx ---> %s\n",
+                                        crf_it->second.getSize() ,
+                                        crf_it->second.getBaseAddr(),
+                                        tc->PID);
 
 
         for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1590,14 +1609,14 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
         );
 
         tc->stopTracking = true;
-        DPRINTF(Capability,"Calloc Size Collector Microop Committed \
-                            [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
-                    head_inst->seqNum,
-                    head_inst->pcState(),
-                    head_inst->pcState().npc() ,
-                    cpu->readArchIntReg(X86ISA::INTREG_RDI, tid) *
-                    cpu->readArchIntReg(X86ISA::INTREG_RSI, tid)
-        );
+        // DPRINTF(Capability,"Calloc Size Collector Microop Committed
+        //                  [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
+        //             head_inst->seqNum,
+        //             head_inst->pcState(),
+        //             head_inst->pcState().npc() ,
+        //             cpu->readArchIntReg(X86ISA::INTREG_RDI, tid) *
+        //             cpu->readArchIntReg(X86ISA::INTREG_RSI, tid)
+        // );
     }
     else if (head_inst->isMallocBaseCollectorMicroop()){
 
@@ -1613,11 +1632,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-            DPRINTF(Capability,"Malloc Base Collector Microop Committed \
-                          [sn:%lli] PC %s  --- NextPC: %#lx Base: %#lx %s\n",
-                      head_inst->seqNum, head_inst->pcState(),
-                      head_inst->pcState().npc() ,
-                      cpu->readArchIntReg(X86ISA::INTREG_RAX, tid), tc->PID);
+            DPRINTF(Capability,"MALLOC(%lu) = %#lx ---> %s\n",
+                                            crf_it->second.getSize() ,
+                                            crf_it->second.getBaseAddr(),
+                                            tc->PID);
 
 
           for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1666,11 +1684,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
                             cpu->readArchIntReg(X86ISA::INTREG_RDI, tid)))
                           );
           tc->stopTracking = true;
-          DPRINTF(Capability,"Malloc Size Collector Microop Committed \
-                              [sn:%lli] PC %s  --- NextPC: %#lx Size: %#lx \n",
-                              head_inst->seqNum, head_inst->pcState(),
-                              head_inst->pcState().npc() ,
-                              cpu->readArchIntReg(X86ISA::INTREG_RDI, tid));
       }
     else if (head_inst->isFreeCallMicroop()){
 
@@ -1687,8 +1700,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
           ){
              NumOfAllocations--;
-             DPRINTF(Capability,"Free Called for Base Address: \
-                                %llx\n", _base_addr);
+             DPRINTF(Capability,"FREE(%llx) --> %s\n", _base_addr, _pid);
               tc->CapRegsFile.erase(_pid);
 
               // erase from RegTrackTable
@@ -1704,7 +1716,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
                   if (mtt_it->second.getPID() == _pid.getPID()) {
                     //std::cout << "Deleted from MemTrackTable! Mem[" <<
                     //mtt_it->first <<"][" << mtt_it->second << "]"<<'\n';
-                    std::cout << "called from free!" << std::endl;
+                    //std::cout << "called from free!" << std::endl;
                     mtt_it = tc->MemTrackTable.erase(mtt_it);
                   }
                   else {
@@ -1716,7 +1728,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           tc->stopTracking  = true;
     }
     else if (head_inst->isFreeRetMicroop()){
-          DPRINTF(Capability,"Free Ret\n");
+          //DPRINTF(Capability,"Free Ret\n");
           tc->stopTracking  = false;
     }
 
@@ -2611,11 +2623,21 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
 
         X86ISA::IntRegIndex   src2 =
                         (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
-        if (src2 <= X86ISA::INTREG_RAX || src2 >= X86ISA::NUM_INTREGS)
+        if (src2 < X86ISA::INTREG_RAX ||
+            src2 >= X86ISA::NUM_INTREGS ||
+            src2 == X86ISA::INTREG_RBP ||
+            src2 == X86ISA::INTREG_RSP)
             return;
 
         uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
-        TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+        //TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        for (auto& capElem : tc->CapRegsFile){
+            if (capElem.second.getBaseAddr() == archRegContent){
+                _pid = capElem.first;
+                break;
+            }
+        }
 
         if (_pid != TheISA::PointerID(0)){
 
@@ -2643,7 +2665,7 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
     if (head_inst->destRegIdx(0).isIntReg()){
         X86ISA::IntRegIndex   dest =
                         (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-        if (dest <= X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
+        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
             return;
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
@@ -2668,7 +2690,7 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
     if (head_inst->destRegIdx(0).isIntReg()){
         X86ISA::IntRegIndex   dest =
                         (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-       if (dest <= X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
+       if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
           return;
 
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
@@ -2694,11 +2716,20 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
     if (head_inst->srcRegIdx(2).isIntReg()){
         X86ISA::IntRegIndex   src2 =
                     (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
-        if (src2 <= X86ISA::INTREG_RAX || src2 >= X86ISA::NUM_INTREGS)
-           return;
+        if (src2 < X86ISA::INTREG_RAX ||
+            src2 >= X86ISA::NUM_INTREGS ||
+            src2 == X86ISA::INTREG_RBP ||
+            src2 == X86ISA::INTREG_RSP)
+                return;
         uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
-        TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
-
+        //TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        for (auto& capElem : tc->CapRegsFile){
+            if (capElem.second.getBaseAddr() == archRegContent){
+                _pid = capElem.first;
+                break;
+            }
+        }
         if (_pid != TheISA::PointerID(0)){
             tc->MemTrackTable[head_inst->effAddr] = _pid;
             StackAdd++;

@@ -5,6 +5,17 @@
  * Author: mkt
  */
 
+ #include "macroop.hh"
+
+ #include <iostream>
+
+ #include "arch/x86/faults.hh"
+ #include "arch/x86/generated/decoder.hh"
+ #include "arch/x86/isa_traits.hh"
+ #include "cpu/reg_class.hh"
+ #include "enums/OpClass.hh"
+ #include "debug/X86.hh"
+
 
 
 namespace X86ISA

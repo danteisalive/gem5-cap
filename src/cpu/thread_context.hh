@@ -93,6 +93,9 @@ namespace TheISA {
  * interface; the ExecContext is a more implicit interface that must
  * be implemented so that the ISA can access whatever state it needs.
  */
+
+
+
 class ThreadContext
 {
   protected:
@@ -113,6 +116,7 @@ class ThreadContext
                                                     CapabilityRegistersFile;
     typedef std::map<X86ISA::IntRegIndex, TheISA::PointerID>
                                                     RegisterTrackTable;
+
     typedef std::map<Addr, TheISA::PointerID> MemoryTrackTable;
     typedef SymbolCache::iterator   SymbolCacheIter;
     //typedef RangeCapabilityCache::iterator RangeCapCacheIter;

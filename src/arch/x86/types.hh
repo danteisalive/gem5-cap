@@ -343,18 +343,20 @@ namespace X86ISA
         private:
             uint64_t begin;
             uint64_t end;
-            uint64_t size;
+            int64_t size;
             std::bitset<16> CSR;
-            uint64_t  stack_addr;
 
 
         public:
             Capability (){
+                size = -1;
+                begin = 0;
                 CSR.reset();
             }
 
             Capability(uint64_t _size)
             {
+                begin = 0;
                 size = _size;
                 CSR.reset();
                 //CSR.set(0, 1);
@@ -374,7 +376,6 @@ namespace X86ISA
                 begin = cap.begin;
                 end = cap.end;
                 size = cap.size;
-                stack_addr = cap.stack_addr;
                 CSR = cap.CSR;
 
                 // return the existing object so we can chain this operator
@@ -386,12 +387,15 @@ namespace X86ISA
                 begin = _cap.begin;
                 end = _cap.end;
                 size = _cap.size;
-                stack_addr = _cap.stack_addr;
                 CSR = _cap.CSR;
             }
 
 
-            void            setBaseAddr(uint64_t _addr){  begin = _addr;}
+            void setBaseAddr(uint64_t _addr){
+                                            if (size < 0) assert(0);
+                                            begin = _addr;
+                                            end = begin + size;
+                                                        }
             void            setSize (uint64_t _size){ size = _size;}
             uint64_t        getSize(){ return size; }
             uint64_t        getEndAddr(){ return begin + size;}
@@ -400,13 +404,10 @@ namespace X86ISA
             void            clearCSRBit(int bit_num){ CSR.set(bit_num, 0);}
             bool            getCSRBit(int bit_num){ return CSR.test(bit_num);}
             std::bitset<16> getCSR(){return CSR;}
-            void            setStackAddr(uint64_t _stack_addr){
-                                                  stack_addr = _stack_addr; }
-            uint64_t        getStackAddr(){ return stack_addr; }
             void            reset(){ CSR.reset(); };
 
             bool contains(Addr _addr){
-                end = begin + size;
+                //end = begin + size;
                 if (_addr >= begin && _addr <= end)
                     return true;
                 else
