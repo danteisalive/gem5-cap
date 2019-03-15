@@ -229,8 +229,8 @@ VcdTraceFile::initialize()
     stream() << "$date" << std::endl;
     time_t long_time;
     time(&long_time);
-    struct tm *p_tm = localtime(&long_time);
-    stream() << std::put_time(p_tm, "     %b %d, %Y       %H:%M:%S\n");
+    //struct tm *p_tm = localtime(&long_time);
+    //stream() << std::put_time(p_tm, "     %b %d, %Y       %H:%M:%S\n");
     stream() << "$end" << std::endl << std::endl;
 
     // Version.
