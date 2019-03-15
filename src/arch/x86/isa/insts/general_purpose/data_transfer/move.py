@@ -57,7 +57,6 @@ def macroop MOV_R_R {
 
 def macroop MOV_M_R {
     st reg, seg, sib, disp
-#    st reg, seg, sib, disp
 };
 
 

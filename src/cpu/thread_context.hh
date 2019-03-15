@@ -125,6 +125,7 @@ class ThreadContext
     //temprory
     typedef std::map<Addr, TheISA::Capability> CapabilityData;
 
+    bool DisablePointerTracker;
     bool stopTracking;
     bool enableCapability;
     std::string symbolsFile;
