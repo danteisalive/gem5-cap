@@ -1351,10 +1351,14 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
            )
         {
 
-            // for (auto& elem: tc->MemTrackTable){
-            //     std::cout << std::hex << elem.first << " <----> " <<
-            //     elem.second << std::endl;
-            // }
+          // for (size_t i = 1; i < tc->PID.getPID(); i++) {
+          //   for (auto& elem: tc->MemTrackTable){
+          //       if (elem.second.getPID() == i){
+          //           std::cout <<  std::hex << elem.second <<
+          //              " " << elem.first << "\n";
+          //       }
+          //   }
+          // }
 
             uint64_t _pid = 0;
             uint64_t num = 0;
@@ -2670,13 +2674,10 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
 
       if (head_inst->srcRegIdx(2).isIntReg()){
 
-        std::string s1 = si->disassemble(head_inst->pcState().pc());
-        // if (s1.find("MOV_P_R") != std::string::npos)
-        //    std::cout << "found!" << '\n';
         X86ISA::IntRegIndex   src2 =
                         (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
         if (src2 < X86ISA::INTREG_RAX ||
-            src2 >= X86ISA::NUM_INTREGS)
+            src2 >= X86ISA::NUM_INTREGS + 15)
             return;
 
         uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
@@ -2688,16 +2689,13 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
             }
         }
 
-        archRegContent = 0;
-        for (auto& capElem : tc->CapRegsFile){
-            if (capElem.second.contains(head_inst->effAddr)){
-                archRegContent = head_inst->effAddr;
-                break;
-            }
-        }
+        if (head_inst->effAddr >= cpu->readArchIntReg(X86ISA::INTREG_RSP, tid))
+            return;
 
-        if (_pid != TheISA::PointerID(0) && archRegContent == 0){
+        if (_pid != TheISA::PointerID(0))
+        {
 
+            std::string s1 = si->disassemble(head_inst->pcState().pc());
 
             tc->MemTrackTable[head_inst->effAddr] = _pid;
 
@@ -2716,6 +2714,11 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
           }
 
         }
+        else if (tc->MemTrackTable.find(head_inst->effAddr) !=
+                                                    tc->MemTrackTable.end())
+        {
+          tc->MemTrackTable.erase(head_inst->effAddr);
+        }
       }
   }
   else if ((si->getName().compare("ld") == 0)){
@@ -2723,22 +2726,11 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
     if (head_inst->destRegIdx(0).isIntReg()){
         X86ISA::IntRegIndex   dest =
                         (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
+        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
             return;
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
           NumOfStackPointers++;
-          // if (ENABLE_CAPABILITY_DEBUG){
-          //   std::cout << si->disassemble(head_inst->pcState().pc()) <<
-          //   std::endl;
-          //   std::cout << std::hex << head_inst->pcState().pc() <<
-          //   ": Ld                  " <<
-          //   X86ISA::IntRegIndexStr(dest) <<
-          //   " = " << "Mem[" <<  head_inst->effAddr << "][" <<
-          //   mtt_it->second << "]" << std::endl;
-          //   std::cout << "<--------------------------------------->" <<
-          //   std::endl;
-          // }
 
         }
     }
@@ -2748,23 +2740,12 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
     if (head_inst->destRegIdx(0).isIntReg()){
         X86ISA::IntRegIndex   dest =
                         (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-       if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS)
+       if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
           return;
 
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
           NumOfStackPointers++;
-          // if (ENABLE_CAPABILITY_DEBUG){
-          //   std::cout << si->disassemble(head_inst->pcState().pc()) <<
-          //   std::endl;
-          //   std::cout << std::hex << head_inst->pcState().pc() <<
-          //   ": Ldis                " <<
-          //   X86ISA::IntRegIndexStr(dest)  <<
-          //   " = " << "Mem[" <<  head_inst->effAddr << "][" <<
-          //   mtt_it->second << "]" << std::endl;
-          //   std::cout << "<--------------------------------------->" <<
-          //   std::endl;
-          // }
 
         }
     }
@@ -2790,21 +2771,6 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
         if (_pid != TheISA::PointerID(0)){
             tc->MemTrackTable[head_inst->effAddr] = _pid;
             StackAdd++;
-            // if (ENABLE_CAPABILITY_DEBUG){
-            //
-            //   std::cout << si->disassemble(head_inst->pcState().pc()) <<
-            //   std::endl;
-            //std::cout << "OPERAND(1): " << cpu->readArchIntReg(src2, tid) <<
-            //   std::endl;
-            //
-            //   std::cout << std::hex << head_inst->pcState().pc() <<
-            //   ": Stis                " <<
-            //   "Mem[" <<  head_inst->effAddr << "]" << " = " <<
-            //   X86ISA::IntRegIndexStr(src2) << "[" <<  _pid << "]" <<
-            //   std::endl;
-            //   std::cout << "<--------------------------------------->" <<
-            //   std::endl;
-            // }
 
         }
     }
