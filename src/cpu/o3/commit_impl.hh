@@ -1397,10 +1397,14 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             NumOfAllocations <<
             " Highest Number of Element: " <<
             " PID(" << _pid << ")" << "[" << num << "]" <<
-          // /  " Allocs: " << _allocs <<
+            " Accessed PIDs: " << tc->OrderedMemTrackTable.size() <<
             std::endl;
 
+            tc->LRUCapCache.LRUCachePrintStats();
+            tc->LRUPidCache.LRUPIDCachePrintStats();
+
             NumOfStackPointers=0; StackAdd=0; StackRemove=0;
+            tc->OrderedMemTrackTable.clear();
 
         }
     }
@@ -2689,15 +2693,15 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
             }
         }
 
-        if (head_inst->effAddr >= cpu->readArchIntReg(X86ISA::INTREG_RSP, tid))
-            return;
-
         if (_pid != TheISA::PointerID(0))
         {
 
             std::string s1 = si->disassemble(head_inst->pcState().pc());
 
             tc->MemTrackTable[head_inst->effAddr] = _pid;
+            if (head_inst->effAddr <
+                cpu->readArchIntReg(X86ISA::INTREG_RSP, tid))
+            { StackAdd++;}
 
             if (ENABLE_CAPABILITY_DEBUG){
               std::cout << si->disassemble(head_inst->pcState().pc()) <<
@@ -2730,8 +2734,10 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
             return;
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
+          tc->OrderedMemTrackTable[mtt_it->second] = 1;
+          tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
+          tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
           NumOfStackPointers++;
-
         }
     }
   }
@@ -2745,7 +2751,10 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
 
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
-          NumOfStackPointers++;
+            tc->OrderedMemTrackTable[mtt_it->second] = 1;
+            tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
+            tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
+            NumOfStackPointers++;
 
         }
     }
@@ -2760,7 +2769,7 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
                 return;
 
         uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
-        //TheISA::PointerID    _pid = SearchCapReg(tid, archRegContent);
+
         TheISA::PointerID _pid = TheISA::PointerID(0);
         for (auto& capElem : tc->CapRegsFile){
             if (capElem.second.getBaseAddr() == archRegContent){
@@ -2770,8 +2779,9 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
         }
         if (_pid != TheISA::PointerID(0)){
             tc->MemTrackTable[head_inst->effAddr] = _pid;
-            StackAdd++;
-
+            if (head_inst->effAddr <
+                cpu->readArchIntReg(X86ISA::INTREG_RSP, tid))
+            {StackAdd++;}
         }
     }
 

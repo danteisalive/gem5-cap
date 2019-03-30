@@ -113,6 +113,97 @@ namespace X86ISA
 
     } ;
 
+    class LRUPIDCache
+    {
+
+    private:
+        CacheEntry*   TheCache;
+        int           MAX_SIZE;
+
+        //TODO: move these to gem5 stats
+        uint64_t                     total_accesses;
+        uint64_t                     total_hits;
+        uint64_t                     total_misses;
+
+    public:
+        LRUPIDCache(uint64_t _cache_size) :
+            MAX_SIZE(_cache_size),
+            total_accesses(0), total_hits(0), total_misses(0)
+        {
+          TheCache = new CacheEntry[MAX_SIZE];
+        }
+
+        ~LRUPIDCache(){
+          delete [] TheCache;
+        }
+
+        void LRUPIDCache_Access(uint64_t _pid_num) {
+            //TODO: stats
+            total_accesses = total_accesses + 1;
+
+            Addr thisIsTheTag = _pid_num; //tag of the VA
+
+            int j;
+            int hit = 0;
+            for (j = 0; j < MAX_SIZE; j++){
+
+                if (TheCache[j].tag == thisIsTheTag){
+
+                    //We have a hit!
+                    hit = 1;
+                    total_hits = total_hits + 1;
+                    //Increase the age of everything
+                    for (int k = 0; k < MAX_SIZE; k++){
+                        TheCache[k].lruAge++;
+                    }
+
+                    TheCache[j].lruAge = 0;
+                    TheCache[j].t_access_nums++;
+                    break;
+
+                }
+            }
+
+            if (hit == 0){
+
+                total_misses = total_misses + 1;
+
+                int m;
+                int highestAge = 0;
+                int highestSpot = 0;
+                //Loop through the set and find the oldest element
+                for (m = 0; m < MAX_SIZE; m++){
+                    if (TheCache[m].lruAge > highestAge){
+                        highestAge = TheCache[m].lruAge;
+                        highestSpot = m;
+                    }
+                }
+
+                //Replace the oldest element with the new tag
+                TheCache[highestSpot].tag = thisIsTheTag;
+
+                //Increase the age of each element
+                for (m = 0; m < MAX_SIZE ; m++){
+                    TheCache[m].lruAge++;
+                }
+
+                TheCache[highestSpot].lruAge = 0;
+                TheCache[highestSpot].t_access_nums++;
+                TheCache[highestSpot].t_num_replaced++;
+
+            }
+
+      }
+
+      void LRUPIDCachePrintStats() {
+        printf("PID Cache Stats: %lu, %lu, %lu, %f \n",
+        total_accesses, total_hits, total_misses,
+        (double)total_hits/total_accesses
+        );
+      }
+
+    };
+
     class LRUCapabilityCache
     {
 
@@ -236,7 +327,7 @@ namespace X86ISA
         }
 
       void LRUCachePrintStats() {
-        DPRINTF(Capability, "Capability Cache Stats: %llu, %llu, %llu, %f \n",
+        printf("Capability Cache Stats: %lu, %lu, %lu, %f \n",
         total_accesses, total_hits, total_misses,
         (double)total_hits/total_accesses
         );

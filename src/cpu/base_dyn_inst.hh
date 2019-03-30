@@ -180,6 +180,7 @@ class BaseDynInst : public ExecContext, public RefCounted
      */
     std::bitset<MaxInstSrcRegs> _readySrcRegIdx;
 
+    TheISA::PointerID uop_pid{0};
   public:
     /** The thread this instruction is from. */
     ThreadID threadNumber;

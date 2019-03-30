@@ -334,6 +334,7 @@ TLB::translate(const RequestPtr &req,
             DPRINTF(TLB, "Paging enabled.\n");
             // The vaddr already has the segment base applied.
             TlbEntry *entry = lookup(vaddr);
+
             if (mode == Read) {
                 rdAccesses++;
             } else {
@@ -387,6 +388,19 @@ TLB::translate(const RequestPtr &req,
             DPRINTF(TLB, "Entry found with paddr %#x, "
                     "doing protection checks.\n", entry->paddr);
             // Do paging protection checks.
+
+            // auto mtt_it = tc->MemTrackTable.find(vaddr);
+            // if (mtt_it != tc->MemTrackTable.end()){
+            //   entry->pids[(mtt_it->second)] = 1;
+            //   if (entry->pids.size() > 0)
+            //   std::cout << std::hex << "Page[" << entry->vaddr <<"] = " <<
+            //             std::dec << entry->pids.size() << std::hex <<
+            //             std::endl;
+            //   for (auto& elem : entry->pids)
+            //       std::cout << std::dec << elem.first << ", " ;
+            //   std::cout << std::endl;
+            // }
+
             bool inUser = (m5Reg.cpl == 3 &&
                     !(flags & (CPL0FlagBit << FlagShift)));
             CR0 cr0 = tc->readMiscRegNoEffect(MISCREG_CR0);

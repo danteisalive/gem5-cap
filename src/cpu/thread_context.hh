@@ -118,6 +118,7 @@ class ThreadContext
                                                     RegisterTrackTable;
 
     typedef std::map<Addr, TheISA::PointerID> MemoryTrackTable;
+    typedef std::map<TheISA::PointerID, Addr> OrderedMemoryTrackTable;
     typedef SymbolCache::iterator   SymbolCacheIter;
     //typedef RangeCapabilityCache::iterator RangeCapCacheIter;
 
@@ -135,10 +136,10 @@ class ThreadContext
     TheISA::StackID                             SID = TheISA::StackID(0);
     RegisterTrackTable                          RegTrackTable;
     MemoryTrackTable                            MemTrackTable;
-    //RangeCapabilityCache                        RangeCapCache;
+    OrderedMemoryTrackTable                     OrderedMemTrackTable;
     CapabilityRegistersFile                     CapRegsFile;
-    TheISA::LRUCapabilityCache                  LRUCapCache{2, 16, 2048};
-
+    TheISA::LRUCapabilityCache                  LRUCapCache{128, 16, 2048};
+    TheISA::LRUPIDCache                         LRUPidCache{128};
 
     enum Status
     {

@@ -65,6 +65,9 @@ namespace X86ISA
 {
     struct TlbEntry : public Serializable
     {
+
+        // All the PIDs in this Page
+        std::map<TheISA::PointerID, uint64_t> pids;
         // The base of the physical page.
         Addr paddr;
 

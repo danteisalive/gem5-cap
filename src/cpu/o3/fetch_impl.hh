@@ -1189,7 +1189,6 @@ DefaultFetch<Impl>::fetch(bool &status_change)
     }
 
     DPRINTF(Fetch, "Attempting to fetch from [tid:%i]\n", tid);
-
     // The current PC.
     TheISA::PCState thisPC = pc[tid];
 
