@@ -162,7 +162,11 @@ DefaultFetch<Impl>::DefaultFetch(O3CPU *_cpu, DerivO3CPUParams *params)
         fetchBuffer[tid] = new uint8_t[fetchBufferSize];
     }
 
-
+    LVPT = new DefaultLVPT( params->LVPTEntries,
+                            params->LVPTTagSize,
+                            params->LVPTInstShiftAmt,
+                            params->numThreads
+                          );
     //initializeMicroopsROM();
 }
 
@@ -548,6 +552,16 @@ DefaultFetch<Impl>::deactivateThread(ThreadID tid)
     if (thread_it != priorityList.end()) {
         priorityList.erase(thread_it);
     }
+}
+
+
+template <class Impl>
+void
+DefaultFetch<Impl>::lookupAndUpdateLVPT(DynInstPtr &inst)
+{
+
+    inst->uop_pid =
+              LVPT->lookup(inst->pcState().instAddr(), inst->threadNumber);
 }
 
 template <class Impl>
@@ -1369,6 +1383,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
             nextPC = thisPC;
 
+            lookupAndUpdateLVPT(instruction);
             // If we're branching after this instruction, quit fetching
             // from the same block.
             predictedBranch |= thisPC.branching();
@@ -1377,6 +1392,8 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (predictedBranch) {
                 DPRINTF(Fetch, "Branch detected with PC = %s\n", thisPC);
             }
+
+
 
             newMacro |= thisPC.instAddr() != nextPC.instAddr();
 

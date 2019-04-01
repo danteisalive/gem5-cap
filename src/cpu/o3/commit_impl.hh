@@ -1389,22 +1389,19 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
             " MemTrackTable Size: " <<
             tc->MemTrackTable.size() <<
-            " NumOfMemTrackAccess: " <<
-            NumOfStackPointers <<
-            " Stack: " <<
-            StackRemove <<
-            " NumOfAllocations: " <<
-            NumOfAllocations <<
+            " NumOfMemTrackAccess: " << NumOfStackPointers <<
+            " Stack: " << StackRemove <<
+            " NumOfAllocations: " << NumOfAllocations <<
             " Highest Number of Element: " <<
             " PID(" << _pid << ")" << "[" << num << "]" <<
-            " Accessed PIDs: " << tc->OrderedMemTrackTable.size() <<
+            //" Accessed PIDs: " << tc->OrderedMemTrackTable.size() <<
             std::endl;
 
             tc->LRUCapCache.LRUCachePrintStats();
             tc->LRUPidCache.LRUPIDCachePrintStats();
 
             NumOfStackPointers=0; StackAdd=0; StackRemove=0;
-            tc->OrderedMemTrackTable.clear();
+            //tc->OrderedMemTrackTable.clear();
 
         }
     }
@@ -2734,10 +2731,29 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
             return;
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
-          tc->OrderedMemTrackTable[mtt_it->second] = 1;
-          tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
-          tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-          NumOfStackPointers++;
+            if (head_inst->effAddr <
+                cpu->readArchIntReg(X86ISA::INTREG_RSP, tid)) {
+                tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
+                tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
+
+                if (head_inst->uop_pid != mtt_it->second){
+                  cpu->updateFetchLVPT(head_inst, mtt_it->second);
+                  std::cout << std::hex <<
+                  "False Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+                }
+                else {
+                  std::cout << std::hex <<
+                  "True Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+                }
+            }
+
+            NumOfStackPointers++;
         }
     }
   }
@@ -2751,9 +2767,27 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
 
         auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
         if (mtt_it != tc->MemTrackTable.end()){
-            tc->OrderedMemTrackTable[mtt_it->second] = 1;
-            tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
-            tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
+            if (head_inst->effAddr <
+                cpu->readArchIntReg(X86ISA::INTREG_RSP, tid)) {
+                tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
+                tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
+                if (head_inst->uop_pid != mtt_it->second){
+                  cpu->updateFetchLVPT(head_inst, mtt_it->second);
+                  std::cout << std::hex <<
+                  "False Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+                }
+                else {
+                  std::cout << std::hex <<
+                  "True Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+                }
+            }
+
             NumOfStackPointers++;
 
         }

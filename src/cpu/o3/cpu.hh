@@ -517,6 +517,9 @@ class FullO3CPU : public BaseO3CPU
 
     void setArchCCReg(int reg_idx, TheISA::CCReg val, ThreadID tid);
 
+
+    void updateFetchLVPT(
+                      DynInstPtr &inst, TheISA::PointerID& _new_pid);
     /** Sets the commit PC state of a specific thread. */
     void pcState(const TheISA::PCState &newPCState, ThreadID tid);
 

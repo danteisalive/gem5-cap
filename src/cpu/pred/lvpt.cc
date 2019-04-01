@@ -59,7 +59,7 @@ DefaultLVPT::DefaultLVPT(unsigned _numEntries,
 
     tagMask = (1 << tagBits) - 1;
 
-    tagShiftAmt = instShiftAmt + floorLog2(numEntries);
+    tagShiftAmt = instShiftAmt + floorLog2(numEntries); // 14
 }
 
 void
@@ -122,7 +122,7 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
         && lvpt[lvpt_idx].tid == tid) {
         return lvpt[lvpt_idx].target;
     } else {
-        return 0;
+        return TheISA::PointerID(0);
     }
 }
 

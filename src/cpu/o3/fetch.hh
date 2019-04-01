@@ -50,6 +50,7 @@
 #include "config/the_isa.hh"
 #include "cpu/pc_event.hh"
 #include "cpu/pred/bpred_unit.hh"
+#include "cpu/pred/lvpt.hh"
 #include "cpu/timebuf.hh"
 #include "cpu/translation.hh"
 #include "mem/packet.hh"
@@ -283,6 +284,8 @@ class DefaultFetch
      */
     bool lookupAndUpdateNextPC(DynInstPtr &inst, TheISA::PCState &pc);
 
+
+    void lookupAndUpdateLVPT(DynInstPtr &inst);
     /**
      * Fetches the cache line that contains the fetch PC.  Returns any
      * fault that happened.  Puts the data into the class variable
@@ -325,6 +328,8 @@ class DefaultFetch
     FetchStatus updateFetchStatus();
 
   public:
+
+    DefaultLVPT* getFetchLVPT(){ return LVPT; }
     /** Squashes a specific thread and resets the PC. Also tells the CPU to
      * remove any instructions that are not in the ROB. The source of this
      * squash should be the commit stage.
@@ -411,6 +416,8 @@ class DefaultFetch
 
     /** BPredUnit. */
     BPredUnit *branchPred;
+
+    DefaultLVPT *LVPT;
 
     TheISA::PCState pc[Impl::MaxThreads];
 

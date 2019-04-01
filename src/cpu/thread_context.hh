@@ -136,7 +136,7 @@ class ThreadContext
     TheISA::StackID                             SID = TheISA::StackID(0);
     RegisterTrackTable                          RegTrackTable;
     MemoryTrackTable                            MemTrackTable;
-    OrderedMemoryTrackTable                     OrderedMemTrackTable;
+    //OrderedMemoryTrackTable                     OrderedMemTrackTable;
     CapabilityRegistersFile                     CapRegsFile;
     TheISA::LRUCapabilityCache                  LRUCapCache{128, 16, 2048};
     TheISA::LRUPIDCache                         LRUPidCache{128};

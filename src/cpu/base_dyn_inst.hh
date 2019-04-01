@@ -180,7 +180,7 @@ class BaseDynInst : public ExecContext, public RefCounted
      */
     std::bitset<MaxInstSrcRegs> _readySrcRegIdx;
 
-    TheISA::PointerID uop_pid{0};
+
   public:
     /** The thread this instruction is from. */
     ThreadID threadNumber;
@@ -188,6 +188,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     /** Iterator pointing to this BaseDynInst in the list of all insts. */
     ListIt instListIt;
 
+    TheISA::PointerID uop_pid{0};
     ////////////////////// Branch Data ///////////////
     /** Predicted PC state after this instruction. */
     TheISA::PCState predPC;
