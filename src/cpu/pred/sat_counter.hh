@@ -79,7 +79,7 @@ class SatCounter
      * Sets the number of bits.
      */
     void setBits(unsigned bits) { maxVal = (1 << bits) - 1; }
-
+    void setInitial(uint8_t _inital_val) { initialVal = _inital_val; }
     void reset() { counter = initialVal; }
 
     /**

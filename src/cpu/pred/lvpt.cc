@@ -60,6 +60,23 @@ DefaultLVPT::DefaultLVPT(unsigned _numEntries,
     tagMask = (1 << tagBits) - 1;
 
     tagShiftAmt = instShiftAmt + floorLog2(numEntries); // 14
+
+    //Setup the array of counters for the local predictor
+    localBiases.resize(numEntries);
+
+    for (int i = 0; i < numEntries; ++i){
+        localBiases[i] = 0;
+    }
+
+    localCtrs.resize(numEntries);
+
+    for (size_t i = 0; i < numEntries; i++) {
+        localCtrs[i].setBits(2);
+        localCtrs[i].setInitial(0x3); // initial value is 0x11
+        localCtrs[i].reset();
+    }
+
+
 }
 
 void
@@ -119,20 +136,76 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
 
     if (lvpt[lvpt_idx].valid
         && inst_tag == lvpt[lvpt_idx].tag
-        && lvpt[lvpt_idx].tid == tid) {
-        return lvpt[lvpt_idx].target;
-    } else {
+        && lvpt[lvpt_idx].tid == tid)
+    {
+      //std::cout << std::hex << "Lookup localCtrs: " <<
+    //  localCtrs[lvpt_idx].read() << std::endl;
+      switch (localCtrs[lvpt_idx].read()) {
+        case 0x0:
+          return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+                                   localBiases[lvpt_idx]);
+        case 0x1:
+          return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+                                   localBiases[lvpt_idx]);
+        case 0x2:
+          return lvpt[lvpt_idx].target;
+        case 0x3:
+          return lvpt[lvpt_idx].target;
+        default:
+          assert("invalud localCtrs value!");
+          return TheISA::PointerID(0);
+      }
+
+    }
+    else
+    {
         return TheISA::PointerID(0);
     }
 }
 
 void
-DefaultLVPT::update(Addr instPC, const TheISA::PointerID &target, ThreadID tid)
+DefaultLVPT::update(
+                    Addr instPC,
+                    const TheISA::PointerID &target,
+                    ThreadID tid, bool predict
+                   )
 {
+
+
     unsigned lvpt_idx = getIndex(instPC, tid);
 
     assert(lvpt_idx < numEntries);
 
+    // if prediction is true, we just update the localCtrs
+      // std::cout << std::hex << "Update localCtrs: " <<
+      // localCtrs[lvpt_idx].read() << std::endl;
+      switch (localCtrs[lvpt_idx].read())
+      {
+        case 0x0:
+          if (predict){ localCtrs[lvpt_idx].decrement(); }
+          else        { localCtrs[lvpt_idx].increment(); }
+          break;
+        case 0x1:
+          if (predict){ localCtrs[lvpt_idx].decrement(); }
+          else        { localCtrs[lvpt_idx].increment(); }
+          break;
+        case 0x2:
+          if (predict){ localCtrs[lvpt_idx].increment(); }
+          else        { localCtrs[lvpt_idx].decrement(); }
+          break;
+        case 0x3:
+          if (predict){ localCtrs[lvpt_idx].increment(); }
+          else        { localCtrs[lvpt_idx].decrement(); }
+          break;
+        default:
+          assert("localCtrs ivanlid value!");
+      }
+
+
+
+
+
+    localBiases[lvpt_idx] = target.getPID() - lvpt[lvpt_idx].target.getPID();
     lvpt[lvpt_idx].tid = tid;
     lvpt[lvpt_idx].valid = true;
     lvpt[lvpt_idx].target = target;

@@ -35,6 +35,7 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "config/the_isa.hh"
+#include "cpu/pred/sat_counter.hh"
 
 class DefaultLVPT
 {
@@ -93,7 +94,7 @@ class DefaultLVPT
      *  @param tid The thread id.
      */
     void update(Addr instPC, const TheISA::PointerID &targetPC,
-                ThreadID tid);
+                ThreadID tid, bool predict);
 
   private:
     /** Returns the index into the LVPT, based on the branch's PC.
@@ -109,8 +110,9 @@ class DefaultLVPT
     inline Addr getTag(Addr instPC);
 
     /** The actual LVPT. */
-    std::vector<LVPTEntry> lvpt;
-
+    std::vector<LVPTEntry>  lvpt;
+    std::vector<int>        localBiases;
+    std::vector<SatCounter> localCtrs;
     /** The number of entries in the LVPT. */
     unsigned numEntries;
 

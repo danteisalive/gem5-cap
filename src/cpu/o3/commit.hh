@@ -138,10 +138,12 @@ class DefaultCommit
     CommitPolicy commitPolicy;
 
     uint64_t prevRSPValue;
-    uint64_t NumOfStackPointers;
-    uint64_t StackAdd;
+    uint64_t NumOfMemTrackTableAccess;
+    //uint64_t StackAdd;
     uint64_t StackRemove;
     uint64_t NumOfAllocations;
+    uint64_t FalsePredict;
+
     /** Probe Points. */
     ProbePointArg<DynInstPtr> *ppCommit;
     ProbePointArg<DynInstPtr> *ppCommitStall;

@@ -519,7 +519,9 @@ class FullO3CPU : public BaseO3CPU
 
 
     void updateFetchLVPT(
-                      DynInstPtr &inst, TheISA::PointerID& _new_pid);
+                      DynInstPtr &inst, TheISA::PointerID& _new_pid,
+                      bool predict
+                      );
     /** Sets the commit PC state of a specific thread. */
     void pcState(const TheISA::PCState &newPCState, ThreadID tid);
 
