@@ -107,7 +107,7 @@ class LSQ {
 
     /** walks through the LSQ of the specified thread to check capability for each entry */
     bool lsqWalker(ThreadID tid);
-    
+    bool mispredictedPID(DynInstPtr &inst);
     /** Inserts a load into the LSQ. */
     void insertLoad(DynInstPtr &load_inst);
     /** Inserts a store into the LSQ. */
@@ -154,9 +154,18 @@ class LSQ {
     bool violation(ThreadID tid)
     { return thread[tid].violation(); }
 
+    bool checkPIDMisprediction();
+    bool checkPIDMisprediction(ThreadID tid)
+    { return thread[tid].checkPIDMisprediction(); }
+
     /** Gets the instruction that caused the memory ordering violation. */
     DynInstPtr getMemDepViolator(ThreadID tid)
     { return thread[tid].getMemDepViolator(); }
+
+
+    DynInstPtr getMemWithWrongPID(ThreadID tid)
+    { return thread[tid].getMemWithWrongPID(); }
+
 
     /** Returns the head index of the load queue for a specific thread. */
     int getLoadHead(ThreadID tid)

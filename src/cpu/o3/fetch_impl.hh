@@ -1320,7 +1320,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 pcOffset += instSize;
             }
         }
-
+        ThreadContext * tc = cpu->tcBase(tid);
         // Extract as many instructions and/or microops as we can from
         // the memory we've processed so far.
         do {
@@ -1330,7 +1330,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
 
                     staticInst = decoder[tid]->decode(thisPC);
-                    ThreadContext * tc = cpu->tcBase(tid);
+
                     if (staticInst->isMacroop() && tc->enableCapability)
                         capabilityCheck(thisPC, tid, staticInst);
 
@@ -1383,7 +1383,11 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
             nextPC = thisPC;
 
-            lookupAndUpdateLVPT(instruction);
+            if (tc->enableCapability)
+              lookupAndUpdateLVPT(instruction);
+
+
+
             // If we're branching after this instruction, quit fetching
             // from the same block.
             predictedBranch |= thisPC.branching();

@@ -1391,7 +1391,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " MemTrackTable Size: " <<
             tc->MemTrackTable.size() <<
             " NumOfMemTrackAccess: " << NumOfMemTrackTableAccess <<
-            " Prediction Accuracy: " <<
+            " Prediction Accuracy(1e6 Instr.): " <<
             (double)(NumOfMemTrackTableAccess - FalsePredict) /
             NumOfMemTrackTableAccess <<
             " NumOfAllocations: " << NumOfAllocations <<
@@ -2736,19 +2736,23 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
             if (head_inst->uop_pid != mtt_it->second){
                 cpu->updateFetchLVPT(head_inst, mtt_it->second, false);
                 FalsePredict++;
-                // std::cout << std::hex <<
-                // "False Prediction Load Instruction: " <<
-                // head_inst->pcState().instAddr() << " " <<
-                // "Predicted: " << head_inst->uop_pid << " " <<
-                // "Actual: " << mtt_it->second << std::endl;
+                if (1){
+                  std::cout << std::hex <<
+                  "Commit: False Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+              }
             }
             else {
                 cpu->updateFetchLVPT(head_inst, mtt_it->second, true);
-                // std::cout << std::hex <<
-                // "True Prediction Load Instruction: " <<
-                // head_inst->pcState().instAddr() << " " <<
-                // "Predicted: " << head_inst->uop_pid << " " <<
-                // "Actual: " << mtt_it->second << std::endl;
+                if (1){
+                  std::cout << std::hex <<
+                  "Commit: True Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+                }
             }
 
             NumOfMemTrackTableAccess++;
@@ -2771,19 +2775,23 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
             if (head_inst->uop_pid != mtt_it->second){
               cpu->updateFetchLVPT(head_inst, mtt_it->second, false);
               FalsePredict++;
-              // std::cout << std::hex <<
-              // "False Prediction Load Instruction: " <<
-              // head_inst->pcState().instAddr() << " " <<
-              // "Predicted: " << head_inst->uop_pid << " " <<
-              // "Actual: " << mtt_it->second << std::endl;
+              if (1){
+                  std::cout << std::hex <<
+                  "Commit: False Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+              }
             }
             else {
               cpu->updateFetchLVPT(head_inst, mtt_it->second, true);
-              // std::cout << std::hex <<
-              // "True Prediction Load Instruction: " <<
-              // head_inst->pcState().instAddr() << " " <<
-              // "Predicted: " << head_inst->uop_pid << " " <<
-              // "Actual: " << mtt_it->second << std::endl;
+              if (1){
+                  std::cout << std::hex <<
+                  "Commit: True Prediction Load Instruction: " <<
+                  head_inst->pcState().instAddr() << " " <<
+                  "Predicted: " << head_inst->uop_pid << " " <<
+                  "Actual: " << mtt_it->second << std::endl;
+              }
             }
 
             NumOfMemTrackTableAccess++;

@@ -201,12 +201,12 @@ LSQUnit<Impl>::resetState()
     CapabilityFuncUints[0] = 0;
     CapabilityFuncUints[1] = 0;
 
-    
+
     rng.seed(std::random_device()());
 
     retryPkt = NULL;
     memDepViolator = NULL;
-
+    loadWithWrongPID = NULL;
     stalled = false;
 
     cacheBlockMask = ~(cpu->cacheLineSize() - 1);
@@ -269,39 +269,41 @@ LSQUnit<Impl>::regStats()
 
     lsqCommitedLoads
         .name(name() + ".lsqCommitedLoads")
-        .desc("number of commited loads");  
+        .desc("number of commited loads");
 
     lsqCommitedStores
         .name(name() + ".lsqCommitedStores")
-        .desc("number of commited stores");  
+        .desc("number of commited stores");
 
     lsqLoadCapabilityMissed
         .name(name() + ".lsqLoadCapabilityMissed")
-        .desc("number of Loads at commit without capability check");  
+        .desc("number of Loads at commit without capability check");
 
     lsqStoreCapabilityMissed
         .name(name() + ".lsqStoreCapabilityMissed")
-        .desc("number of Store at commit without capability check"); 
+        .desc("number of Store at commit without capability check");
 
     lsqLoadCapabilityCyclesStalled
         .name(name() + ".lsqLoadCapabilityCyclesStalled")
-        .desc("Total number of cycles the iew stalled due to capability check for loads"); 
+        .desc("Total number of cycles the iew stalled\
+              due to capability check for loads");
 
     lsqStoreCapabilityCyclesStalled
         .name(name() + ".lsqStoreCapabilityCyclesStalled")
-        .desc("Total number of cycles the iew stalled due to capability check for stores"); 
+        .desc("Total number of cycles the iew stalled\
+              due to capability check for stores");
 
     numOfCapabilityCehckedLoads
         .name(name() + ".numOfCapabilityCehckedLoads")
-        .desc("Total number of capabilities checked for the loads"); 
+        .desc("Total number of capabilities checked for the loads");
 
     numOfCapabilityCehckedStores
         .name(name() + ".numOfCapabilityCehckedStores")
-        .desc("Total number of capabilities checked for the stores"); 
+        .desc("Total number of capabilities checked for the stores");
 
     lsqCapabilityCacheMiss
         .name(name() + ".lsqCapabilityCacheMiss")
-        .desc("Total number of capability cache misses");           
+        .desc("Total number of capability cache misses");
 }
 
 template<class Impl>
@@ -410,8 +412,8 @@ LSQUnit<Impl>::lsqGetCachePort(DynInstPtr& inst)
     std::uniform_int_distribution<std::mt19937::result_type> dist100(0,100);
     int rand  = dist100(rng);
     bool miss;
-    
-    // how many cache ports are available => 2 port 
+
+    // how many cache ports are available => 2 port
     uint64_t *freePort = NULL;
     uint64_t *freeFuncUnit = NULL;
 
@@ -427,8 +429,8 @@ LSQUnit<Impl>::lsqGetCachePort(DynInstPtr& inst)
     if (cpu->curCycle() > CapabilityLoadPorts[0])
         freePort = &CapabilityLoadPorts[0];
     else if (cpu->curCycle() > CapabilityLoadPorts[1])
-        freePort = &CapabilityLoadPorts[1];       
-    
+        freePort = &CapabilityLoadPorts[1];
+
 
     // we just need to assign a Func unit
     if (inst->isCapFetched()){
@@ -441,13 +443,13 @@ LSQUnit<Impl>::lsqGetCachePort(DynInstPtr& inst)
         else{
 
             DPRINTF(Capability, "Capability check stalled due to unavailabe FU at %llu for %s\n", cpu->curCycle(), inst->pcState());
-            return 0; // it means we cant say this cap is cheched 
+            return 0; // it means we cant say this cap is cheched
         }
     }
     // cap is not fetched but still maybe we will have a hit
     else{
 
-        if (!miss && freePort){  //hit, 
+        if (!miss && freePort){  //hit,
             inst->setFlag(StaticInstFlags::IsCapFetched);
             inst->capFetchCycle = cpu->curCycle() + CACHE_HIT_LAT;
             *freePort = cpu->curCycle() + CACHE_HIT_LAT;
@@ -478,10 +480,11 @@ LSQUnit<Impl>::lsqWalker()
     DPRINTF(Capability, "Cache Port #0: %llu Cache Port #1: %llu\n", CapabilityLoadPorts[0], CapabilityLoadPorts[1]);
     DPRINTF(Capability, "Func  Port #0: %llu Func  Port #1: %llu\n", CapabilityFuncUints[0], CapabilityFuncUints[1]);
     for (int ldq_id = loadHead; ldq_id < loadTail; ldq_id++){
-        DPRINTF(Capability, "Before LQWalker: Cycle: %llu %s Issued: %d Executed: %d Completed: %d CommitReady: %d Checked: %d\n", 
+        DPRINTF(Capability, "Before LQWalker: Cycle: %llu %s Issued: \
+        %d Executed: %d Completed: %d CommitReady: %d Checked: %d\n",
                 cpu->curCycle(),
-                loadQueue[ldq_id]->pcState(), 
-                loadQueue[ldq_id]->isIssued(), 
+                loadQueue[ldq_id]->pcState(),
+                loadQueue[ldq_id]->isIssued(),
                 loadQueue[ldq_id]->isExecuted(),
                 loadQueue[ldq_id]->isCompleted(),
                 loadQueue[ldq_id]->readyToCommit(),
@@ -489,10 +492,11 @@ LSQUnit<Impl>::lsqWalker()
                 );
     }
     for (int stq_id = storeHead; stq_id < storeTail; stq_id++){
-        DPRINTF(Capability, "Before SQWalker: Cycle: %llu %s Issued: %d Executed: %d Completed: %d CommitReady: %d Checked: %d\n", 
+        DPRINTF(Capability, "Before SQWalker: Cycle: %llu %s Issued:\
+         %d Executed: %d Completed: %d CommitReady: %d Checked: %d\n",
                 cpu->curCycle(),
-                storeQueue[stq_id].inst->pcState(), 
-                storeQueue[stq_id].inst->isIssued(), 
+                storeQueue[stq_id].inst->pcState(),
+                storeQueue[stq_id].inst->isIssued(),
                 storeQueue[stq_id].inst->isExecuted(),
                 storeQueue[stq_id].inst->isCompleted(),
                 storeQueue[stq_id].inst->readyToCommit(),
@@ -500,7 +504,7 @@ LSQUnit<Impl>::lsqWalker()
                 );
     }
 
-    
+
 
     //check the load Queue first, because loads are more important or maybe in order?
     // if both ques are't empty firs get seq number of both queues
@@ -552,8 +556,9 @@ LSQUnit<Impl>::lsqWalker()
                     uint64_t t_finishCycle = lsqGetCachePort(loadQueue[lqIdx]);
                     if (t_finishCycle){
                         DPRINTF(Capability, "LQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", cpu->curCycle(),loadQueue[lqIdx]->pcState(), loadQueue[lqIdx]->isIssued(), loadQueue[lqIdx]->isExecuted(),loadQueue[lqIdx]->isCapabilityChecked());
-                        loadQueue[lqIdx]->setFlag(StaticInstFlags::IsCapabilityChecked);     
-                        ++numOfCapabilityCehckedLoads;      
+                        loadQueue[lqIdx]->setFlag(
+                            StaticInstFlags::IsCapabilityChecked);
+                        ++numOfCapabilityCehckedLoads;
                         return true;
                     }
                     return false;
@@ -562,8 +567,8 @@ LSQUnit<Impl>::lsqWalker()
             }
 
         }
-        
-        for (; lqIdx < loadTail; lqIdx++){ 
+
+        for (; lqIdx < loadTail; lqIdx++){
 
             if (loadQueue[lqIdx]->isCapFetched()  && (loadQueue[lqIdx]->capFetchCycle >= cpu->curCycle()) ){
                 continue;
@@ -571,29 +576,31 @@ LSQUnit<Impl>::lsqWalker()
 
             if (loadQueue[lqIdx]->isIssued() && !loadQueue[lqIdx]->isCapabilityChecked())
             {
-                
-                uint64_t t_finishCycle = lsqGetCachePort(loadQueue[lqIdx]);     
+
+                uint64_t t_finishCycle = lsqGetCachePort(loadQueue[lqIdx]);
                 if (t_finishCycle){
                     DPRINTF(Capability, "LQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", cpu->curCycle(),loadQueue[lqIdx]->pcState(), loadQueue[lqIdx]->isIssued(), loadQueue[lqIdx]->isExecuted(),loadQueue[lqIdx]->isCapabilityChecked());
-                    loadQueue[lqIdx]->setFlag(StaticInstFlags::IsCapabilityChecked);   
-                    ++numOfCapabilityCehckedLoads;     
+                    loadQueue[lqIdx]->setFlag(
+                      StaticInstFlags::IsCapabilityChecked);
+                    ++numOfCapabilityCehckedLoads;
                     return true;
                 }
                 return false;
             }
 
         }
-        
+
         for (; sqIdx < storeTail; sqIdx++){
 
             if (storeQueue[sqIdx].inst->isCapFetched()  && (storeQueue[sqIdx].inst->capFetchCycle >= cpu->curCycle()) ){
                 continue;
             }
 
-            if ( storeQueue[sqIdx].inst->isIssued() && !storeQueue[sqIdx].inst->isCapabilityChecked() )
+            if ( storeQueue[sqIdx].inst->isIssued() &&
+                !storeQueue[sqIdx].inst->isCapabilityChecked() )
             {
-                
-                uint64_t t_finishCycle = lsqGetCachePort(storeQueue[sqIdx].inst);  
+                uint64_t t_finishCycle =
+                      lsqGetCachePort(storeQueue[sqIdx].inst);
                 if (t_finishCycle){
                     DPRINTF(Capability, "SQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", cpu->curCycle(),storeQueue[sqIdx].inst->pcState(), storeQueue[sqIdx].inst->isIssued(), storeQueue[sqIdx].inst->isExecuted(),storeQueue[sqIdx].inst->isCapabilityChecked());
                     storeQueue[sqIdx].inst->setFlag(StaticInstFlags::IsCapabilityChecked);
@@ -604,26 +611,28 @@ LSQUnit<Impl>::lsqWalker()
             }
 
         }
- 
+
     }
 
     else if (!lqEmpty() && sqEmpty())
     {
-        for (int ldq_id = loadHead; ldq_id < loadTail; ldq_id++){    
+        for (int ldq_id = loadHead; ldq_id < loadTail; ldq_id++){
 
             if (loadQueue[ldq_id]->isCapFetched() && (loadQueue[ldq_id]->capFetchCycle >= cpu->curCycle())){
-                continue;   
+                continue;
             }
 
-            if (loadQueue[ldq_id]->isIssued() && !loadQueue[ldq_id]->isCapabilityChecked())
+            if (loadQueue[ldq_id]->isIssued() &&
+            !loadQueue[ldq_id]->isCapabilityChecked())
             {
-
-                uint64_t t_finishCycle = lsqGetCachePort(loadQueue[ldq_id]);
+                uint64_t t_finishCycle =
+                      lsqGetCachePort(loadQueue[ldq_id]);
                 if (t_finishCycle) {
-                    DPRINTF(Capability, "LQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", 
+                    DPRINTF(Capability, "LQWalker: Cycle: %llu %s Issued:\
+                     %d Executed: %d Checked: %d\n\n",
                         cpu->curCycle(),
-                        loadQueue[ldq_id]->pcState(), 
-                        loadQueue[ldq_id]->isIssued(), 
+                        loadQueue[ldq_id]->pcState(),
+                        loadQueue[ldq_id]->isIssued(),
                         loadQueue[ldq_id]->isExecuted(),
                         loadQueue[ldq_id]->isCapabilityChecked()
                     );
@@ -632,7 +641,7 @@ LSQUnit<Impl>::lsqWalker()
                     return true;
                 }
                 return false;
-            }            
+            }
         }
 
     }
@@ -647,12 +656,14 @@ LSQUnit<Impl>::lsqWalker()
             if ( storeQueue[stq_id].inst->isIssued() && !storeQueue[stq_id].inst->isCapabilityChecked() )
             {
 
-                uint64_t t_finishCycle = lsqGetCachePort(storeQueue[stq_id].inst);
+                uint64_t t_finishCycle =
+                  lsqGetCachePort(storeQueue[stq_id].inst);
                 if (t_finishCycle) {
-                    DPRINTF(Capability, "SQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", 
+                    DPRINTF(Capability, "SQWalker: Cycle: %llu %s\
+                     Issued: %d Executed: %d Checked: %d\n\n",
                         cpu->curCycle(),
-                        storeQueue[stq_id].inst->pcState(), 
-                        storeQueue[stq_id].inst->isIssued(), 
+                        storeQueue[stq_id].inst->pcState(),
+                        storeQueue[stq_id].inst->isIssued(),
                         storeQueue[stq_id].inst->isExecuted(),
                         storeQueue[stq_id].inst->isCapabilityChecked()
                     );
@@ -661,8 +672,8 @@ LSQUnit<Impl>::lsqWalker()
                     return true;
                 }
                 return false;
-            }            
-        
+            }
+
         }
 
     }
@@ -728,6 +739,17 @@ LSQUnit<Impl>::getMemDepViolator()
     DynInstPtr temp = memDepViolator;
 
     memDepViolator = NULL;
+
+    return temp;
+}
+
+template <class Impl>
+typename Impl::DynInstPtr
+LSQUnit<Impl>::getMemWithWrongPID()
+{
+    DynInstPtr temp = loadWithWrongPID;
+
+    loadWithWrongPID = NULL;
 
     return temp;
 }
@@ -942,11 +964,12 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
 
     ThreadContext * tc = cpu->tcBase(tid);
     if (tc->enableCapability && inst->isBoundsCheckMicroop()){
-        inst->setExecuted(); 
+        inst->setExecuted();
         inst->setCompleted();
+        //inst->setCanCommit();
         return load_fault;
     }
-    
+
     if (inst->isTranslationDelayed() &&
         load_fault == NoFault)
         return load_fault;
@@ -973,6 +996,11 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         assert(inst->effAddrValid());
         int load_idx = inst->lqIdx;
         incrLdIdx(load_idx);
+
+        // check PID for this load here
+        if (tc->enableCapability && mispredictedPID(tid, inst)){
+            loadWithWrongPID = inst;
+        }
 
         if (checkLoads)
             return checkViolations(load_idx, inst);
@@ -1002,12 +1030,13 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
 
     Fault store_fault = store_inst->initiateAcc();
-    
+
 
     ThreadContext * tc = cpu->tcBase(tid);
     if (tc->enableCapability && store_inst->isBoundsCheckMicroop()){
-        store_inst->setExecuted(); 
+        store_inst->setExecuted();
         store_inst->setCompleted();
+        store_inst->setCanCommit();
         return store_fault;
     }
 
@@ -1097,7 +1126,7 @@ LSQUnit<Impl>::commitStores(InstSeqNum &youngest_inst)
 
     int store_idx = storeHead;
 
-    
+
 
     while (store_idx != storeTail) {
         assert(storeQueue[store_idx].inst);
@@ -1386,7 +1415,7 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
 
         // Clear the smart pointer to make sure it is decremented.
         loadQueue[load_idx]->setSquashed();
-        /** set not capability checked */ 
+        /** set not capability checked */
         loadQueue[load_idx]->resetFlag(StaticInstFlags::IsCapabilityChecked);
         loadQueue[load_idx]->resetFlag(StaticInstFlags::IsCapFetched);
         loadQueue[load_idx] = NULL;
@@ -1401,6 +1430,10 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
 
     if (memDepViolator && squashed_num < memDepViolator->seqNum) {
         memDepViolator = NULL;
+    }
+
+    if (loadWithWrongPID && squashed_num < loadWithWrongPID->seqNum) {
+        loadWithWrongPID = NULL;
     }
 
     int store_idx = storeTail;
@@ -1429,9 +1462,11 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
 
         // Clear the smart pointer to make sure it is decremented.
         storeQueue[store_idx].inst->setSquashed();
-        /** set not capability checked */ 
-        storeQueue[store_idx].inst->resetFlag(StaticInstFlags::IsCapabilityChecked);
-        storeQueue[store_idx].inst->resetFlag(StaticInstFlags::IsCapFetched);
+        /** set not capability checked */
+        storeQueue[store_idx].inst->resetFlag(
+                              StaticInstFlags::IsCapabilityChecked);
+        storeQueue[store_idx].inst->resetFlag(
+                              StaticInstFlags::IsCapFetched);
         storeQueue[store_idx].inst = NULL;
         storeQueue[store_idx].canWB = 0;
 
@@ -1706,6 +1741,110 @@ LSQUnit<Impl>::dumpInsts() const
     }
 
     cprintf("\n");
+}
+
+template <class Impl>
+bool
+LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
+{
+
+  //return false;
+   // if (inst->uop_pid == TheISA::PointerID{99}){
+   //    return false;
+   // }
+   // else {
+   //    TheISA::PointerID  pid = TheISA::PointerID{99};
+   //    cpu->updateFetchLVPT(inst, pid, false);
+   //    return true;
+   // }
+
+
+   ThreadContext * tc = cpu->tcBase(tid);
+   const StaticInstPtr si = inst->staticInst;
+
+   if ((si->getName().compare("ld") == 0)){
+
+     if (inst->destRegIdx(0).isIntReg()){
+         X86ISA::IntRegIndex   dest =
+                         (X86ISA::IntRegIndex)inst->destRegIdx(0).index();
+         if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
+             return false;
+         auto mtt_it = tc->MemTrackTable.find(inst->effAddr);
+         if (mtt_it != tc->MemTrackTable.end()){
+             //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
+             //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
+
+             if (inst->uop_pid != mtt_it->second){
+                 cpu->updateFetchLVPT(inst, mtt_it->second, false);
+
+                 if (1){
+                   std::cout << std::hex <<
+                   "EXECUTE: False Prediction Load Instruction: " <<
+                   inst->pcState().instAddr() << " " <<
+                   "Predicted: " << inst->uop_pid << " " <<
+                   "Actual: " << mtt_it->second << std::endl;
+                 }
+                 inst->uop_pid = mtt_it->second;
+               return false;
+             }
+             else {
+                 cpu->updateFetchLVPT(inst, mtt_it->second, true);
+                 if (1){
+                   std::cout << std::hex <<
+                   "EXECUTE: True Prediction Load Instruction: " <<
+                   inst->pcState().instAddr() << " " <<
+                   "Predicted: " << inst->uop_pid << " " <<
+                   "Actual: " << mtt_it->second << std::endl;
+                 }
+                 return false;
+             }
+
+         }
+     }
+   }
+   else if ((si->getName().compare("ldis") == 0)){
+
+     if (inst->destRegIdx(0).isIntReg()){
+         X86ISA::IntRegIndex   dest =
+                         (X86ISA::IntRegIndex)inst->destRegIdx(0).index();
+        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
+           return false;
+
+         auto mtt_it = tc->MemTrackTable.find(inst->effAddr);
+         if (mtt_it != tc->MemTrackTable.end()){
+             //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
+             //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
+
+             if (inst->uop_pid != mtt_it->second){
+               cpu->updateFetchLVPT(inst, mtt_it->second, false);
+
+               if (1){
+                   std::cout << std::hex <<
+                   "EXECUTE: False Prediction Load Instruction: " <<
+                   inst->pcState().instAddr() << " " <<
+                   "Predicted: " << inst->uop_pid << " " <<
+                   "Actual: " << mtt_it->second << std::endl;
+               }
+               inst->uop_pid = mtt_it->second;
+               return false;
+             }
+             else {
+               cpu->updateFetchLVPT(inst, mtt_it->second, true);
+               if (1){
+                   std::cout << std::hex <<
+                   "EXECUTE: True Prediction Load Instruction: " <<
+                   inst->pcState().instAddr() << " " <<
+                   "Predicted: " << inst->uop_pid << " " <<
+                   "Actual: " << mtt_it->second << std::endl;
+               }
+               return false;
+             }
+
+
+         }
+     }
+   }
+   return false;
 }
 
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

@@ -243,6 +243,7 @@ class DefaultIEW
      */
     void squashDueToMemOrder(DynInstPtr &inst, ThreadID tid);
 
+    void squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid);
     /** Sets Dispatch to blocked, and signals back to other stages to block. */
     void block(ThreadID tid);
 

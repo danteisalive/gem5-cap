@@ -191,8 +191,8 @@ DefaultIEW<Impl>::regStats()
 
     iewLSQCapabilityBlockEvent
         .name(name() + ".iewLSQCapabilityBlockEvent")
-        .desc("number of times the IEW blocked due to a capability check");       
-         
+        .desc("number of times the IEW blocked due to a capability check");
+
     iewLSQFullEvents
         .name(name() + ".iewLSQFullEvents")
         .desc("Number of times the LSQ has become full, causing a stall");
@@ -489,7 +489,8 @@ DefaultIEW<Impl>::squashDueToBranch(DynInstPtr &inst, ThreadID tid)
             "[sn:%i].\n", tid, inst->pcState(), inst->seqNum);
 
     if (!toCommit->squash[tid] ||
-            inst->seqNum < toCommit->squashedSeqNum[tid]) {
+        inst->seqNum < toCommit->squashedSeqNum[tid])
+    {
         toCommit->squash[tid] = true;
         toCommit->squashedSeqNum[tid] = inst->seqNum;
         toCommit->branchTaken[tid] = inst->pcState().branching();
@@ -532,6 +533,35 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
         wroteToTimeBuffer = true;
     }
 }
+
+
+template<class Impl>
+void
+DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
+{
+    DPRINTF(IEW, "[tid:%i]: Wrong PID predicted,"
+            "insts, PC: %s [sn:%i].\n", tid, inst->pcState(), inst->seqNum);
+
+    if (!toCommit->squash[tid] ||
+            inst->seqNum < toCommit->squashedSeqNum[tid]) {
+        toCommit->squash[tid] = true;
+
+        toCommit->squashedSeqNum[tid] = inst->seqNum;
+
+        TheISA::PCState pc = inst->pcState();
+        //TheISA::advancePC(pc, inst->staticInst);
+
+        toCommit->pc[tid] = pc;
+        toCommit->mispredictInst[tid] = NULL;
+
+        // Must include the memory violator in the squash? I dont think so
+        // we will just update the PID and continue running
+        toCommit->includeSquashInst[tid] = true;
+
+        wroteToTimeBuffer = true;
+    }
+}
+
 
 template<class Impl>
 void
@@ -953,10 +983,8 @@ template <class Impl>
 void
 DefaultIEW<Impl>::LSQWalker(ThreadID tid)
 {
-    
-    ldstQueue.lsqWalker(tid);
-     
 
+    ldstQueue.lsqWalker(tid);
 
 }
 
@@ -1072,7 +1100,7 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
                 inst->resetFlag(StaticInstFlags::IsCapabilityChecked);
                 inst->resetFlag(StaticInstFlags::IsCapFetched);
             }
-            
+
             ldstQueue.insertLoad(inst);
 
             ++iewDispLoadInsts;
@@ -1080,12 +1108,12 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
             add_to_iq = true;
 
             toRename->iewInfo[tid].dispatchedToLQ++;
-            
+
 
         } else if (inst->isStore()) {
             DPRINTF(IEW, "[tid:%i]: Issue: Memory instruction "
                     "encountered, adding to LSQ.\n", tid);
-            
+
             if (0){
                 inst->resetFlag(StaticInstFlags::IsCapabilityChecked);
                 inst->resetFlag(StaticInstFlags::IsCapFetched);
@@ -1111,7 +1139,7 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
             }
 
             toRename->iewInfo[tid].dispatchedToSQ++;
-         
+
 
         } else if (inst->isMemBarrier() || inst->isWriteBarrier()) {
             // Same as non-speculative stores.
@@ -1169,9 +1197,11 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
 
         ppDispatch->notify(inst);
     }
-    
-    // Here we are out of dispatching and we call lsqWalker once before we go into block state
-    //call SQL walker and try to check caps for a load or store/ make sure that you consider store forwading cases
+
+    // Here we are out of dispatching and we call
+    //lsqWalker once before we go into block state
+    //call SQL walker and try to check caps for a
+    //load or store/ make sure that you consider store forwading cases
     if (0){
         LSQWalker(tid);
     }
@@ -1356,7 +1386,7 @@ DefaultIEW<Impl>::executeInsts()
         // scheduler is used.  Currently the scheduler schedules the oldest
         // instruction first, so the branch resolution order will be correct.
         ThreadID tid = inst->threadNumber;
-
+        ThreadContext * tc = cpu->tcBase(tid);
         if (!fetchRedirect[tid] ||
             !toCommit->squash[tid] ||
             toCommit->squashedSeqNum[tid] > inst->seqNum) {
@@ -1406,6 +1436,27 @@ DefaultIEW<Impl>::executeInsts()
 
                 ++memOrderViolationEvents;
             }
+
+            else if (tc->enableCapability &&
+                    ldstQueue.checkPIDMisprediction(tid))
+            {
+                assert(0);
+                assert(inst->isMemRef());
+
+                DynInstPtr mispredictedInst;
+                mispredictedInst = ldstQueue.getMemWithWrongPID(tid);
+
+                DPRINTF(IEW, "LDSTQ detected a mispredicted PID load . "
+                        "Violator PC: %s "
+                        "[sn:%lli], inst PC: %s [sn:%lli]. Addr is: %#x.\n",
+                        mispredictedInst->pcState(), mispredictedInst->seqNum,
+                        inst->pcState(), inst->seqNum, inst->physEffAddrLow);
+
+               //fetchRedirect[tid] = true;
+               squashDueToMispredictedPID(mispredictedInst, tid);
+
+            }
+
         } else {
             // Reset any state associated with redirects that will not
             // be used.
@@ -1635,26 +1686,6 @@ DefaultIEW<Impl>::updateExeInstStats(DynInstPtr &inst)
 #endif
     inst->completeTick = curTick() - inst->fetchTick;
     inst->completeCycle = cpu->curCycle();
-    //uint64_t cc = cpu->curCycle();
-    // ThreadContext * tc = cpu->tcBase(tid);
-    // if (tc->enableCapability){
-    //     if (inst->isLoad() || inst->isStore()){
-    //         if (inst->completeTick - inst->dispatchTick >= 1000)
-    //             DPRINTF(Capability, "fetchTick: %d decodeTick: %d renameTick: %d dispatchTick: %llu issueTick: %d completeTick %llu diff: %llu\n", 
-    //                             inst->fetchTick , 
-    //                             inst->fetchTick + inst->decodeTick ,
-    //                             inst->fetchTick + inst->renameTick , 
-    //                             inst->dispatchCycle,
-    //                             inst->fetchTick + inst->issueTick,
-    //                             inst->completeCycle,
-    //                             inst->completeCycle - inst->dispatchCycle//,
-    //                             //cc
-    //                             );
-            
-    //     }
-    // }
-
-
     //
     //  Control operations
     //
@@ -1703,5 +1734,8 @@ DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
         }
     }
 }
+
+
+
 
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

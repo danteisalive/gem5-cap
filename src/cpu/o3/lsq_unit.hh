@@ -121,6 +121,8 @@ class LSQUnit {
 
     bool lsqWalker();
     uint64_t lsqGetCachePort(DynInstPtr& inst);
+    bool mispredictedPID(ThreadID tid, DynInstPtr &inst);
+
     /** Inserts a load instruction. */
     void insertLoad(DynInstPtr &load_inst);
     /** Inserts a store instruction. */
@@ -184,6 +186,11 @@ class LSQUnit {
 
     /** Returns the memory ordering violator. */
     DynInstPtr getMemDepViolator();
+
+    bool checkPIDMisprediction() { return loadWithWrongPID;}
+
+    DynInstPtr getMemWithWrongPID();
+
 
     /** Returns the number of free LQ entries. */
     unsigned numFreeLoadEntries();
@@ -343,7 +350,7 @@ class LSQUnit {
             : inst(NULL), req(NULL), size(0),
               canWB(0), committed(0), completed(0)
         {
-            
+
             std::memset(data, 0, sizeof(data));
         }
 
@@ -357,7 +364,7 @@ class LSQUnit {
             : inst(_inst), req(NULL), sreqLow(NULL), sreqHigh(NULL), size(0),
               isSplit(0), canWB(0), committed(0), completed(0), isAllZeros(0)
         {
-            
+
             std::memset(data, 0, sizeof(data));
         }
         /** The store data. */
@@ -438,7 +445,7 @@ class LSQUnit {
     uint64_t CapabilityLoadPorts[2];
     uint64_t CapabilityFuncUints[2];
     std::mt19937 rng;
-     
+
 
     /// @todo Consider moving to a more advanced model with write vs read ports
     /** The number of cache ports available each cycle (stores only). */
@@ -476,6 +483,8 @@ class LSQUnit {
     /** The oldest load that caused a memory ordering violation. */
     DynInstPtr memDepViolator;
 
+    /** The load that with wrong PID. */
+    DynInstPtr loadWithWrongPID;
     /** Whether or not there is a packet that couldn't be sent because of
      * a lack of cache ports. */
     bool hasPendingPkt;

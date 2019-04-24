@@ -260,9 +260,15 @@ template<class Impl>
 bool
 LSQ<Impl>::lsqWalker(ThreadID tid)
 {
-    
-
     return thread[tid].lsqWalker();
+}
+
+template<class Impl>
+bool
+LSQ<Impl>::mispredictedPID(DynInstPtr &inst)
+{
+    ThreadID tid = inst->threadNumber;
+    return thread[tid].mispredictedPID(tid, inst);
 }
 
 
@@ -333,6 +339,25 @@ LSQ<Impl>::violation()
         ThreadID tid = *threads++;
 
         if (thread[tid].violation())
+            return true;
+    }
+
+    return false;
+}
+
+
+template<class Impl>
+bool
+LSQ<Impl>::checkPIDMisprediction()
+{
+    /* Answers: Does Anybody Have a mispredicted PID?*/
+    list<ThreadID>::iterator threads = activeThreads->begin();
+    list<ThreadID>::iterator end = activeThreads->end();
+
+    while (threads != end) {
+        ThreadID tid = *threads++;
+
+        if (thread[tid].checkPIDMisprediction())
             return true;
     }
 

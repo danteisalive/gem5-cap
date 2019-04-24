@@ -148,7 +148,6 @@ namespace X86ISA
             for (j = 0; j < MAX_SIZE; j++){
 
                 if (TheCache[j].tag == thisIsTheTag){
-
                     //We have a hit!
                     hit = 1;
                     total_hits = total_hits + 1;
