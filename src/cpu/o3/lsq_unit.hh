@@ -122,6 +122,7 @@ class LSQUnit {
     bool lsqWalker();
     uint64_t lsqGetCachePort(DynInstPtr& inst);
     bool mispredictedPID(ThreadID tid, DynInstPtr &inst);
+    void updateAliasTable(ThreadID tid, DynInstPtr &inst);
 
     /** Inserts a load instruction. */
     void insertLoad(DynInstPtr &load_inst);
@@ -441,6 +442,9 @@ class LSQUnit {
     /** The index of the tail instruction in the SQ. */
     int storeTail;
 
+    uint64_t prevRSPValue;
+    uint64_t NumOfAliasTableAccess;
+    uint64_t FalsePredict;
 
     uint64_t CapabilityLoadPorts[2];
     uint64_t CapabilityFuncUints[2];

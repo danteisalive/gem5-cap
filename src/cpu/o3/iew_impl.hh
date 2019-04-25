@@ -1668,6 +1668,41 @@ DefaultIEW<Impl>::tick()
         DPRINTF(Activity, "Activity this cycle.\n");
         cpu->activityThisCycle();
     }
+
+    // if ((uint64_t)cpu->thread[tid]->numInsts.value() % 1000000 == 0 &&
+    //     !inst->isNop() &&
+    //     !inst->isInstPrefetch() &&
+    //     inst->isLastMicroop()
+    //    )
+    // {
+    //
+    //     uint64_t _pid = 0;
+    //     uint64_t num = 0;
+    //     for (size_t i = 1; i < tc->PID.getPID(); i++) {
+    //       uint64_t _num = 0;
+    //       for (auto& elem: tc->ExecuteAliasTable){
+    //           if (elem.second.getPID() == i){
+    //               _num++;
+    //           }
+    //       }
+    //       if (_num >= num){
+    //         num = _num;
+    //         _pid = i;
+    //       }
+    //     }
+    //
+    //     std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
+    //     " ExecuteAliasTable Size: " <<
+    //     tc->ExecuteAliasTable.size() <<
+    //     " Prediction Accuracy(1e6 Instr.): " <<
+    //     (double)(NumOfAliasTableAccess - FalsePredict) /
+    //     NumOfAliasTableAccess <<
+    //     " Highest Number of Element: " <<
+    //     " PID(" << _pid << ")" << "[" << num << "]" <<
+    //     std::endl;
+    //
+    //     NumOfAliasTableAccess=0; FalsePredict=0;
+    // }
 }
 
 template <class Impl>

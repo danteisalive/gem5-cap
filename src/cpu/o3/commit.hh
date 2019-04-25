@@ -138,11 +138,8 @@ class DefaultCommit
     CommitPolicy commitPolicy;
 
     uint64_t prevRSPValue;
-    uint64_t NumOfMemTrackTableAccess;
-    //uint64_t StackAdd;
     uint64_t StackRemove;
     uint64_t NumOfAllocations;
-    uint64_t FalsePredict;
 
     /** Probe Points. */
     ProbePointArg<DynInstPtr> *ppCommit;
@@ -315,7 +312,7 @@ class DefaultCommit
     void collector(ThreadID tid, DynInstPtr &head_inst);
     void updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
     void RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
-    void RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst);
+    void updateAliasTable(ThreadID tid, DynInstPtr &head_inst);
     TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
     void validateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
     /** Gets the thread to commit, based on the SMT policy. */

@@ -117,8 +117,7 @@ class ThreadContext
     typedef std::map<X86ISA::IntRegIndex, TheISA::PointerID>
                                                     RegisterTrackTable;
 
-    typedef std::map<Addr, TheISA::PointerID> MemoryTrackTable;
-    typedef std::map<TheISA::PointerID, Addr> OrderedMemoryTrackTable;
+    typedef std::map<Addr, TheISA::PointerID> AliasTable;
     typedef SymbolCache::iterator   SymbolCacheIter;
     //typedef RangeCapabilityCache::iterator RangeCapCacheIter;
 
@@ -135,8 +134,8 @@ class ThreadContext
     TheISA::PointerID                           PID = TheISA::PointerID(0);
     TheISA::StackID                             SID = TheISA::StackID(0);
     RegisterTrackTable                          RegTrackTable;
-    MemoryTrackTable                            MemTrackTable;
-    //OrderedMemoryTrackTable                     OrderedMemTrackTable;
+    AliasTable                                  CommitAliasTable;
+    AliasTable                                  ExecuteAliasTable;
     CapabilityRegistersFile                     CapRegsFile;
     TheISA::LRUCapabilityCache                  LRUCapCache{128, 16, 2048};
     TheISA::LRUPIDCache                         LRUPidCache{128};

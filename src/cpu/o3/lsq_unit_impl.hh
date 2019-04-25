@@ -206,7 +206,12 @@ LSQUnit<Impl>::resetState()
 
     retryPkt = NULL;
     memDepViolator = NULL;
+
     loadWithWrongPID = NULL;
+    prevRSPValue = 0;
+    NumOfAliasTableAccess = 0;
+    FalsePredict = 0;
+
     stalled = false;
 
     cacheBlockMask = ~(cpu->cacheLineSize() - 1);
@@ -1036,7 +1041,7 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
     if (tc->enableCapability && store_inst->isBoundsCheckMicroop()){
         store_inst->setExecuted();
         store_inst->setCompleted();
-        store_inst->setCanCommit();
+        //store_inst->setCanCommit();
         return store_fault;
     }
 
@@ -1069,6 +1074,10 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
         ++storesToWB;
     }
 
+    panic_if(!store_inst->effAddrValid(), "store effAddr is not valid!");
+    if (tc->enableCapability){
+      updateAliasTable( tid, store_inst);
+    }
     return checkViolations(load_idx, store_inst);
 
 }
@@ -1748,17 +1757,6 @@ bool
 LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 {
 
-  //return false;
-   // if (inst->uop_pid == TheISA::PointerID{99}){
-   //    return false;
-   // }
-   // else {
-   //    TheISA::PointerID  pid = TheISA::PointerID{99};
-   //    cpu->updateFetchLVPT(inst, pid, false);
-   //    return true;
-   // }
-
-
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
 
@@ -1769,15 +1767,15 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                          (X86ISA::IntRegIndex)inst->destRegIdx(0).index();
          if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
              return false;
-         auto mtt_it = tc->MemTrackTable.find(inst->effAddr);
-         if (mtt_it != tc->MemTrackTable.end()){
+         auto mtt_it = tc->ExecuteAliasTable.find(inst->effAddr);
+         if (mtt_it != tc->ExecuteAliasTable.end()){
              //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
              //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-
+             NumOfAliasTableAccess++;
              if (inst->uop_pid != mtt_it->second){
                  cpu->updateFetchLVPT(inst, mtt_it->second, false);
-
-                 if (1){
+                 FalsePredict++;
+                 if (0){
                    std::cout << std::hex <<
                    "EXECUTE: False Prediction Load Instruction: " <<
                    inst->pcState().instAddr() << " " <<
@@ -1789,7 +1787,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
              }
              else {
                  cpu->updateFetchLVPT(inst, mtt_it->second, true);
-                 if (1){
+                 if (0){
                    std::cout << std::hex <<
                    "EXECUTE: True Prediction Load Instruction: " <<
                    inst->pcState().instAddr() << " " <<
@@ -1810,15 +1808,15 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
         if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
            return false;
 
-         auto mtt_it = tc->MemTrackTable.find(inst->effAddr);
-         if (mtt_it != tc->MemTrackTable.end()){
+         auto mtt_it = tc->ExecuteAliasTable.find(inst->effAddr);
+         if (mtt_it != tc->ExecuteAliasTable.end()){
              //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
              //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-
+             NumOfAliasTableAccess++;
              if (inst->uop_pid != mtt_it->second){
                cpu->updateFetchLVPT(inst, mtt_it->second, false);
-
-               if (1){
+               FalsePredict++;
+               if (0){
                    std::cout << std::hex <<
                    "EXECUTE: False Prediction Load Instruction: " <<
                    inst->pcState().instAddr() << " " <<
@@ -1830,7 +1828,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
              }
              else {
                cpu->updateFetchLVPT(inst, mtt_it->second, true);
-               if (1){
+               if (0){
                    std::cout << std::hex <<
                    "EXECUTE: True Prediction Load Instruction: " <<
                    inst->pcState().instAddr() << " " <<
@@ -1844,7 +1842,103 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
          }
      }
    }
+
    return false;
 }
+
+
+template <class Impl>
+void
+LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
+{
+
+  ThreadContext * tc = cpu->tcBase(tid);
+  const StaticInstPtr si = inst->staticInst;
+
+  // sanitization
+  if (inst->isMicroopInjected()) return;
+
+  if ((si->getName().compare("st") == 0)){
+
+      if (inst->srcRegIdx(2).isIntReg()){
+
+        X86ISA::IntRegIndex   src2 =
+                        (X86ISA::IntRegIndex)inst->srcRegIdx(2).index();
+        if (src2 < X86ISA::INTREG_RAX ||
+            src2 >= X86ISA::NUM_INTREGS + 15)
+            return;
+
+        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        for (auto& capElem : tc->CapRegsFile){
+            if (capElem.second.getBaseAddr() == archRegContent){
+                _pid = capElem.first;
+                break;
+            }
+        }
+
+        if (_pid != TheISA::PointerID(0))
+        {
+
+            std::string s1 = si->disassemble(inst->pcState().pc());
+
+            tc->ExecuteAliasTable[inst->effAddr] = _pid;
+
+        }
+        else if (tc->ExecuteAliasTable.find(inst->effAddr) !=
+                                      tc->ExecuteAliasTable.end())
+        {
+          tc->ExecuteAliasTable.erase(inst->effAddr);
+        }
+      }
+  }
+  else if ((si->getName().compare("stis") == 0)){
+
+    if (inst->srcRegIdx(2).isIntReg()){
+        X86ISA::IntRegIndex   src2 =
+                    (X86ISA::IntRegIndex)inst->srcRegIdx(2).index();
+        if (src2 < X86ISA::INTREG_RAX ||
+            src2 >= X86ISA::NUM_INTREGS)
+                return;
+
+        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
+
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        for (auto& capElem : tc->CapRegsFile){
+            if (capElem.second.getBaseAddr() == archRegContent){
+                _pid = capElem.first;
+                break;
+            }
+        }
+        if (_pid != TheISA::PointerID(0)){
+            tc->ExecuteAliasTable[inst->effAddr] = _pid;
+        }
+    }
+
+  }
+
+
+  uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
+  if (prevRSPValue < newRSPValue){
+      for (auto mtt_it = tc->ExecuteAliasTable.cbegin();
+                    mtt_it != tc->ExecuteAliasTable.cend(); /* no increment */)
+      {
+          if (mtt_it->first < newRSPValue &&
+              mtt_it->first >= prevRSPValue)
+          {
+              mtt_it = tc->ExecuteAliasTable.erase(mtt_it);
+          }
+          else {
+              ++mtt_it;
+          }
+      }
+
+  }
+  prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
+
+
+}
+
+
 
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

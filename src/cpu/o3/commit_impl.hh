@@ -104,8 +104,7 @@ DefaultCommit<Impl>::DefaultCommit(O3CPU *_cpu, DerivO3CPUParams *params)
 
     _status = Active;
     prevRSPValue = 0;
-    NumOfMemTrackTableAccess = 0; StackRemove=0; NumOfAllocations=0;
-    FalsePredict = 0;
+     StackRemove=0; NumOfAllocations=0;
     _nextStatus = Inactive;
     std::string policy = params->smtCommitPolicy;
 
@@ -1294,19 +1293,14 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
         if (prevRSPValue < newRSPValue){
 
-            for (auto mtt_it = tc->MemTrackTable.cbegin();
-                  mtt_it != tc->MemTrackTable.cend(); /* no increment */)
+            for (auto mtt_it = tc->CommitAliasTable.cbegin();
+                  mtt_it != tc->CommitAliasTable.cend(); /* no increment */)
             {
                 if (mtt_it->first < newRSPValue &&
                     mtt_it->first >= prevRSPValue)
                 {
 
-                    // if (ENABLE_CAPABILITY_DEBUG)
-                    // {
-                    //   std::cout << "Deleted from MemTrackTable! Mem[" <<
-                    //   mtt_it->first <<"][" << mtt_it->second << "]"<<'\n';
-                    // }
-                    mtt_it = tc->MemTrackTable.erase(mtt_it);
+                    mtt_it = tc->CommitAliasTable.erase(mtt_it);
                     StackRemove++;
                 }
                 else {
@@ -1343,7 +1337,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         //validateRegTrackTable(tid, head_inst);
         //updateRegTrackTable(tid, head_inst);
         //RefreshRegTrackTable(tid, head_inst);
-        RefreshMemTrackTable(tid, head_inst);
+        updateAliasTable(tid, head_inst);
 
         if ((uint64_t)cpu->thread[tid]->numInsts.value() % 1000000 == 0 &&
             !head_inst->isNop() &&
@@ -1352,20 +1346,11 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
            )
         {
 
-          // for (size_t i = 1; i < tc->PID.getPID(); i++) {
-          //   for (auto& elem: tc->MemTrackTable){
-          //       if (elem.second.getPID() == i){
-          //           std::cout <<  std::hex << elem.second <<
-          //              " " << elem.first << "\n";
-          //       }
-          //   }
-          // }
-
             uint64_t _pid = 0;
             uint64_t num = 0;
             for (size_t i = 1; i < tc->PID.getPID(); i++) {
               uint64_t _num = 0;
-              for (auto& elem: tc->MemTrackTable){
+              for (auto& elem: tc->CommitAliasTable){
                   if (elem.second.getPID() == i){
                       _num++;
                   }
@@ -1379,7 +1364,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             uint64_t _allocs = 0;
             for (size_t i = 1; i < tc->PID.getPID(); i++) {
 
-              for (auto& elem: tc->MemTrackTable){
+              for (auto& elem: tc->CommitAliasTable){
                   if (elem.second.getPID() == i){
                       _allocs++;
                       break;
@@ -1388,12 +1373,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             }
 
             std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
-            " MemTrackTable Size: " <<
-            tc->MemTrackTable.size() <<
-            " NumOfMemTrackAccess: " << NumOfMemTrackTableAccess <<
-            " Prediction Accuracy(1e6 Instr.): " <<
-            (double)(NumOfMemTrackTableAccess - FalsePredict) /
-            NumOfMemTrackTableAccess <<
+            " CommitAliasTable Size: " <<
+            tc->CommitAliasTable.size() <<
             " NumOfAllocations: " << NumOfAllocations <<
             " Highest Number of Element: " <<
             " PID(" << _pid << ")" << "[" << num << "]" <<
@@ -1402,8 +1383,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             tc->LRUCapCache.LRUCachePrintStats();
             tc->LRUPidCache.LRUPIDCachePrintStats();
 
-            NumOfMemTrackTableAccess=0; StackRemove=0; FalsePredict=0;
-            //tc->OrderedMemTrackTable.clear();
+            StackRemove=0;
 
         }
     }
@@ -1511,13 +1491,13 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
                                                   TheISA::PointerID(0);
               }
             }
-            // erase from MemTrackTable
-            for (auto mtt_it = tc->MemTrackTable.cbegin();
-                mtt_it != tc->MemTrackTable.cend(); /* no increment */)
+            // erase from CommitAliasTable
+            for (auto mtt_it = tc->CommitAliasTable.cbegin();
+                mtt_it != tc->CommitAliasTable.cend(); /* no increment */)
             {
                 if (mtt_it->second.getPID() == _pid.getPID()) {
                   //std::cout << "called! from realloc" << std::endl;
-                  mtt_it = tc->MemTrackTable.erase(mtt_it);
+                  mtt_it = tc->CommitAliasTable.erase(mtt_it);
                 }
                 else {
                   ++mtt_it;
@@ -1687,15 +1667,15 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
                tc->RegTrackTable[(X86ISA::IntRegIndex)i] =TheISA::PointerID(0);
              }
             }
-              // erase from MemTrackTable
-              for (auto mtt_it = tc->MemTrackTable.cbegin();
-                    mtt_it != tc->MemTrackTable.cend(); /* no increment */)
+              // erase from CommitAliasTable
+              for (auto mtt_it = tc->CommitAliasTable.cbegin();
+                    mtt_it != tc->CommitAliasTable.cend(); /* no increment */)
               {
                   if (mtt_it->second.getPID() == _pid.getPID()) {
-                    //std::cout << "Deleted from MemTrackTable! Mem[" <<
+                    //std::cout << "Deleted from CommitAliasTable! Mem[" <<
                     //mtt_it->first <<"][" << mtt_it->second << "]"<<'\n';
                     //std::cout << "called from free!" << std::endl;
-                    mtt_it = tc->MemTrackTable.erase(mtt_it);
+                    mtt_it = tc->CommitAliasTable.erase(mtt_it);
                   }
                   else {
                     ++mtt_it;
@@ -1706,7 +1686,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           tc->stopTracking  = true;
     }
     else if (head_inst->isFreeRetMicroop()){
-          //DPRINTF(Capability,"Free Ret\n");
           tc->stopTracking  = false;
     }
 
@@ -2408,7 +2387,7 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
           cpu->readArchIntReg(src2, tid) <<
           std::endl;
 
-            tc->MemTrackTable[head_inst->effAddr] = tc->RegTrackTable[src2];
+            tc->CommitAliasTable[head_inst->effAddr] = tc->RegTrackTable[src2];
 
             if (ENABLE_CAPABILITY_DEBUG){
                 std::cout << std::hex << head_inst->pcState().pc() <<
@@ -2441,8 +2420,8 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
                         (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
         TheISA::PointerID    _pid_dest = tc->RegTrackTable[dest];
 
-        auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
-        if (mtt_it != tc->MemTrackTable.end()){
+        auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
+        if (mtt_it != tc->CommitAliasTable.end()){
 
             tc->RegTrackTable[dest] = mtt_it->second;
 
@@ -2484,8 +2463,8 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
                         (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
         TheISA::PointerID    _pid_dest = tc->RegTrackTable[dest];
 
-        auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
-        if (mtt_it != tc->MemTrackTable.end()){
+        auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
+        if (mtt_it != tc->CommitAliasTable.end()){
             tc->RegTrackTable[dest] = mtt_it->second;
 
             if (ENABLE_CAPABILITY_DEBUG){
@@ -2512,7 +2491,7 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
                         (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
         TheISA::PointerID     _pid_src2 = tc->RegTrackTable[src2];
         if (_pid_src2 != TheISA::PointerID(0)){
-            tc->MemTrackTable[head_inst->effAddr] = tc->RegTrackTable[src2];
+            tc->CommitAliasTable[head_inst->effAddr] = tc->RegTrackTable[src2];
 
             if (ENABLE_CAPABILITY_DEBUG){
 
@@ -2661,7 +2640,7 @@ DefaultCommit<Impl>::updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
 
 template <class Impl>
 void
-DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
+DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
 {
 
   ThreadContext * tc = cpu->tcBase(tid);
@@ -2694,110 +2673,14 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
 
         if (_pid != TheISA::PointerID(0))
         {
-
-            std::string s1 = si->disassemble(head_inst->pcState().pc());
-
-            tc->MemTrackTable[head_inst->effAddr] = _pid;
-
-            if (ENABLE_CAPABILITY_DEBUG){
-              std::cout << si->disassemble(head_inst->pcState().pc()) <<
-              std::endl;
-              std::cout << "OPERAND(1): " << cpu->readArchIntReg(src2, tid) <<
-              std::endl;
-              std::cout << std::hex << head_inst->pcState().pc() <<
-              ": St                  " <<
-              "Mem[" <<  head_inst->effAddr << "]" << " = " <<
-              X86ISA::IntRegIndexStr(src2) << "[" <<  _pid << "]" <<
-              std::endl;
-              std::cout << "<--------------------------------------->" <<
-              std::endl;
-          }
-
+            tc->CommitAliasTable[head_inst->effAddr] = _pid;
         }
-        else if (tc->MemTrackTable.find(head_inst->effAddr) !=
-                                                    tc->MemTrackTable.end())
+        else if (tc->CommitAliasTable.find(head_inst->effAddr) !=
+                                                    tc->CommitAliasTable.end())
         {
-          tc->MemTrackTable.erase(head_inst->effAddr);
+          tc->CommitAliasTable.erase(head_inst->effAddr);
         }
       }
-  }
-  else if ((si->getName().compare("ld") == 0)){
-
-    if (head_inst->destRegIdx(0).isIntReg()){
-        X86ISA::IntRegIndex   dest =
-                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
-            return;
-        auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
-        if (mtt_it != tc->MemTrackTable.end()){
-            tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
-            tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-
-            if (head_inst->uop_pid != mtt_it->second){
-                cpu->updateFetchLVPT(head_inst, mtt_it->second, false);
-                FalsePredict++;
-                if (1){
-                  std::cout << std::hex <<
-                  "Commit: False Prediction Load Instruction: " <<
-                  head_inst->pcState().instAddr() << " " <<
-                  "Predicted: " << head_inst->uop_pid << " " <<
-                  "Actual: " << mtt_it->second << std::endl;
-              }
-            }
-            else {
-                cpu->updateFetchLVPT(head_inst, mtt_it->second, true);
-                if (1){
-                  std::cout << std::hex <<
-                  "Commit: True Prediction Load Instruction: " <<
-                  head_inst->pcState().instAddr() << " " <<
-                  "Predicted: " << head_inst->uop_pid << " " <<
-                  "Actual: " << mtt_it->second << std::endl;
-                }
-            }
-
-            NumOfMemTrackTableAccess++;
-        }
-    }
-  }
-  else if ((si->getName().compare("ldis") == 0)){
-
-    if (head_inst->destRegIdx(0).isIntReg()){
-        X86ISA::IntRegIndex   dest =
-                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-       if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
-          return;
-
-        auto mtt_it = tc->MemTrackTable.find(head_inst->effAddr);
-        if (mtt_it != tc->MemTrackTable.end()){
-            tc->LRUCapCache.LRUCache_Access(head_inst->effAddr);
-            tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-
-            if (head_inst->uop_pid != mtt_it->second){
-              cpu->updateFetchLVPT(head_inst, mtt_it->second, false);
-              FalsePredict++;
-              if (1){
-                  std::cout << std::hex <<
-                  "Commit: False Prediction Load Instruction: " <<
-                  head_inst->pcState().instAddr() << " " <<
-                  "Predicted: " << head_inst->uop_pid << " " <<
-                  "Actual: " << mtt_it->second << std::endl;
-              }
-            }
-            else {
-              cpu->updateFetchLVPT(head_inst, mtt_it->second, true);
-              if (1){
-                  std::cout << std::hex <<
-                  "Commit: True Prediction Load Instruction: " <<
-                  head_inst->pcState().instAddr() << " " <<
-                  "Predicted: " << head_inst->uop_pid << " " <<
-                  "Actual: " << mtt_it->second << std::endl;
-              }
-            }
-
-            NumOfMemTrackTableAccess++;
-
-        }
-    }
   }
   else if ((si->getName().compare("stis") == 0)){
 
@@ -2818,7 +2701,7 @@ DefaultCommit<Impl>::RefreshMemTrackTable(ThreadID tid, DynInstPtr &head_inst)
             }
         }
         if (_pid != TheISA::PointerID(0)){
-            tc->MemTrackTable[head_inst->effAddr] = _pid;
+            tc->CommitAliasTable[head_inst->effAddr] = _pid;
         }
     }
 
