@@ -511,6 +511,8 @@ template<class Impl>
 void
 DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
 {
+
+    ThreadContext * tc = cpu->tcBase(tid);
     DPRINTF(IEW, "[tid:%i]: Memory violation, squashing violator and younger "
             "insts, PC: %s [sn:%i].\n", tid, inst->pcState(), inst->seqNum);
     // Need to include inst->seqNum in the following comparison to cover the
@@ -531,6 +533,7 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = true;
 
         wroteToTimeBuffer = true;
+        tc->ExecuteAliasTable = tc->CommitAliasTable;
     }
 }
 
@@ -549,14 +552,14 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
         toCommit->squashedSeqNum[tid] = inst->seqNum;
 
         TheISA::PCState pc = inst->pcState();
-        //TheISA::advancePC(pc, inst->staticInst);
+        TheISA::advancePC(pc, inst->staticInst);
 
         toCommit->pc[tid] = pc;
         toCommit->mispredictInst[tid] = NULL;
 
         // Must include the memory violator in the squash? I dont think so
         // we will just update the PID and continue running
-        toCommit->includeSquashInst[tid] = true;
+        toCommit->includeSquashInst[tid] = false;
 
         wroteToTimeBuffer = true;
     }
@@ -1443,21 +1446,20 @@ DefaultIEW<Impl>::executeInsts()
             else if (tc->enableCapability &&
                     ldstQueue.checkPIDMisprediction(tid))
             {
-                //assert(0);
-                //assert(inst->isMemRef());
-
                 DynInstPtr mispredictedInst;
                 mispredictedInst = ldstQueue.getMemWithWrongPID(tid);
+                assert(mispredictedInst);
+// std::cout << std::hex << "LDSTQ detected a mispredicted PID load . " <<
+// " Violator PC: " << mispredictedInst->pcState() << std::dec <<
+// " [sn:" << mispredictedInst->seqNum << "]" << std::hex <<
+// " , inst PC: " << inst->pcState() << std::dec <<
+// " [sn:" << inst->seqNum  << "] " << std::hex <<
+// " Addr is: " << inst->physEffAddrLow << "\n";
 
-                DPRINTF(IEW, "LDSTQ detected a mispredicted PID load . "
-                        "Violator PC: %s "
-                        "[sn:%lli], inst PC: %s [sn:%lli]. Addr is: %#x.\n",
-                        mispredictedInst->pcState(), mispredictedInst->seqNum,
-                        inst->pcState(), inst->seqNum, inst->physEffAddrLow);
 
-               //fetchRedirect[tid] = true;
+               fetchRedirect[tid] = true;
                //squashDueToMispredictedPID(mispredictedInst, tid);
-               tc->ExecuteAliasTable = tc->CommitAliasTable;
+
 
             }
 
@@ -1714,6 +1716,7 @@ void
 DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
 {
     ThreadID tid = inst->threadNumber;
+    ThreadContext * tc = cpu->tcBase(tid);
 
     if (!fetchRedirect[tid] ||
         !toCommit->squash[tid] ||
@@ -1736,6 +1739,7 @@ DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
             } else {
                 predictedNotTakenIncorrect++;
             }
+            tc->ExecuteAliasTable = tc->CommitAliasTable;
         }
     }
 }

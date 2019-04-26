@@ -59,7 +59,7 @@ DefaultLVPT::DefaultLVPT(unsigned _numEntries,
 
     tagMask = (1 << tagBits) - 1;
 
-    tagShiftAmt = instShiftAmt + floorLog2(numEntries); // 14
+    tagShiftAmt = instShiftAmt + floorLog2(numEntries); // 12 + 2
 
     //Setup the array of counters for the local predictor
     localBiases.resize(numEntries);
@@ -203,7 +203,8 @@ DefaultLVPT::update(
 
 
 
-
+    // std::cout << std::hex << "Inst. " << instPC << " updated the LVPT." <<
+    // " Before: " <<   lvpt[lvpt_idx].target << " After: " << target << "\n";
 
     localBiases[lvpt_idx] = target.getPID() - lvpt[lvpt_idx].target.getPID();
     lvpt[lvpt_idx].tid = tid;
