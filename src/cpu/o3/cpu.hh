@@ -724,7 +724,8 @@ class FullO3CPU : public BaseO3CPU
         return thread[tid]->getTC();
     }
 
-
+    uint64_t NumOfAliasTableAccess;
+    uint64_t FalsePredict;
 
 
     /** The global sequence number counter. */

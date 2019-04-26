@@ -1380,8 +1380,38 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " PID(" << _pid << ")" << "[" << num << "]" <<
             std::endl;
 
-            tc->LRUCapCache.LRUCachePrintStats();
-            tc->LRUPidCache.LRUPIDCachePrintStats();
+            {
+
+                uint64_t _pid = 0;
+                uint64_t num = 0;
+                for (size_t i = 1; i < tc->PID.getPID(); i++) {
+                  uint64_t _num = 0;
+                  for (auto& elem: tc->ExecuteAliasTable){
+                      if (elem.second.getPID() == i){
+                          _num++;
+                      }
+                  }
+                  if (_num >= num){
+                    num = _num;
+                    _pid = i;
+                  }
+                }
+
+                std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
+                " ExecuteAliasTable Size: " <<
+                tc->ExecuteAliasTable.size() <<
+                " Prediction Accuracy(1e6 Instr.): " <<
+                (double)(cpu->NumOfAliasTableAccess - cpu->FalsePredict) /
+                cpu->NumOfAliasTableAccess <<
+                " Highest Number of Element: " <<
+                " PID(" << _pid << ")" << "[" << num << "]" <<
+                std::endl;
+
+                cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
+            }
+
+            // tc->LRUCapCache.LRUCachePrintStats();
+            // tc->LRUPidCache.LRUPIDCachePrintStats();
 
             StackRemove=0;
 

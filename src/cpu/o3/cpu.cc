@@ -430,7 +430,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++)
            o3_tc->RegTrackTable[(X86ISA::IntRegIndex)i] = TheISA::PointerID(0);
 
-
+         NumOfAliasTableAccess = 0;
+         FalsePredict = 0;
 
         // Setup quiesce event.
         this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);

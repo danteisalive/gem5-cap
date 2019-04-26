@@ -209,8 +209,6 @@ LSQUnit<Impl>::resetState()
 
     loadWithWrongPID = NULL;
     prevRSPValue = 0;
-    NumOfAliasTableAccess = 0;
-    FalsePredict = 0;
 
     stalled = false;
 
@@ -1771,10 +1769,10 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
          if (mtt_it != tc->ExecuteAliasTable.end()){
              //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
              //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-             NumOfAliasTableAccess++;
+             cpu->NumOfAliasTableAccess++;
              if (inst->uop_pid != mtt_it->second){
                  cpu->updateFetchLVPT(inst, mtt_it->second, false);
-                 FalsePredict++;
+                 cpu->FalsePredict++;
                  if (0){
                    std::cout << std::hex <<
                    "EXECUTE: False Prediction Load Instruction: " <<
@@ -1812,10 +1810,10 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
          if (mtt_it != tc->ExecuteAliasTable.end()){
              //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
              //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-             NumOfAliasTableAccess++;
+             cpu->NumOfAliasTableAccess++;
              if (inst->uop_pid != mtt_it->second){
                cpu->updateFetchLVPT(inst, mtt_it->second, false);
-               FalsePredict++;
+               cpu->FalsePredict++;
                if (0){
                    std::cout << std::hex <<
                    "EXECUTE: False Prediction Load Instruction: " <<

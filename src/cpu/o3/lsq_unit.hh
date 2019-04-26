@@ -443,8 +443,7 @@ class LSQUnit {
     int storeTail;
 
     uint64_t prevRSPValue;
-    uint64_t NumOfAliasTableAccess;
-    uint64_t FalsePredict;
+
 
     uint64_t CapabilityLoadPorts[2];
     uint64_t CapabilityFuncUints[2];
