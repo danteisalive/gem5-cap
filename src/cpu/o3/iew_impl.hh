@@ -1458,7 +1458,7 @@ DefaultIEW<Impl>::executeInsts()
 
 
                fetchRedirect[tid] = true;
-               //squashDueToMispredictedPID(mispredictedInst, tid);
+               squashDueToMispredictedPID(mispredictedInst, tid);
 
 
             }
