@@ -1400,6 +1400,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
                 " ExecuteAliasTable Size: " <<
                 tc->ExecuteAliasTable.size() <<
+                " Number of Execute Alias Table accesses: " <<
+                cpu->NumOfAliasTableAccess <<
                 " Prediction Accuracy(1e6 Instr.): " <<
                 (double)(cpu->NumOfAliasTableAccess - cpu->FalsePredict) /
                 cpu->NumOfAliasTableAccess <<

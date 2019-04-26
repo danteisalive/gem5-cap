@@ -1376,7 +1376,6 @@ DefaultIEW<Impl>::executeInsts()
         }
 
         updateExeInstStats(inst);
-
         // Check if branch prediction was correct, if not then we need
         // to tell commit to squash in flight instructions.  Only
         // handle this if there hasn't already been something that
@@ -1387,6 +1386,10 @@ DefaultIEW<Impl>::executeInsts()
         // instruction first, so the branch resolution order will be correct.
         ThreadID tid = inst->threadNumber;
         ThreadContext * tc = cpu->tcBase(tid);
+
+        updateTracker(tid, inst);
+
+
         if (!fetchRedirect[tid] ||
             !toCommit->squash[tid] ||
             toCommit->squashedSeqNum[tid] > inst->seqNum) {
@@ -1440,8 +1443,8 @@ DefaultIEW<Impl>::executeInsts()
             else if (tc->enableCapability &&
                     ldstQueue.checkPIDMisprediction(tid))
             {
-                assert(0);
-                assert(inst->isMemRef());
+                //assert(0);
+                //assert(inst->isMemRef());
 
                 DynInstPtr mispredictedInst;
                 mispredictedInst = ldstQueue.getMemWithWrongPID(tid);
@@ -1453,7 +1456,8 @@ DefaultIEW<Impl>::executeInsts()
                         inst->pcState(), inst->seqNum, inst->physEffAddrLow);
 
                //fetchRedirect[tid] = true;
-               squashDueToMispredictedPID(mispredictedInst, tid);
+               //squashDueToMispredictedPID(mispredictedInst, tid);
+               tc->ExecuteAliasTable = tc->CommitAliasTable;
 
             }
 
@@ -1737,6 +1741,14 @@ DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
 }
 
 
+template <class Impl>
+void
+DefaultIEW<Impl>::updateTracker(ThreadID tid, DynInstPtr &head_inst)
+{
+    ThreadContext * tc = cpu->tcBase(tid);
+    tc->ExeStopTracking = tc->stopTracking;
+
+}
 
 
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

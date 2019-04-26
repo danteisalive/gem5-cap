@@ -1781,7 +1781,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                    "Actual: " << mtt_it->second << std::endl;
                  }
                  inst->uop_pid = mtt_it->second;
-               return false;
+               return true;
              }
              else {
                  cpu->updateFetchLVPT(inst, mtt_it->second, true);
@@ -1822,7 +1822,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                    "Actual: " << mtt_it->second << std::endl;
                }
                inst->uop_pid = mtt_it->second;
-               return false;
+               return true;
              }
              else {
                cpu->updateFetchLVPT(inst, mtt_it->second, true);
@@ -1855,6 +1855,7 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
   // sanitization
   if (inst->isMicroopInjected()) return;
+  if (tc->ExeStopTracking) return;
 
   if ((si->getName().compare("st") == 0)){
 

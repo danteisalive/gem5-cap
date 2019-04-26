@@ -127,6 +127,7 @@ class ThreadContext
 
     bool DisablePointerTracker;
     bool stopTracking;
+    bool ExeStopTracking;
     bool enableCapability;
     std::string symbolsFile;
 

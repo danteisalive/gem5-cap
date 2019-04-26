@@ -231,7 +231,7 @@ class DefaultIEW
 
     /** Check misprediction  */
     void checkMisprediction(DynInstPtr &inst);
-
+    void updateTracker(ThreadID tid, DynInstPtr &head_inst);
   private:
     /** Sends commit proper information for a squash due to a branch
      * mispredict.
