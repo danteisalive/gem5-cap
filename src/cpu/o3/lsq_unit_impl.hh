@@ -1765,11 +1765,12 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                          (X86ISA::IntRegIndex)inst->destRegIdx(0).index();
          if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
              return false;
+
+         cpu->NumOfAliasTableAccess++;
          auto mtt_it = tc->ExecuteAliasTable.find(inst->effAddr);
          if (mtt_it != tc->ExecuteAliasTable.end()){
              //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
              //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-             cpu->NumOfAliasTableAccess++;
              if (inst->uop_pid != mtt_it->second){
                  cpu->updateFetchLVPT(inst, mtt_it->second, false);
                  cpu->FalsePredict++;
@@ -1796,6 +1797,21 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
              }
 
          }
+         // this is not a pointer refill so we need to check whether
+         // LVPT predicted right or not
+         else {
+           TheISA::PointerID _pid_t  = TheISA::PointerID{0};
+           if (inst->uop_pid != TheISA::PointerID(0)){
+               cpu->updateFetchLVPT(inst, _pid_t, false);
+               cpu->FalsePredict++;
+               inst->uop_pid = TheISA::PointerID(0);
+               return true;
+           }
+           else {
+               cpu->updateFetchLVPT(inst, _pid_t, true);
+               return false;
+           }
+        }
      }
    }
    else if ((si->getName().compare("ldis") == 0)){
@@ -1806,11 +1822,12 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
         if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
            return false;
 
+         cpu->NumOfAliasTableAccess++;
          auto mtt_it = tc->ExecuteAliasTable.find(inst->effAddr);
          if (mtt_it != tc->ExecuteAliasTable.end()){
              //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
              //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-             cpu->NumOfAliasTableAccess++;
+
              if (inst->uop_pid != mtt_it->second){
                cpu->updateFetchLVPT(inst, mtt_it->second, false);
                cpu->FalsePredict++;
@@ -1838,6 +1855,21 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
 
          }
+         // this is not a pointer refill so we need to check whether
+         // LVPT predicted right or not
+         else {
+           TheISA::PointerID _pid_t  = TheISA::PointerID{0};
+           if (inst->uop_pid != TheISA::PointerID(0)){
+               cpu->updateFetchLVPT(inst, _pid_t, false);
+               cpu->FalsePredict++;
+               inst->uop_pid = TheISA::PointerID(0);
+               return true;
+           }
+           else {
+               cpu->updateFetchLVPT(inst, _pid_t, true);
+               return false;
+           }
+        }
      }
    }
 
