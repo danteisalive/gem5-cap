@@ -503,6 +503,12 @@ DefaultIEW<Impl>::squashDueToBranch(DynInstPtr &inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = false;
 
         wroteToTimeBuffer = true;
+
+        ThreadContext * tc = cpu->tcBase(tid);
+        if (tc->enableCapability &&
+            (tc->ExecuteAliasTable.size() > tc->CommitAliasTable.size() + 50)){
+          tc->ExecuteAliasTable = tc->CommitAliasTable;
+        }
     }
 
 }
@@ -512,7 +518,7 @@ void
 DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
 {
 
-    ThreadContext * tc = cpu->tcBase(tid);
+
     DPRINTF(IEW, "[tid:%i]: Memory violation, squashing violator and younger "
             "insts, PC: %s [sn:%i].\n", tid, inst->pcState(), inst->seqNum);
     // Need to include inst->seqNum in the following comparison to cover the
@@ -533,7 +539,12 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = true;
 
         wroteToTimeBuffer = true;
-        tc->ExecuteAliasTable = tc->CommitAliasTable;
+
+        ThreadContext * tc = cpu->tcBase(tid);
+        if (tc->enableCapability &&
+            (tc->ExecuteAliasTable.size() > tc->CommitAliasTable.size() + 50)){
+          tc->ExecuteAliasTable = tc->CommitAliasTable;
+        }
     }
 }
 
@@ -1716,7 +1727,6 @@ void
 DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
 {
     ThreadID tid = inst->threadNumber;
-    ThreadContext * tc = cpu->tcBase(tid);
 
     if (!fetchRedirect[tid] ||
         !toCommit->squash[tid] ||
@@ -1739,7 +1749,7 @@ DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
             } else {
                 predictedNotTakenIncorrect++;
             }
-            tc->ExecuteAliasTable = tc->CommitAliasTable;
+
         }
     }
 }
