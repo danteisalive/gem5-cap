@@ -54,6 +54,81 @@ namespace X86ISA
 {
 
 
+
+  class PointerID
+  {
+  private:
+      uint64_t id;
+  public:
+
+      PointerID(){
+
+      }
+
+      PointerID(uint64_t _id){
+
+          id = _id;
+      }
+
+      ~PointerID()
+      {
+
+      }
+
+      bool operator != (const PointerID& _pid){
+          return (id != _pid.id);
+      }
+
+      bool operator == (const PointerID& _pid){
+          return (id == _pid.id);
+      }
+
+          // A better implementation of operator=
+      PointerID& operator = (const PointerID& _pid)
+          {
+              // self-assignment guard
+              if (this == &_pid)
+                  return *this;
+
+              // do the copy
+              this->id = _pid.id;
+
+              // return the existing object so we can chain this operator
+              return *this;
+      }
+
+      bool operator < (const PointerID& rhs) const {
+
+          return (this->id < rhs.id);
+      }
+
+      PointerID operator + (uint64_t _val)
+      {
+          this->id += _val;
+          PointerID temp(*this);
+          //temp.id += _val;
+
+          return temp;
+
+      }
+
+      PointerID& operator += (const uint64_t& _rhs)
+      {
+          this->id += _rhs;
+          return *this;
+      }
+
+      PointerID(const PointerID& _PID)
+      {
+          this->id = _PID.id;
+      }
+
+      void        setPID(uint64_t _id) { id = _id; }
+      uint64_t    getPID() const { return id; }
+
+
+  };
+
     class Range
     {
         private:
@@ -95,23 +170,191 @@ namespace X86ISA
 
     }; // class Range
 
+    class AliasTableEntry
+    {
+      public:
+        PointerID         pid;
+        uint64_t          seqNum;
+    };
+
     class CacheEntry {
 
         public:
             int tag;
-            int valid;
-            int dirty;
+            bool valid;
+            bool dirty;
             uint64_t lruAge;
             uint64_t t_access_nums;
             uint64_t t_num_replaced;
-
+            PointerID pid{0};
+            uint64_t sqn;
         public:
             CacheEntry():
-                tag(-1),valid(1), dirty(0),
+                tag(-1),valid(false), dirty(false),
                 lruAge(1),t_access_nums(0), t_num_replaced(0)
             {}
 
     } ;
+
+    class LRUAliasCache
+    {
+
+    private:
+        std::map<int, CacheEntry>   TheCache;
+
+        uint64_t                     NumWays;
+        uint64_t                     NumSets;
+        uint64_t                     CacheSize;
+        uint64_t                     CacheBlockSize;
+        uint64_t                     NumEntriesInCache;
+        uint64_t                     BitsPerBlock;
+        uint64_t                     BitsPerSet;
+        uint64_t                     ShiftAmount;
+
+        //TODO: move these to gem5 stats
+        uint64_t                     total_accesses;
+        uint64_t                     total_hits;
+        uint64_t                     total_misses;
+
+    public:
+        LRUAliasCache(uint64_t _num_ways,
+                            uint64_t _cache_block_size,
+                            uint64_t _cache_size) :
+            NumWays(_num_ways), CacheSize(_cache_size),
+            CacheBlockSize(_cache_block_size),
+            total_accesses(0), total_hits(0), total_misses(0)
+            {
+
+                NumSets = (CacheSize / CacheBlockSize) / (NumWays);
+                NumEntriesInCache = NumSets * NumWays;
+                BitsPerSet = std::log2(NumSets);
+                BitsPerBlock = std::log2(CacheBlockSize);
+                ShiftAmount = BitsPerSet + BitsPerBlock;
+
+                for (size_t idx = 0; idx < NumEntriesInCache; idx++) {
+                  TheCache[idx].tag = -1;
+                  TheCache[idx].valid = false;
+                  TheCache[idx].dirty = false;
+                  TheCache[idx].lruAge = 1;
+                  TheCache[idx].pid = PointerID{0};
+                }
+
+            }
+
+        ~LRUAliasCache(){
+
+        }
+
+        bool access(Addr v_addr, bool write, PointerID& pid) {
+            //TODO: stats
+            total_accesses = total_accesses + 1;
+
+            Addr thisIsTheTag = v_addr >> (ShiftAmount); //tag of the VA
+
+            //Extract the set from the VA
+            Addr thisIsTheSet =
+                ((v_addr - (thisIsTheTag << ShiftAmount)) >> BitsPerBlock);
+
+            int setLoopLow = thisIsTheSet * NumWays;
+            int setLoopHigh = setLoopLow + (NumWays - 1);
+
+            int hit = 0;
+            for (int j = setLoopLow; j <= setLoopHigh; j++){
+                if (TheCache[j].tag == thisIsTheTag){
+                    //We have a hit!
+                    hit = 1;
+                    total_hits = total_hits + 1;
+                    //Increase the age of everything
+                    for (int k = setLoopLow; k <= setLoopHigh; k++){
+                        TheCache[k].lruAge++;
+                    }
+
+                    if (write){
+                      TheCache[j].dirty = true;
+                      TheCache[j].pid = pid;
+                    }
+                    else {
+                      pid = TheCache[j].pid;
+                    }
+
+                    TheCache[j].lruAge = 0;
+                    TheCache[j].t_access_nums++;
+
+                    if (!write){
+                      pid = TheCache[j].pid;
+                    }
+                    break;
+
+                }
+            }
+
+            if (hit == 0){
+
+                total_misses = total_misses + 1;
+
+                int highestAge = 0;
+                int highestSpot = 0;
+                //Loop through the set and find the oldest element
+                for (int m = setLoopLow; m <= setLoopHigh; m++){
+
+                    if (TheCache[m].lruAge > highestAge){
+                        highestAge = TheCache[m].lruAge;
+                        highestSpot = m;
+                    }
+
+                }
+
+                //Replace the oldest element with the new tag
+                TheCache[highestSpot].tag = thisIsTheTag;
+
+                //Increase the age of each element
+                for (int m = setLoopLow; m <= setLoopHigh; m++){
+                    TheCache[m].lruAge++;
+                }
+
+                if (write){
+                  TheCache[highestSpot].dirty = true;
+                  TheCache[highestSpot].pid = pid;
+                }
+                else
+                {
+                  TheCache[highestSpot].dirty = false;
+                  pid = TheCache[highestSpot].pid;
+                }
+
+                TheCache[highestSpot].lruAge = 0;
+                TheCache[highestSpot].t_access_nums++;
+                TheCache[highestSpot].t_num_replaced++;
+
+            }
+
+            return hit;
+
+        }
+
+      void flush(uint64_t _sqn){
+          for (size_t idx = 0; idx < NumEntriesInCache; idx++) {
+            if (TheCache[idx].dirty &&
+                (TheCache[idx].sqn >= _sqn))
+            {
+                TheCache[idx].tag = -1;
+                TheCache[idx].valid = false;
+                TheCache[idx].dirty = false;
+                TheCache[idx].lruAge = 1;
+                TheCache[idx].pid = PointerID{0};
+                // also update it with last correct PID number
+            }
+          }
+      }
+
+      void print_stats() {
+        printf("Capability Cache Stats: %lu, %lu, %lu, %f \n",
+        total_accesses, total_hits, total_misses,
+        (double)total_hits/total_accesses
+        );
+      }
+
+    };
 
     class LRUPIDCache
     {
@@ -203,7 +446,7 @@ namespace X86ISA
 
     };
 
-    class LRUCapabilityCache
+    class LRUCache
     {
 
     private:
@@ -224,7 +467,7 @@ namespace X86ISA
         uint64_t                     total_misses;
 
     public:
-        LRUCapabilityCache(uint64_t _num_ways,
+        LRUCache(uint64_t _num_ways,
                             uint64_t _cache_block_size,
                             uint64_t _cache_size) :
             NumWays(_num_ways), CacheSize(_cache_size),
@@ -242,7 +485,7 @@ namespace X86ISA
 
             }
 
-        ~LRUCapabilityCache(){
+        ~LRUCache(){
             delete [] TheCache;
         }
 
@@ -310,15 +553,6 @@ namespace X86ISA
                 TheCache[highestSpot].lruAge = 0;
                 TheCache[highestSpot].t_access_nums++;
                 TheCache[highestSpot].t_num_replaced++;
-                //tl_assert(n_guest_instrs < g_guest_instrs_executed);
-                // ULong miss_inst_diff = n_guest_instrs - n_guest_instrs_prev;
-                // n_guest_instrs_prev = n_guest_instrs;
-
-
-                // uint index = miss_inst_diff/100;
-
-                //  if (index < CACHE_MISS_BINS_N)
-                //     CacheMissHist[index]++;
 
 
             }
@@ -335,79 +569,7 @@ namespace X86ISA
     };
 
 
-    class PointerID
-    {
-    private:
-        uint64_t id;
-    public:
 
-        PointerID(){
-
-        }
-
-        PointerID(uint64_t _id){
-
-            id = _id;
-        }
-
-        ~PointerID()
-        {
-
-        }
-
-        bool operator != (const PointerID& _pid){
-            return (id != _pid.id);
-        }
-
-        bool operator == (const PointerID& _pid){
-            return (id == _pid.id);
-        }
-
-            // A better implementation of operator=
-        PointerID& operator = (const PointerID& _pid)
-            {
-                // self-assignment guard
-                if (this == &_pid)
-                    return *this;
-
-                // do the copy
-                this->id = _pid.id;
-
-                // return the existing object so we can chain this operator
-                return *this;
-        }
-
-        bool operator < (const PointerID& rhs) const {
-
-            return (this->id < rhs.id);
-        }
-
-        PointerID operator + (uint64_t _val)
-        {
-            this->id += _val;
-            PointerID temp(*this);
-            //temp.id += _val;
-
-            return temp;
-
-        }
-
-        PointerID& operator += (const uint64_t& _rhs)
-        {
-            this->id += _rhs;
-            return *this;
-        }
-
-        PointerID(const PointerID& _PID)
-        {
-            this->id = _PID.id;
-        }
-
-        void        setPID(uint64_t _id) { id = _id; }
-        uint64_t    getPID() const { return id; }
-
-
-    };
 
     inline static std::ostream &
             operator << (std::ostream & os, const PointerID & _pid)

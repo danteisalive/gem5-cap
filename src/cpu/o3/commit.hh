@@ -259,6 +259,8 @@ class DefaultCommit
     /** Handles a squash from a squashAfter() request. */
     void squashFromSquashAfter(ThreadID tid);
 
+    void squashExecuteAliasTable(DynInstPtr &inst, bool equal);
+
     /**
      * Handle squashing from instruction with SquashAfter set.
      *

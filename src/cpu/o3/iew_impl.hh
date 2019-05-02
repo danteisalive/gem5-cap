@@ -479,6 +479,9 @@ DefaultIEW<Impl>::squash(ThreadID tid)
     }
 
     emptyRenameInsts(tid);
+
+
+
 }
 
 template<class Impl>
@@ -504,11 +507,7 @@ DefaultIEW<Impl>::squashDueToBranch(DynInstPtr &inst, ThreadID tid)
 
         wroteToTimeBuffer = true;
 
-        ThreadContext * tc = cpu->tcBase(tid);
-        if (tc->enableCapability &&
-            (tc->ExecuteAliasTable.size() > tc->CommitAliasTable.size() + 50)){
-          tc->ExecuteAliasTable = tc->CommitAliasTable;
-        }
+        squashExecuteAliasTable(inst);
     }
 
 }
@@ -540,11 +539,7 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
 
         wroteToTimeBuffer = true;
 
-        ThreadContext * tc = cpu->tcBase(tid);
-        if (tc->enableCapability &&
-            (tc->ExecuteAliasTable.size() > tc->CommitAliasTable.size() + 50)){
-          tc->ExecuteAliasTable = tc->CommitAliasTable;
-        }
+        squashExecuteAliasTable(inst);
     }
 }
 
@@ -573,6 +568,8 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = false;
 
         wroteToTimeBuffer = true;
+
+        squashExecuteAliasTable(inst);
     }
 }
 
@@ -1460,16 +1457,8 @@ DefaultIEW<Impl>::executeInsts()
                 DynInstPtr mispredictedInst;
                 mispredictedInst = ldstQueue.getMemWithWrongPID(tid);
                 assert(mispredictedInst);
-// std::cout << std::hex << "LDSTQ detected a mispredicted PID load . " <<
-// " Violator PC: " << mispredictedInst->pcState() << std::dec <<
-// " [sn:" << mispredictedInst->seqNum << "]" << std::hex <<
-// " , inst PC: " << inst->pcState() << std::dec <<
-// " [sn:" << inst->seqNum  << "] " << std::hex <<
-// " Addr is: " << inst->physEffAddrLow << "\n";
-
-
-               fetchRedirect[tid] = true;
-               squashDueToMispredictedPID(mispredictedInst, tid);
+                fetchRedirect[tid] = true;
+                squashDueToMispredictedPID(mispredictedInst, tid);
 
 
             }
@@ -1764,5 +1753,24 @@ DefaultIEW<Impl>::updateTracker(ThreadID tid, DynInstPtr &head_inst)
 
 }
 
+template <class Impl>
+void
+DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
+{
+    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+    if (tc->enableCapability ){
+       for (auto exe_alias_table =
+          tc->ExecuteAliasTable.cbegin(), next_it = exe_alias_table;
+           exe_alias_table != tc->ExecuteAliasTable.cend();
+           exe_alias_table = next_it)
+       {
+          ++next_it;
+          if (exe_alias_table->second.seqNum > inst->seqNum)
+          {
+            tc->ExecuteAliasTable.erase(exe_alias_table);
+          }
+       }
+    }
+}
 
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

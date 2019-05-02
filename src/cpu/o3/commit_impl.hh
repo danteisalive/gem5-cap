@@ -104,7 +104,7 @@ DefaultCommit<Impl>::DefaultCommit(O3CPU *_cpu, DerivO3CPUParams *params)
 
     _status = Active;
     prevRSPValue = 0;
-     StackRemove=0; NumOfAllocations=0;
+    NumOfAllocations=0;
     _nextStatus = Inactive;
     std::string policy = params->smtCommitPolicy;
 
@@ -1009,6 +1009,8 @@ DefaultCommit<Impl>::commitInsts()
         // (be removed from the ROB) at any time.
         if (head_inst->isSquashed()) {
 
+            squashExecuteAliasTable(head_inst, true);
+
             DPRINTF(Commit, "Retiring squashed instruction from "
                     "ROB.\n");
 
@@ -1033,7 +1035,10 @@ DefaultCommit<Impl>::commitInsts()
             // Try to commit the head instruction.
             bool commit_success = commitHead(head_inst, num_committed);
 
+
+
             if (commit_success) {
+                squashExecuteAliasTable(head_inst, false);
                 ++num_committed;
                 statCommittedInstType[tid][head_inst->opClass()]++;
                 ppCommit->notify(head_inst);
@@ -1285,7 +1290,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                   );
 
 
-    //DPRINTF(Capability,"%s\n",  si->disassemble(head_inst->pcState().pc()));
     #define ENABLE_CAPABILITY_DEBUG 0
     ThreadContext * tc = cpu->tcBase(tid);
 
@@ -1301,13 +1305,25 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 {
 
                     mtt_it = tc->CommitAliasTable.erase(mtt_it);
-                    StackRemove++;
                 }
                 else {
                   ++mtt_it;
                 }
             }
 
+            for (auto mtt_it = tc->ExecuteAliasTable.cbegin();
+                          mtt_it != tc->ExecuteAliasTable.cend();
+                          /* no increment */)
+            {
+                if (mtt_it->first < newRSPValue &&
+                    mtt_it->first >= prevRSPValue)
+                {
+                    mtt_it = tc->ExecuteAliasTable.erase(mtt_it);
+                }
+                else {
+                    ++mtt_it;
+                }
+            }
         }
         prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
     }
@@ -1334,9 +1350,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (tc->enableCapability){
-        //validateRegTrackTable(tid, head_inst);
-        //updateRegTrackTable(tid, head_inst);
-        //RefreshRegTrackTable(tid, head_inst);
+
         updateAliasTable(tid, head_inst);
 
         if ((uint64_t)cpu->thread[tid]->numInsts.value() % 1000000 == 0 &&
@@ -1387,7 +1401,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 for (size_t i = 1; i < tc->PID.getPID(); i++) {
                   uint64_t _num = 0;
                   for (auto& elem: tc->ExecuteAliasTable){
-                      if (elem.second.getPID() == i){
+                      if (elem.second.pid.getPID() == i){
                           _num++;
                       }
                   }
@@ -1416,10 +1430,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             }
 
-            // tc->LRUCapCache.LRUCachePrintStats();
-            // tc->LRUPidCache.LRUPIDCachePrintStats();
 
-            StackRemove=0;
+            //StackRemove=0;
 
         }
     }
@@ -2688,7 +2700,8 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
 
 
 
-  if ((si->getName().compare("st") == 0)){
+  if ((si->getName().compare("st") == 0) ||
+      (si->getName().compare("stis") == 0)){
 
       if (head_inst->srcRegIdx(2).isIntReg()){
 
@@ -2707,9 +2720,17 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
             }
         }
 
+
         if (_pid != TheISA::PointerID(0))
         {
             tc->CommitAliasTable[head_inst->effAddr] = _pid;
+            auto exe_alias_table =
+                tc->ExecuteAliasTable.find(head_inst->effAddr);
+            if (exe_alias_table != tc->ExecuteAliasTable.end()){
+              if (exe_alias_table->second.seqNum == head_inst->seqNum){
+                  tc->ExecuteAliasTable.erase(head_inst->effAddr);
+              }
+            }
         }
         else if (tc->CommitAliasTable.find(head_inst->effAddr) !=
                                                     tc->CommitAliasTable.end())
@@ -2718,30 +2739,7 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
         }
       }
   }
-  else if ((si->getName().compare("stis") == 0)){
 
-    if (head_inst->srcRegIdx(2).isIntReg()){
-        X86ISA::IntRegIndex   src2 =
-                    (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
-        if (src2 < X86ISA::INTREG_RAX ||
-            src2 >= X86ISA::NUM_INTREGS)
-                return;
-
-        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
-
-        TheISA::PointerID _pid = TheISA::PointerID(0);
-        for (auto& capElem : tc->CapRegsFile){
-            if (capElem.second.getBaseAddr() == archRegContent){
-                _pid = capElem.first;
-                break;
-            }
-        }
-        if (_pid != TheISA::PointerID(0)){
-            tc->CommitAliasTable[head_inst->effAddr] = _pid;
-        }
-    }
-
-  }
 
 }
 
@@ -2774,9 +2772,11 @@ DefaultCommit<Impl>::getInsts()
 
             youngestSeqNum[tid] = inst->seqNum;
         } else {
+            squashExecuteAliasTable(inst, true);
             DPRINTF(Commit, "Instruction PC %s [sn:%i] [tid:%i] was "
                     "squashed, skipping.\n",
                     inst->pcState(), inst->seqNum, tid);
+
         }
     }
 }
@@ -2967,4 +2967,32 @@ DefaultCommit<Impl>::oldestReady()
     }
 }
 
+
+template<class Impl>
+void
+DefaultCommit<Impl>::squashExecuteAliasTable(DynInstPtr &inst, bool equal)
+{
+    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+    if (tc->enableCapability ){
+       for (auto exe_alias_table =
+            tc->ExecuteAliasTable.cbegin(), next_it = exe_alias_table;
+           exe_alias_table != tc->ExecuteAliasTable.cend();
+           exe_alias_table = next_it)
+       {
+          ++next_it;
+          if (equal){
+              if (exe_alias_table->second.seqNum == inst->seqNum)
+              {
+                tc->ExecuteAliasTable.erase(exe_alias_table);
+              }
+          }
+          else {
+            if (exe_alias_table->second.seqNum < inst->seqNum)
+            {
+              tc->ExecuteAliasTable.erase(exe_alias_table);
+            }
+          }
+       }
+    }
+}
 #endif//__CPU_O3_COMMIT_IMPL_HH__

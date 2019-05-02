@@ -1422,6 +1422,7 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
 
         // Clear the smart pointer to make sure it is decremented.
         loadQueue[load_idx]->setSquashed();
+        squashExecuteAliasTable(loadQueue[load_idx], squashed_num);
         /** set not capability checked */
         loadQueue[load_idx]->resetFlag(StaticInstFlags::IsCapabilityChecked);
         loadQueue[load_idx]->resetFlag(StaticInstFlags::IsCapFetched);
@@ -1469,6 +1470,7 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
 
         // Clear the smart pointer to make sure it is decremented.
         storeQueue[store_idx].inst->setSquashed();
+        squashExecuteAliasTable(storeQueue[store_idx].inst, squashed_num);
         /** set not capability checked */
         storeQueue[store_idx].inst->resetFlag(
                               StaticInstFlags::IsCapabilityChecked);
@@ -1494,6 +1496,7 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
         decrStIdx(store_idx);
         ++lsqSquashedStores;
     }
+
 }
 
 template <class Impl>
@@ -1758,7 +1761,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
 
-   if ((si->getName().compare("ld") == 0)){
+   if ((si->getName().compare("ld") == 0) ||
+      (si->getName().compare("ldis") == 0)){
 
      if (inst->destRegIdx(0).isIntReg()){
          X86ISA::IntRegIndex   dest =
@@ -1767,93 +1771,63 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
              return false;
 
          cpu->NumOfAliasTableAccess++;
-         auto mtt_it = tc->ExecuteAliasTable.find(inst->effAddr);
-         if (mtt_it != tc->ExecuteAliasTable.end()){
-             //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
-             //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-             if (inst->uop_pid != mtt_it->second){
-                 cpu->updateFetchLVPT(inst, mtt_it->second, false);
+         //first look in Execute Alias Table
+         auto exe_alias_table = tc->ExecuteAliasTable.find(inst->effAddr);
+         auto commit_alias_table = tc->CommitAliasTable.find(inst->effAddr);
+
+         if (exe_alias_table != tc->ExecuteAliasTable.end()){
+             if (inst->uop_pid != exe_alias_table->second.pid){
+                 cpu->updateFetchLVPT(
+                          inst, exe_alias_table->second.pid, false
+                                    );
                  cpu->FalsePredict++;
                  if (0){
                    std::cout << std::hex <<
                    "EXECUTE: False Prediction Load Instruction: " <<
                    inst->pcState().instAddr() << " " <<
                    "Predicted: " << inst->uop_pid << " " <<
-                   "Actual: " << mtt_it->second << std::endl;
+                   "Actual: " << exe_alias_table->second.pid << std::endl;
                  }
-                 inst->uop_pid = mtt_it->second;
+                 inst->uop_pid = exe_alias_table->second.pid;
                return true;
              }
              else {
-                 cpu->updateFetchLVPT(inst, mtt_it->second, true);
+                 cpu->updateFetchLVPT(inst, exe_alias_table->second.pid, true);
                  if (0){
                    std::cout << std::hex <<
                    "EXECUTE: True Prediction Load Instruction: " <<
                    inst->pcState().instAddr() << " " <<
                    "Predicted: " << inst->uop_pid << " " <<
-                   "Actual: " << mtt_it->second << std::endl;
+                   "Actual: " << exe_alias_table->second.pid << std::endl;
                  }
                  return false;
              }
-
          }
-         // this is not a pointer refill so we need to check whether
-         // LVPT predicted right or not
-         else {
-           TheISA::PointerID _pid_t  = TheISA::PointerID{0};
-           if (inst->uop_pid != TheISA::PointerID(0)){
-               cpu->updateFetchLVPT(inst, _pid_t, false);
+         else if (commit_alias_table != tc->CommitAliasTable.end()){
+           if (inst->uop_pid != commit_alias_table->second){
+               cpu->updateFetchLVPT(inst, commit_alias_table->second, false);
                cpu->FalsePredict++;
-               inst->uop_pid = TheISA::PointerID(0);
-               return true;
+               if (0){
+                 std::cout << std::hex <<
+                 "EXECUTE: False Prediction Load Instruction: " <<
+                 inst->pcState().instAddr() << " " <<
+                 "Predicted: " << inst->uop_pid << " " <<
+                 "Actual: " << commit_alias_table->second << std::endl;
+               }
+               inst->uop_pid = commit_alias_table->second;
+             return true;
            }
            else {
-               cpu->updateFetchLVPT(inst, _pid_t, true);
+               cpu->updateFetchLVPT(inst, commit_alias_table->second, true);
+               if (0){
+                 std::cout << std::hex <<
+                 "EXECUTE: True Prediction Load Instruction: " <<
+                 inst->pcState().instAddr() << " " <<
+                 "Predicted: " << inst->uop_pid << " " <<
+                 "Actual: " << commit_alias_table->second << std::endl;
+               }
                return false;
            }
-        }
-     }
-   }
-   else if ((si->getName().compare("ldis") == 0)){
-
-     if (inst->destRegIdx(0).isIntReg()){
-         X86ISA::IntRegIndex   dest =
-                         (X86ISA::IntRegIndex)inst->destRegIdx(0).index();
-        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
-           return false;
-
-         cpu->NumOfAliasTableAccess++;
-         auto mtt_it = tc->ExecuteAliasTable.find(inst->effAddr);
-         if (mtt_it != tc->ExecuteAliasTable.end()){
-             //tc->LRUCapCache.LRUCache_Access(inst->effAddr);
-             //tc->LRUPidCache.LRUPIDCache_Access(mtt_it->second.getPID());
-
-             if (inst->uop_pid != mtt_it->second){
-               cpu->updateFetchLVPT(inst, mtt_it->second, false);
-               cpu->FalsePredict++;
-               if (0){
-                   std::cout << std::hex <<
-                   "EXECUTE: False Prediction Load Instruction: " <<
-                   inst->pcState().instAddr() << " " <<
-                   "Predicted: " << inst->uop_pid << " " <<
-                   "Actual: " << mtt_it->second << std::endl;
-               }
-               inst->uop_pid = mtt_it->second;
-               return true;
-             }
-             else {
-               cpu->updateFetchLVPT(inst, mtt_it->second, true);
-               if (0){
-                   std::cout << std::hex <<
-                   "EXECUTE: True Prediction Load Instruction: " <<
-                   inst->pcState().instAddr() << " " <<
-                   "Predicted: " << inst->uop_pid << " " <<
-                   "Actual: " << mtt_it->second << std::endl;
-               }
-               return false;
-             }
-
-
          }
          // this is not a pointer refill so we need to check whether
          // LVPT predicted right or not
@@ -1889,7 +1863,8 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
   if (inst->isMicroopInjected()) return;
   if (tc->ExeStopTracking) return;
 
-  if ((si->getName().compare("st") == 0)){
+  if ((si->getName().compare("st") == 0) ||
+      (si->getName().compare("stis") == 0)){
 
       if (inst->srcRegIdx(2).isIntReg()){
 
@@ -1908,13 +1883,12 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
             }
         }
 
+
+
         if (_pid != TheISA::PointerID(0))
         {
-
-            std::string s1 = si->disassemble(inst->pcState().pc());
-
-            tc->ExecuteAliasTable[inst->effAddr] = _pid;
-
+            tc->ExecuteAliasTable[inst->effAddr].pid = _pid;
+            tc->ExecuteAliasTable[inst->effAddr].seqNum = inst->seqNum;
         }
         else if (tc->ExecuteAliasTable.find(inst->effAddr) !=
                                       tc->ExecuteAliasTable.end())
@@ -1923,36 +1897,14 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
         }
       }
   }
-  else if ((si->getName().compare("stis") == 0)){
 
-    if (inst->srcRegIdx(2).isIntReg()){
-        X86ISA::IntRegIndex   src2 =
-                    (X86ISA::IntRegIndex)inst->srcRegIdx(2).index();
-        if (src2 < X86ISA::INTREG_RAX ||
-            src2 >= X86ISA::NUM_INTREGS)
-                return;
-
-        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
-
-        TheISA::PointerID _pid = TheISA::PointerID(0);
-        for (auto& capElem : tc->CapRegsFile){
-            if (capElem.second.getBaseAddr() == archRegContent){
-                _pid = capElem.first;
-                break;
-            }
-        }
-        if (_pid != TheISA::PointerID(0)){
-            tc->ExecuteAliasTable[inst->effAddr] = _pid;
-        }
-    }
-
-  }
-
-
+  // still dont know how I can safely handel this
+  // TODO: need to change place of this coede
   uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
   if (prevRSPValue < newRSPValue){
       for (auto mtt_it = tc->ExecuteAliasTable.cbegin();
-                    mtt_it != tc->ExecuteAliasTable.cend(); /* no increment */)
+                    mtt_it != tc->ExecuteAliasTable.cend();
+                    /* no increment */)
       {
           if (mtt_it->first < newRSPValue &&
               mtt_it->first >= prevRSPValue)
@@ -1970,6 +1922,28 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
 }
 
+template <class Impl>
+void
+LSQUnit<Impl>::squashExecuteAliasTable(DynInstPtr& inst,
+                                const InstSeqNum & squashed_num){
 
+  ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+  if (tc->enableCapability ){
+     for (auto exe_alias_table = tc->ExecuteAliasTable.cbegin(),
+          next_it = exe_alias_table;
+         exe_alias_table != tc->ExecuteAliasTable.cend();
+         exe_alias_table = next_it)
+     {
+        ++next_it;
+        if (exe_alias_table->second.seqNum > squashed_num)
+        {
+          tc->ExecuteAliasTable.erase(exe_alias_table);
+        }
+
+     }
+
+  }
+
+}
 
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

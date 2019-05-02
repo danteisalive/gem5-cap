@@ -191,7 +191,9 @@ class LSQUnit {
     bool checkPIDMisprediction() { return loadWithWrongPID;}
 
     DynInstPtr getMemWithWrongPID();
-
+    void squashExecuteAliasTable(
+                DynInstPtr &inst, const InstSeqNum &squashed_num
+                );
 
     /** Returns the number of free LQ entries. */
     unsigned numFreeLoadEntries();
