@@ -125,6 +125,8 @@ public:
 
     }
 
+    void injectCheckMicroops(TheISA::PointerID& _pid);
+    void undoCheckMicroops();
 
     void injectMicroops( ThreadContext * _tc, PCState &nextPC, TheISA::CheckType _sym);
 

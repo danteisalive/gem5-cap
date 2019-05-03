@@ -110,9 +110,21 @@ StaticInst::getMicroops() const
 }
 
 void
-StaticInst::injectMicroops(ThreadContext * _tc, TheISA::PCState &nextPC, TheISA::CheckType _sym){
+StaticInst::injectMicroops(ThreadContext * _tc,
+                          TheISA::PCState &nextPC,
+                          TheISA::CheckType _sym){
 
     panic("injectMicroops: This should only be called by a macroop");
+}
+
+void
+StaticInst::undoCheckMicroops(){
+    panic("undoCheckMicroops: This should only be called by a macroop");
+}
+
+void
+StaticInst::injectCheckMicroops(TheISA::PointerID& _pid){
+    panic("injectCheckMicroops: This should only be called by a macroop");
 }
 
 void

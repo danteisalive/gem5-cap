@@ -726,6 +726,9 @@ class FullO3CPU : public BaseO3CPU
 
     uint64_t NumOfAliasTableAccess;
     uint64_t FalsePredict;
+    uint64_t PnA0;
+    uint64_t P0An;
+    uint64_t PmAn;
 
 
     /** The global sequence number counter. */

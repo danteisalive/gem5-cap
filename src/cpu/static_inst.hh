@@ -239,6 +239,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// The binary machine instruction.
     ExtMachInst machInst;
 
+
+
   protected:
 
     /// See destRegIdx().
@@ -253,6 +255,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
      * initialized.
      */
     const char *mnemonic;
+
+    TheISA::PointerID pid{0};
 
     /**
      * String representation of disassembly (lazily evaluated via
@@ -309,6 +313,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual void injectMicroops(ThreadContext * _tc, TheISA::PCState &nextPC, TheISA::CheckType _sym);
     virtual void undoInjecttion();
 
+    virtual void injectCheckMicroops(TheISA::PointerID& _pid);
+    virtual void undoCheckMicroops();
+
     virtual uint64_t getDisp();
     virtual void setDisp(uint64_t displacement);
 
@@ -356,6 +363,14 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     /// Return name of machine instruction
     std::string getName() { return mnemonic; }
+
+    void setMacroopPid(TheISA::PointerID& _pid){
+        pid = _pid;
+    }
+
+    TheISA::PointerID getMacroopPid(){
+      return pid;
+    }
 
   protected:
     template<typename T>

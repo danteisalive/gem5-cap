@@ -312,11 +312,10 @@ class DefaultCommit
     void markCompletedInsts();
 
     void collector(ThreadID tid, DynInstPtr &head_inst);
-    void updateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
     void RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
     void updateAliasTable(ThreadID tid, DynInstPtr &head_inst);
     TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
-    void validateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
+    //void validateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
     /** Gets the thread to commit, based on the SMT policy. */
     ThreadID getCommittingThread();
 

@@ -1781,6 +1781,14 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                           inst, exe_alias_table->second.pid, false
                                     );
                  cpu->FalsePredict++;
+                 if (inst->uop_pid == TheISA::PointerID(0) &&
+                     exe_alias_table->second.pid != TheISA::PointerID(0)){
+                       cpu->P0An++;
+                 }
+                 else if (inst->uop_pid != TheISA::PointerID(0) &&
+                        exe_alias_table->second.pid != TheISA::PointerID(0)){
+                       cpu->PmAn++;
+                 }
                  if (0){
                    std::cout << std::hex <<
                    "EXECUTE: False Prediction Load Instruction: " <<
@@ -1807,6 +1815,14 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
            if (inst->uop_pid != commit_alias_table->second){
                cpu->updateFetchLVPT(inst, commit_alias_table->second, false);
                cpu->FalsePredict++;
+               if (inst->uop_pid == TheISA::PointerID(0) &&
+                   commit_alias_table->second != TheISA::PointerID(0)){
+                     cpu->P0An++;
+               }
+               else if (inst->uop_pid != TheISA::PointerID(0) &&
+                      commit_alias_table->second != TheISA::PointerID(0)){
+                     cpu->PmAn++;
+               }
                if (0){
                  std::cout << std::hex <<
                  "EXECUTE: False Prediction Load Instruction: " <<
@@ -1836,10 +1852,17 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
            if (inst->uop_pid != TheISA::PointerID(0)){
                cpu->updateFetchLVPT(inst, _pid_t, false);
                cpu->FalsePredict++;
+               cpu->PnA0++;
                inst->uop_pid = TheISA::PointerID(0);
                return true;
            }
            else {
+               if (0){
+                 std::cout << std::hex <<
+                 "EXECUTE: True Prediction Load Instruction: " <<
+                 inst->pcState().instAddr() << " " <<
+                 "Predicted: " << inst->uop_pid << " " << std::endl;
+               }
                cpu->updateFetchLVPT(inst, _pid_t, true);
                return false;
            }
