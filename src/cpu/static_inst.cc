@@ -122,6 +122,12 @@ StaticInst::undoCheckMicroops(){
     panic("undoCheckMicroops: This should only be called by a macroop");
 }
 
+
+void
+StaticInst::updatePointerTracker(ThreadContext * tc){
+    panic("updatePointerTracker: This should only be called by a macroop");
+}
+
 void
 StaticInst::injectCheckMicroops(TheISA::PointerID& _pid){
     panic("injectCheckMicroops: This should only be called by a macroop");

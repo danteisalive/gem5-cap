@@ -21,6 +21,197 @@
 namespace X86ISA
 {
 
+void MacroopBase::updatePointerTracker(ThreadContext * tc)
+  {
+      for (size_t i = 0; i < numMicroops; i++) {
+
+           const StaticInstPtr si = microops[i];
+           #define ENABLE_CAPABILITY_DEBUG 0
+
+           // sanitization
+           //if (tc->DisablePointerTracker) return;
+           if (microops[i]->isMicroopInjected()) return;
+           if (tc->stopTracking) return;
+
+
+          if ((si->getName().compare("and") == 0)){
+
+            X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(0).index();
+            X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(1).index();
+            X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                          si->destRegIdx(0).index();
+            TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+            TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+            TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+
+            if (src1 == src2)
+            {
+              tc->RegTrackTable[dest] = _pid_src1;
+            }
+            else
+            {
+              if ( _pid_src1 != TheISA::PointerID(0) &&
+                   _pid_src2 == TheISA::PointerID(0))
+              {
+                   tc->RegTrackTable[dest] = _pid_src1;
+              }
+              else if ( _pid_src1 == TheISA::PointerID(0) &&
+                        _pid_src2 != TheISA::PointerID(0))
+              {
+                   tc->RegTrackTable[dest] = _pid_src2;
+              }
+              else
+              {
+                   tc->RegTrackTable[dest] = TheISA::PointerID(0);
+              }
+            }
+
+          }
+          else if ((si->getName().compare("xor") == 0)){
+
+            X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(0).index();
+            X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(1).index();
+            X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                          si->destRegIdx(0).index();
+            TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+            TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+            TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+              tc->RegTrackTable[dest] = TheISA::PointerID(0);
+
+          }
+          else if ((si->getName().compare("sub") == 0) ||
+                   (si->getName().compare("sbb") == 0))
+          {
+
+            X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(0).index();
+            X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(1).index();
+            X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                          si->destRegIdx(0).index();
+            TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+            TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+            TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+            if (_pid_src1 != TheISA::PointerID(0) &&
+                _pid_src2 != TheISA::PointerID(0))
+            {
+                tc->RegTrackTable[dest] = TheISA::PointerID(0);
+            }
+            else if (_pid_src1 != TheISA::PointerID(0))
+            {
+                tc->RegTrackTable[dest] = _pid_src1;
+            }
+            else if (_pid_src2 != TheISA::PointerID(0))
+            {
+                tc->RegTrackTable[dest] = _pid_src2;
+            }
+          }
+          else if ((si->getName().compare("add") == 0) ||
+                   (si->getName().compare("adc") == 0))
+          {
+
+            X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(0).index();
+            X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                          si->srcRegIdx(1).index();
+            X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                          si->destRegIdx(0).index();
+            TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+            TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+            TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+            if (_pid_src1 != TheISA::PointerID(0) &&
+                _pid_src2 != TheISA::PointerID(0))
+            {
+                tc->RegTrackTable[dest] = TheISA::PointerID(0);
+            }
+            else if (_pid_src1 != TheISA::PointerID(0))
+            {
+                tc->RegTrackTable[dest] = _pid_src1;
+            }
+            else if (_pid_src2 != TheISA::PointerID(0)){
+                tc->RegTrackTable[dest] = _pid_src2;
+            }
+
+          }
+          else if ((si->getName().compare("andi") == 0))
+          {
+              X86ISA::IntRegIndex   src1 =
+                      (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
+              X86ISA::IntRegIndex   dest =
+                      (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+              TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+              TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+              tc->RegTrackTable[dest] = _pid_src1;
+
+          }
+
+          else if ((si->getName().compare("addi") == 0) ||
+                  (si->getName().compare("adci") == 0) ||
+                  (si->getName().compare("subi") == 0) ||
+                  (si->getName().compare("sbbi") == 0)
+                  )
+          {
+              X86ISA::IntRegIndex   src1 =
+                      (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
+              X86ISA::IntRegIndex   dest =
+                      (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+              TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+              TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+
+              tc->RegTrackTable[dest] = _pid_src1;
+          }
+
+          else if ((si->getName().compare("mov") == 0)){
+
+              X86ISA::IntRegIndex   src1 =
+                              (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
+              X86ISA::IntRegIndex   dest =
+                              (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+              TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+              TheISA::PointerID _pid_dest = tc->RegTrackTable[dest];
+
+              tc->RegTrackTable[dest] = _pid_src1;
+
+          }
+
+          else if ((si->getName().compare("ld") == 0) ||
+                   (si->getName().compare("ldis") == 0))
+          {
+
+              X86ISA::IntRegIndex   dest =
+                              (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+              TheISA::PointerID    _pid_dest = tc->RegTrackTable[dest];
+
+            //  tc->RegTrackTable[dest] = lookupAndUpdateLVPT(si);
+
+
+          }
+
+
+          if (si->isLastMicroop()){
+              for (int i = X86ISA::NUM_INTREGS;
+                    i < X86ISA::NUM_INTREGS + 16;
+                    ++i)
+              {
+                  tc->RegTrackTable[(X86ISA::IntRegIndex)i] =
+                                                  TheISA::PointerID(0);
+              }
+          }
+
+       }
+
+  }
+
 
 void MacroopBase::injectCheckMicroops(TheISA::PointerID& _pid){
 

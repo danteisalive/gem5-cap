@@ -1352,6 +1352,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     if (tc->enableCapability){
 
         updateAliasTable(tid, head_inst);
+        updatePointerTracker(tid, head_inst);
 
         if ((uint64_t)cpu->thread[tid]->numInsts.value() % 1000000 == 0 &&
             !head_inst->isNop() &&
@@ -1394,23 +1395,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " PID(" << _pid << ")" << "[" << num << "]" <<
             std::endl;
 
-            {
-
-                uint64_t _pid = 0;
-                uint64_t num = 0;
-                for (size_t i = 1; i < tc->PID.getPID(); i++) {
-                  uint64_t _num = 0;
-                  for (auto& elem: tc->ExecuteAliasTable){
-                      if (elem.second.pid.getPID() == i){
-                          _num++;
-                      }
-                  }
-                  if (_num >= num){
-                    num = _num;
-                    _pid = i;
-                  }
-                }
-
                 double accuracy =
                 (double)(cpu->NumOfAliasTableAccess - cpu->FalsePredict) /
                 cpu->NumOfAliasTableAccess;
@@ -1423,16 +1407,10 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 " P0An: " << cpu->P0An <<
                 " PnA0: " << cpu->PnA0 <<
                 " PmAn: " << cpu->PmAn <<
-                " Highest Number of Element: " <<
-                " PID(" << _pid << ")" << "[" << num << "]" <<
                 std::endl;
 
                 cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
                 cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
-            }
-
-
-            //StackRemove=0;
 
         }
     }
@@ -1763,7 +1741,7 @@ DefaultCommit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
 
 template <class Impl>
 void
-DefaultCommit<Impl>::RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
+DefaultCommit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
 {
 
   ThreadContext * tc = cpu->tcBase(tid);
@@ -1777,8 +1755,11 @@ DefaultCommit<Impl>::RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
            (si->getName().compare("ldis") == 0))
   {
 
-      X86ISA::IntRegIndex   dest =
-                      (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+    if (head_inst->destRegIdx(0).isIntReg()){
+        X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
+            return;
 
       auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
       if (mtt_it != tc->CommitAliasTable.end()){
@@ -1787,7 +1768,7 @@ DefaultCommit<Impl>::RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst)
       else{
           tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
       }
-
+    }
 
   }
 

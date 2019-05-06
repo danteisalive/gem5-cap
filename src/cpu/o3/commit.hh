@@ -312,7 +312,7 @@ class DefaultCommit
     void markCompletedInsts();
 
     void collector(ThreadID tid, DynInstPtr &head_inst);
-    void RefreshRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
+    void updatePointerTracker(ThreadID tid, DynInstPtr &head_inst);
     void updateAliasTable(ThreadID tid, DynInstPtr &head_inst);
     TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
     //void validateRegTrackTable(ThreadID tid, DynInstPtr &head_inst);
