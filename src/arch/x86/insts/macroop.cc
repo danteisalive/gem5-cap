@@ -192,7 +192,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
                               (X86ISA::IntRegIndex)si->destRegIdx(0).index();
               TheISA::PointerID    _pid_dest = tc->RegTrackTable[dest];
 
-            //  tc->RegTrackTable[dest] = lookupAndUpdateLVPT(si);
+            //  tc->RegTrackTable[dest] = lookupLVPT(si);
 
 
           }

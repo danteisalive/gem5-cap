@@ -1177,13 +1177,13 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
             si->injectMicroops(tc, thisPC, syms_it->second);
         }
         ////check to see if we need to inject checks for this macroop
-        // else {
+         else {
         //    ////first for all the microops in this macroop update the
         //    //// pointer tracker and then inject microps
-        //     si->updatePointerTracker(tc);
+             si->updatePointerTracker(tc);
         //     // for this microop update the pointer tracker logic
-        //     //si->injectCheckMicroops(_pid);
-        // }
+        //     si->injectCheckMicroops(_pid);
+         }
 
 
 }
@@ -1394,7 +1394,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
             nextPC = thisPC;
 
-            lookupAndUpdateLVPT(instruction);
+            //lookupAndUpdateLVPT(instruction);
 
 
 
