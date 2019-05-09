@@ -21,7 +21,8 @@
 namespace X86ISA
 {
 
-void MacroopBase::updatePointerTracker(ThreadContext * tc)
+void MacroopBase::updatePointerTracker(ThreadContext * tc,
+                                        TheISA::PointerID& _pred_pid)
   {
       for (size_t i = 0; i < numMicroops; i++) {
 
@@ -30,7 +31,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
 
            // sanitization
            //if (tc->DisablePointerTracker) return;
-           if (microops[i]->isMicroopInjected()) return;
+           if (si->isMicroopInjected()) return;
            if (tc->stopTracking) return;
 
 
@@ -187,12 +188,16 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
           else if ((si->getName().compare("ld") == 0) ||
                    (si->getName().compare("ldis") == 0))
           {
+            if (si->destRegIdx(0).isIntReg()){
+                X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+                if (dest < X86ISA::INTREG_RAX ||
+                    dest >= X86ISA::NUM_INTREGS + 15)
+                    return;
 
-              X86ISA::IntRegIndex   dest =
-                              (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-              TheISA::PointerID    _pid_dest = tc->RegTrackTable[dest];
+              tc->RegTrackTable[dest] = _pred_pid;
 
-            //  tc->RegTrackTable[dest] = lookupLVPT(si);
+            }
 
 
           }

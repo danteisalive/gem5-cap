@@ -315,7 +315,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     virtual void injectCheckMicroops(TheISA::PointerID& _pid);
     virtual void undoCheckMicroops();
-    virtual void updatePointerTracker(ThreadContext * tc);
+    virtual void updatePointerTracker(ThreadContext * tc,
+                                      TheISA::PointerID& _pred_pid);
 
     virtual uint64_t getDisp();
     virtual void setDisp(uint64_t displacement);
@@ -365,13 +366,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// Return name of machine instruction
     std::string getName() { return mnemonic; }
 
-    void setMacroopPid(TheISA::PointerID& _pid){
-        pid = _pid;
-    }
+    virtual void setMacroopPid(TheISA::PointerID _pid);
 
-    TheISA::PointerID getMacroopPid(){
-      return pid;
-    }
+    virtual TheISA::PointerID getMacroopPid();
 
   protected:
     template<typename T>

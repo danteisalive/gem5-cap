@@ -285,7 +285,9 @@ class DefaultFetch
     bool lookupAndUpdateNextPC(DynInstPtr &inst, TheISA::PCState &pc);
 
 
-    void lookupAndUpdateLVPT(DynInstPtr &inst);
+    void lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
+                            ThreadID tid,
+                            StaticInstPtr &inst);
     /**
      * Fetches the cache line that contains the fetch PC.  Returns any
      * fault that happened.  Puts the data into the class variable

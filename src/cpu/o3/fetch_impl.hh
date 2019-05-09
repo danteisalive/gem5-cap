@@ -557,11 +557,15 @@ DefaultFetch<Impl>::deactivateThread(ThreadID tid)
 
 template <class Impl>
 void
-DefaultFetch<Impl>::lookupAndUpdateLVPT(DynInstPtr &inst)
+DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
+                                        ThreadID tid,
+                                        StaticInstPtr &inst)
 {
 
-    inst->uop_pid =
-          LVPT->lookup(inst->pcState().instAddr(), inst->threadNumber);
+    // inst->uop_pid =
+    //       LVPT->lookup(inst->pcState().instAddr(), inst->threadNumber);
+    inst->setMacroopPid(
+          LVPT->lookup(thisPC.instAddr(), tid));
 }
 
 
@@ -1180,7 +1184,9 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
          else {
         //    ////first for all the microops in this macroop update the
         //    //// pointer tracker and then inject microps
-             si->updatePointerTracker(tc);
+            // TheISA::PointerID _pred_pid =
+            //       LVPT->lookup(thisPC.instAddr(), tid);
+            //  si->updatePointerTracker(tc, _pred_pid);
         //     // for this microop update the pointer tracker logic
         //     si->injectCheckMicroops(_pid);
          }
@@ -1343,6 +1349,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                     staticInst = decoder[tid]->decode(thisPC);
 
                     if (staticInst->isMacroop() && tc->enableCapability){
+                        lookupAndUpdateLVPT(thisPC, tid, staticInst);
                         capabilityCheck(thisPC, tid, staticInst);
 
                     }

@@ -47,6 +47,7 @@
 #include "debug/Capability.hh"
 #include "mem/request.hh"
 
+
 namespace X86ISA
 {
 //using namespace X86ISAInst;
@@ -56,11 +57,11 @@ class MacroopBase : public X86StaticInst
 public:
 
   protected:
-    const char *macrocodeBlock;
-
+     const char *macrocodeBlock;
+     TheISA::PointerID macroop_pid{0};
      uint32_t numMicroops;
      uint32_t numOfOriginalMicroops;
-    X86ISA::EmulEnv env;
+     X86ISA::EmulEnv env;
 
     //Constructor.
     MacroopBase(const char *mnem, ExtMachInst _machInst,
@@ -109,6 +110,14 @@ public:
         return env;
     }
 
+    void setMacroopPid(TheISA::PointerID _pid){
+       macroop_pid = _pid;
+    }
+
+    TheISA::PointerID getMacroopPid(){
+      return macroop_pid;
+    }
+
     StaticInstPtr *
     getMicroops() const
     {
@@ -127,7 +136,8 @@ public:
 
     void injectCheckMicroops(TheISA::PointerID& _pid);
     void undoCheckMicroops();
-    void updatePointerTracker(ThreadContext * tc);
+    void updatePointerTracker(ThreadContext * tc,
+                              TheISA::PointerID& _pred_pid);
 
     void injectMicroops( ThreadContext * _tc, PCState &nextPC, TheISA::CheckType _sym);
 
