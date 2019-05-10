@@ -313,10 +313,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual void injectMicroops(ThreadContext * _tc, TheISA::PCState &nextPC, TheISA::CheckType _sym);
     virtual void undoInjecttion();
 
-    virtual void injectCheckMicroops(TheISA::PointerID& _pid);
+    virtual void injectCheckMicroops();
     virtual void undoCheckMicroops();
-    virtual void updatePointerTracker(ThreadContext * tc,
-                                      TheISA::PointerID& _pred_pid);
+    virtual void updatePointerTracker(ThreadContext * tc);
 
     virtual uint64_t getDisp();
     virtual void setDisp(uint64_t displacement);

@@ -1186,9 +1186,9 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
         //    //// pointer tracker and then inject microps
             // TheISA::PointerID _pred_pid =
             //       LVPT->lookup(thisPC.instAddr(), tid);
-            //  si->updatePointerTracker(tc, _pred_pid);
+              si->updatePointerTracker(tc);
         //     // for this microop update the pointer tracker logic
-        //     si->injectCheckMicroops(_pid);
+              si->injectCheckMicroops();
          }
 
 

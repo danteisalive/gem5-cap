@@ -131,13 +131,12 @@ TheISA::PointerID StaticInst::getMacroopPid(){
 }
 
 void
-StaticInst::updatePointerTracker(ThreadContext * tc,
-                                 TheISA::PointerID& _pred_pid){
+StaticInst::updatePointerTracker(ThreadContext * tc){
     panic("updatePointerTracker: This should only be called by a macroop");
 }
 
 void
-StaticInst::injectCheckMicroops(TheISA::PointerID& _pid){
+StaticInst::injectCheckMicroops(){
     panic("injectCheckMicroops: This should only be called by a macroop");
 }
 
