@@ -729,6 +729,7 @@ class FullO3CPU : public BaseO3CPU
     uint64_t PnA0;
     uint64_t P0An;
     uint64_t PmAn;
+    uint64_t heapAccesses;
 
 
     /** The global sequence number counter. */

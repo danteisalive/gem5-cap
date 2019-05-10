@@ -1407,10 +1407,12 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 " P0An: " << cpu->P0An <<
                 " PnA0: " << cpu->PnA0 <<
                 " PmAn: " << cpu->PmAn <<
+                " Heap Access: " << cpu->heapAccesses <<
                 std::endl;
 
                 cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
                 cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
+                cpu->heapAccesses = 0;
 
         }
     }
@@ -1767,6 +1769,12 @@ DefaultCommit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
       }
       else{
           tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
+      }
+
+      // let's see how many of ld,ldis are for heap
+      TheISA::PointerID _pid = SearchCapReg(tid, head_inst->effAddr);
+      if (_pid != TheISA::PointerID(0)){
+        cpu->heapAccesses++;
       }
     }
 

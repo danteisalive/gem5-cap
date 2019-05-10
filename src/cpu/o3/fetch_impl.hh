@@ -564,8 +564,7 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
 
     // inst->uop_pid =
     //       LVPT->lookup(inst->pcState().instAddr(), inst->threadNumber);
-    inst->setMacroopPid(
-          LVPT->lookup(thisPC.instAddr(), tid));
+    inst->setMacroopPid(LVPT->lookup(thisPC.instAddr(), tid));
 }
 
 
@@ -1184,11 +1183,9 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
          else {
         //    ////first for all the microops in this macroop update the
         //    //// pointer tracker and then inject microps
-            // TheISA::PointerID _pred_pid =
-            //       LVPT->lookup(thisPC.instAddr(), tid);
               si->updatePointerTracker(tc);
         //     // for this microop update the pointer tracker logic
-              si->injectCheckMicroops();
+        //      si->injectCheckMicroops();
          }
 
 
