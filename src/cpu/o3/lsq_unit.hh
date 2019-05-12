@@ -195,6 +195,8 @@ class LSQUnit {
                 DynInstPtr &inst, const InstSeqNum &squashed_num
                 );
 
+    TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
+
     /** Returns the number of free LQ entries. */
     unsigned numFreeLoadEntries();
 

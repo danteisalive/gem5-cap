@@ -239,7 +239,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// The binary machine instruction.
     ExtMachInst machInst;
 
-
+    TheISA::PointerID uop_pid{0};
 
   protected:
 

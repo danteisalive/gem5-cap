@@ -609,6 +609,7 @@ namespace X86ISA
             Capability(uint64_t _size)
             {
                 begin = 0;
+                end = 0;
                 size = _size;
                 CSR.reset();
                 //CSR.set(0, 1);
@@ -659,7 +660,8 @@ namespace X86ISA
             void            reset(){ CSR.reset(); };
 
             bool contains(Addr _addr){
-                //end = begin + size;
+                //assert(end);
+                if (end == 0) return false;
                 if (_addr >= begin && _addr <= end)
                     return true;
                 else

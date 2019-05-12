@@ -1407,12 +1407,15 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 " P0An: " << cpu->P0An <<
                 " PnA0: " << cpu->PnA0 <<
                 " PmAn: " << cpu->PmAn <<
+                " ldsWithPid: " << cpu->ldsWithPid <<
                 " Heap Access: " << cpu->heapAccesses <<
+                " Heap True Predection: " << cpu->truePredection <<
                 std::endl;
 
                 cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
                 cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
-                cpu->heapAccesses = 0;
+                cpu->heapAccesses = 0; cpu->truePredection = 0;
+                cpu->ldsWithPid = 0;
 
         }
     }
@@ -1753,8 +1756,9 @@ DefaultCommit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
   if (head_inst->isMicroopInjected()) return;
   if (tc->stopTracking) return;
 
-  else if ((si->getName().compare("ld") == 0) ||
-           (si->getName().compare("ldis") == 0))
+
+  if ((si->getName().compare("ld") == 0) ||
+      (si->getName().compare("ldis") == 0))
   {
 
     if (head_inst->destRegIdx(0).isIntReg()){
@@ -1772,10 +1776,15 @@ DefaultCommit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
       }
 
       // let's see how many of ld,ldis are for heap
-      TheISA::PointerID _pid = SearchCapReg(tid, head_inst->effAddr);
-      if (_pid != TheISA::PointerID(0)){
-        cpu->heapAccesses++;
-      }
+
+      // TheISA::PointerID _pid = SearchCapReg(tid, head_inst->effAddr);
+      // if (_pid != TheISA::PointerID(0)){
+      //   cpu->heapAccesses++;
+      //   if (head_inst->macroop->getMacroopPid() == _pid){
+      //     // correct guess
+      //     cpu->truePredection++;
+      //   }
+      // }
     }
 
   }

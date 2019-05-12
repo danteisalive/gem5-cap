@@ -1762,7 +1762,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    const StaticInstPtr si = inst->staticInst;
 
    if ((si->getName().compare("ld") == 0) ||
-      (si->getName().compare("ldis") == 0)){
+       (si->getName().compare("ldis") == 0)){
 
      if (inst->destRegIdx(0).isIntReg()){
          X86ISA::IntRegIndex   dest =
@@ -1777,7 +1777,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
          if (exe_alias_table != tc->ExecuteAliasTable.end()){
              if (inst->macroop->getMacroopPid() !=
-                  exe_alias_table->second.pid){
+                  exe_alias_table->second.pid)
+              {
                  cpu->updateFetchLVPT(
                           inst, exe_alias_table->second.pid, false
                                     );
@@ -1803,13 +1804,6 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
              }
              else {
                  cpu->updateFetchLVPT(inst, exe_alias_table->second.pid, true);
-                 if (0){
-                   std::cout << std::hex <<
-                   "EXECUTE: True Prediction Load Instruction: " <<
-                   inst->pcState().instAddr() << " " <<
-                   "Predicted: " << inst->macroop->getMacroopPid() << " " <<
-                   "Actual: " << exe_alias_table->second.pid << std::endl;
-                 }
                  return false;
              }
          }
@@ -1851,6 +1845,43 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
          // this is not a pointer refill so we need to check whether
          // LVPT predicted right or not
          else {
+           //let's see whether this is a heap access or not
+           //heap accesses can be made only with ld
+            if (si->getName().compare("ld") == 0){
+               X86ISA::IntRegIndex   src_reg =
+                          (X86ISA::IntRegIndex)inst->srcRegIdx(1).index();
+               if (src_reg != X86ISA::INTREG_RSP){
+                 // src reg is not rsp which is always for stack
+                   cpu->ldsWithPid++;
+                   TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
+                   if (_pid != TheISA::PointerID(0)){ // heap access?
+                     cpu->heapAccesses++;
+                     if (inst->staticInst->uop_pid == _pid){
+                       // correct guess
+                       cpu->truePredection++;
+                       //cpu->updateFetchLVPT(inst, _pid, true);
+                       //return false;
+                     }
+                     else {
+                       // this is heap access and we have miss prediction
+                       ///cpu->updateFetchLVPT(inst, _pid, false);
+                      // return false; // for now "false"
+                        inst->staticInst->uop_pid = _pid;
+                     }
+                   }
+                   else {
+                     // this is not a heap but we need to make sure that
+                     // we did not accidentaly assign a PID to it
+                     if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
+                       cpu->truePredection++;
+                     }
+                     else {
+                       inst->staticInst->uop_pid = TheISA::PointerID(0);
+                     }
+                   }
+                }
+            }
+
            TheISA::PointerID _pid_t  = TheISA::PointerID{0};
            if (inst->macroop->getMacroopPid() != TheISA::PointerID(0)){
                cpu->updateFetchLVPT(inst, _pid_t, false);
@@ -1860,13 +1891,6 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                return true;
            }
            else {
-               if (0){
-                 std::cout << std::hex <<
-                 "EXECUTE: True Prediction Load Instruction: " <<
-                 inst->pcState().instAddr() << " " <<
-                 "Predicted: " << inst->macroop->getMacroopPid() <<
-                 " " << std::endl;
-               }
                cpu->updateFetchLVPT(inst, _pid_t, true);
                return false;
            }
@@ -1971,6 +1995,25 @@ LSQUnit<Impl>::squashExecuteAliasTable(DynInstPtr& inst,
 
   }
 
+}
+
+
+
+template <class Impl>
+TheISA::PointerID
+LSQUnit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
+{
+  ThreadContext * tc = cpu->tcBase(tid);
+
+  TheISA::PointerID _pid = TheISA::PointerID(0);
+  for (auto& capElem : tc->CapRegsFile){
+      if (capElem.second.contains(_addr)){
+          _pid = capElem.first;
+          break;
+      }
+  }
+
+  return _pid;
 }
 
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

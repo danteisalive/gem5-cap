@@ -730,8 +730,8 @@ class FullO3CPU : public BaseO3CPU
     uint64_t P0An;
     uint64_t PmAn;
     uint64_t heapAccesses;
-
-
+    uint64_t truePredection;
+    uint64_t ldsWithPid;
     /** The global sequence number counter. */
     InstSeqNum globalSeqNum;//[Impl::MaxThreads];
 

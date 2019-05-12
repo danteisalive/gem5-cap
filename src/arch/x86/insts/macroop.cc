@@ -1,8 +1,8 @@
 /*
  * macroop.cc
  *
- * Created on: Feb 27, 2017
- * Author: mkt
+ * Created on: May 11, 2018
+ * Author: rasool
  */
 
  #include "macroop.hh"
@@ -278,6 +278,25 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
               }
           }
 
+
+          //let's see whether this is a heap access or not
+          //heap accesses can be made only with ld
+           if (si->getName().compare("ld") == 0){
+                X86ISA::IntRegIndex   src_reg =
+                          (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
+
+                if ((src_reg >= X86ISA::INTREG_RAX) &&
+                    (src_reg < X86ISA::NUM_INTREGS + 15) &&
+                    (src_reg != X86ISA::INTREG_RSP))
+                {
+                  if (tc->RegTrackTable.find(src_reg) !=
+                      tc->RegTrackTable.end()){
+                    if (tc->RegTrackTable[src_reg] != TheISA::PointerID(0)){
+                       si->uop_pid = tc->RegTrackTable[src_reg];
+                    }
+                  }
+                }
+           }
 
           if (si->isLastMicroop()){
               for (int i = X86ISA::NUM_INTREGS;
