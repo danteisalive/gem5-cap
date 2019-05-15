@@ -700,7 +700,6 @@ Decoder::decode(PCState &nextPC)
         return NULL;
     instDone = false;
     updateNPC(nextPC);
-
     StaticInstPtr &si = instBytes->si;
     if (si){
         if (si->isMacroop()){

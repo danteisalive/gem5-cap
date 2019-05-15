@@ -240,6 +240,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     ExtMachInst machInst;
 
     TheISA::PointerID uop_pid{0};
+    bool checked;
 
   protected:
 
@@ -280,7 +281,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
           _numFPDestRegs(0), _numIntDestRegs(0), _numCCDestRegs(0),
           _numVecDestRegs(0), _numVecElemDestRegs(0), machInst(_machInst),
           mnemonic(_mnemonic), cachedDisassembly(0)
-    { _isInjected = false; }
+    { _isInjected = false; checked = false;}
 
   public:
     virtual ~StaticInst();
@@ -313,7 +314,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual void injectMicroops(ThreadContext * _tc, TheISA::PCState &nextPC, TheISA::CheckType _sym);
     virtual void undoInjecttion();
 
-    virtual void injectCheckMicroops();
+    virtual bool injectCheckMicroops();
     virtual void undoCheckMicroops();
     virtual void updatePointerTracker(ThreadContext * tc);
 

@@ -134,7 +134,7 @@ public:
 
     }
 
-    void injectCheckMicroops();
+    bool injectCheckMicroops();
     void undoCheckMicroops();
     void updatePointerTracker(ThreadContext * tc);
 

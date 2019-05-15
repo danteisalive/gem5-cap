@@ -135,7 +135,7 @@ StaticInst::updatePointerTracker(ThreadContext * tc){
     panic("updatePointerTracker: This should only be called by a macroop");
 }
 
-void
+bool
 StaticInst::injectCheckMicroops(){
     panic("injectCheckMicroops: This should only be called by a macroop");
 }

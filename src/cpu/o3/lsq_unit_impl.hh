@@ -965,12 +965,9 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
 
     load_fault = inst->initiateAcc();
 
-    ThreadContext * tc = cpu->tcBase(tid);
+     ThreadContext * tc = cpu->tcBase(tid);
     if (tc->enableCapability && inst->isBoundsCheckMicroop()){
-        inst->setExecuted();
-        inst->setCompleted();
-        //inst->setCanCommit();
-        return load_fault;
+        inst->setRegMade(false);
     }
 
     if (inst->isTranslationDelayed() &&
@@ -996,6 +993,19 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         iewStage->instToCommit(inst);
         iewStage->activityThisCycle();
     } else {
+
+        // if (tc->enableCapability && inst->isBoundsCheckMicroop()){
+        //     //inst->forwardOldRegs();;
+        //     if (!(inst->hasRequest() && inst->strictlyOrdered()) ||
+        //          inst->isAtCommit())
+        //     {
+        //       inst->setExecuted();
+        //     }
+        //
+        //     iewStage->instToCommit(inst);
+        //     iewStage->activityThisCycle();
+        //     return NoFault;
+        // }
         assert(inst->effAddrValid());
         int load_idx = inst->lqIdx;
         incrLdIdx(load_idx);
@@ -1004,6 +1014,7 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         if (tc->enableCapability && mispredictedPID(tid, inst)){
             loadWithWrongPID = inst;
         }
+
 
         if (checkLoads)
             return checkViolations(load_idx, inst);
@@ -1035,13 +1046,13 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
     Fault store_fault = store_inst->initiateAcc();
 
 
-    ThreadContext * tc = cpu->tcBase(tid);
-    if (tc->enableCapability && store_inst->isBoundsCheckMicroop()){
-        store_inst->setExecuted();
-        store_inst->setCompleted();
-        //store_inst->setCanCommit();
-        return store_fault;
-    }
+     ThreadContext * tc = cpu->tcBase(tid);
+    // if (tc->enableCapability && store_inst->isBoundsCheckMicroop()){
+    //     store_inst->setExecuted();
+    //     store_inst->setCompleted();
+    //     store_inst->setCanCommit();
+    //     return store_fault;
+    // }
 
 
     if (store_inst->isTranslationDelayed() &&
@@ -1761,6 +1772,10 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
 
+   // if (tc->ExeStopTracking) return false;
+   if (inst->isMicroopInjected()) return false;
+   if (inst->isBoundsCheckMicroop()) return false;
+
    if ((si->getName().compare("ld") == 0) ||
        (si->getName().compare("ldis") == 0)){
 
@@ -1859,14 +1874,17 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                      if (inst->staticInst->uop_pid == _pid){
                        // correct guess
                        cpu->truePredection++;
+                       inst->staticInst->checked = true;
                        //cpu->updateFetchLVPT(inst, _pid, true);
-                       //return false;
+                       return false;
                      }
                      else {
                        // this is heap access and we have miss prediction
                        ///cpu->updateFetchLVPT(inst, _pid, false);
-                      // return false; // for now "false"
+                        cpu->HeapPnAm++;
                         inst->staticInst->uop_pid = _pid;
+                        inst->staticInst->checked = true;
+                        return false; // for now "false"
                      }
                    }
                    else {
@@ -1874,10 +1892,16 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                      // we did not accidentaly assign a PID to it
                      if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
                        cpu->truePredection++;
+                       inst->staticInst->checked = true;
+                       return false;
                      }
                      else {
+                       cpu->HeapPnA0++;
                        inst->staticInst->uop_pid = TheISA::PointerID(0);
+                       inst->staticInst->checked = true;
+                       return false;
                      }
+
                    }
                 }
             }
@@ -2016,4 +2040,41 @@ LSQUnit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
   return _pid;
 }
 
+
+template <class Impl>
+void
+LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
+{
+
+  ThreadContext * tc = cpu->tcBase(tid);
+  const StaticInstPtr si = head_inst->staticInst;
+
+
+  // sanitization
+  if (head_inst->isMicroopInjected()) return;
+  if (tc->ExeStopTracking) return;
+
+
+  if ((si->getName().compare("ld") == 0) ||
+      (si->getName().compare("ldis") == 0))
+  {
+
+    if (head_inst->destRegIdx(0).isIntReg()){
+        X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
+            return;
+
+      auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
+      if (mtt_it != tc->CommitAliasTable.end()){
+          tc->CommitPointerTracker[dest] = mtt_it->second;
+      }
+      else{
+          tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
+      }
+    }
+
+  }
+
+}
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

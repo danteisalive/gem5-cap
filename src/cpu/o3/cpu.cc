@@ -433,7 +433,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
          NumOfAliasTableAccess = 0;
          FalsePredict = 0; PnA0 = 0; P0An=0; PmAn = 0; heapAccesses = 0;
-         truePredection = 0; ldsWithPid = 0;
+         truePredection = 0; ldsWithPid = 0; HeapPnA0 = 0; HeapPnAm = 0;
 
         // Setup quiesce event.
         this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);

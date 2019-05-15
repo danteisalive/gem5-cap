@@ -281,7 +281,10 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
 
           //let's see whether this is a heap access or not
           //heap accesses can be made only with ld
-           if (si->getName().compare("ld") == 0){
+
+           if ((si->getName().compare("ld") == 0) &&
+               (!si->checked))
+           {
                 X86ISA::IntRegIndex   src_reg =
                           (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
 
@@ -298,6 +301,26 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
                 }
            }
 
+           // else if ((si->getName().compare("st") == 0) &&
+           //     (!si->checked))
+           // {
+           //      X86ISA::IntRegIndex   src_reg =
+           //                (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
+           //
+           //
+           //      if ((src_reg >= X86ISA::INTREG_RAX) &&
+           //          (src_reg < X86ISA::NUM_INTREGS + 15) &&
+           //          (src_reg != X86ISA::INTREG_RSP))
+           //      {
+           //        if (tc->RegTrackTable.find(src_reg) !=
+           //            tc->RegTrackTable.end()){
+           //          if (tc->RegTrackTable[src_reg] != TheISA::PointerID(0)){
+           //             si->uop_pid = tc->RegTrackTable[src_reg];
+           //          }
+           //        }
+           //      }
+           // }
+
           if (si->isLastMicroop()){
               for (int i = X86ISA::NUM_INTREGS;
                     i < X86ISA::NUM_INTREGS + 16;
@@ -310,117 +333,41 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
 
        }
 
+
+
   }
 
 
-void MacroopBase::injectCheckMicroops(){
+bool MacroopBase::injectCheckMicroops(){
 
-  if ((numMicroops > 0) && (!_isInjected) &&
-      (macroop_pid != TheISA::PointerID(0)))
+  if ((numMicroops > 0) && (!_isInjected))
   {
+
+      for (int j = 0; j < numMicroops; ++j)
+      {
+          if ((microops[j]->getName().compare("br") == 0))
+          {
+              return false;
+          }
+      }
 
       int i;
       for (i = 0; i < numMicroops; ++i)
       {
-          if (microops[i]->isStore() || microops[i]->isLoad()){
-              break;
+          if ((microops[i]->getName().compare("ld") == 0) &&
+              microops[i]->uop_pid != TheISA::PointerID(0))
+          {
+              return true;
           }
       }
 
       if (i >= numMicroops) {
-        // there is no load/store microop in this macropp
-        //TODO: what should we do in this case?
-        // this should not happen as we already know from
-        // pointer tracker logic which macro is going to load/store
-        // this case is a defenetly a missprediction which will be handled in
-        // execute stage
-        return;
+        return false;
       }
-
-       // at this point we are sure that this macro has a load/store macropp
-      // remember to set and clear last micro of original microops
-
-      microops[0]->clearFirstMicroop();
-
-      StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
-
-      for (int i=0; i < numMicroops; i++)
-          microopTemp[i+1] = microops[i];
-      StaticInstPtr micro_0;
-      // TODO: do we need new flag or we can use the old one?
-      if (microops[i]->isStore()){
-          micro_0 = new X86ISAInst::St(machInst,
-                              "AP_BOUNDS_CHECK_INJECT",
-                              (1ULL << StaticInst::IsMicroop) |
-                               (1ULL << StaticInst::IsFirstMicroop) |
-                               (1ULL << StaticInst::IsMicroopInjected)|
-                               (1ULL << StaticInst::IsBoundsCheckMicroop),
-                              env.scale,
-                              InstRegIndex(env.index),
-                              InstRegIndex(env.base),
-                              microops[i]->getDisp(),
-                              InstRegIndex(env.seg),
-                              InstRegIndex(NUM_INTREGS+15),
-                              2,
-                              env.addressSize,
-                              0 |
-                              (machInst.legacy.addr ?
-                                (AddrSizeFlagBit << FlagShift) : 0)
-                              );
-      }
-      else if (microops[i]->isLoad()){
-          micro_0 = (env.dataSize >= 4) ?
-                  (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
-                                  "AP_BOUNDS_CHECK_INJECT",
-                                  (1ULL << StaticInst::IsMicroop) |
-                                  (1ULL << StaticInst::IsFirstMicroop) |
-                                  (1ULL << StaticInst::IsMicroopInjected)|
-                                  (1ULL << StaticInst::IsBoundsCheckMicroop),
-                                  env.scale,
-                                  InstRegIndex(env.index),
-                                  InstRegIndex(env.base),
-                                   microops[i]->getDisp(),
-                                  InstRegIndex(env.seg),
-                                  InstRegIndex(env.reg),
-                                  env.dataSize,
-                                  env.addressSize,
-                                  0 | (machInst.legacy.addr ?
-                                    (AddrSizeFlagBit << FlagShift) : 0))) :
-                  (StaticInstPtr)(new X86ISAInst::Ld(machInst,
-                                  "AP_BOUNDS_CHECK_INJECT",
-                                  (1ULL << StaticInst::IsMicroop) |
-                                  (1ULL << StaticInst::IsFirstMicroop) |
-                                  (1ULL << StaticInst::IsMicroopInjected)|
-                                  (1ULL << StaticInst::IsBoundsCheckMicroop),
-                                  env.scale,
-                                  InstRegIndex(env.index),
-                                  InstRegIndex(env.base),
-                                   microops[i]->getDisp(),
-                                  InstRegIndex(env.seg),
-                                  InstRegIndex(env.reg),
-                                  env.dataSize,
-                                  env.addressSize,
-                                  0 | (machInst.legacy.addr ?
-                                    (AddrSizeFlagBit << FlagShift) : 0))
-                                  );
-      }
-      else{
-          panic("Not a Store/Load Microop!");
-      }
-
-      microopTemp[0] = micro_0;
-
-      delete [] microops;
-      microops = microopTemp;
-      numMicroops = numMicroops + 1;
-      _isInjected = true;
-
 
   }
-  else if (numMicroops <= 0){
-      //DPRINTF(Capability, "INVALID NUMBER OF MICROOPS\n");
-      panic("Invalid  Number Of Microops");
-  }
+  return false;
+
 }
 
 void MacroopBase::undoCheckMicroops(){
@@ -455,17 +402,19 @@ void MacroopBase::undoInjecttion(){
 
         _isInjected = false;
 
+        panic_if(numOfOriginalMicroops >= numMicroops,
+                "numOfOriginalMicroops >= numMicroops");
 
         StaticInstPtr * microopTemp = new StaticInstPtr[numOfOriginalMicroops];
-
+        int numOfInjectedUops = numMicroops - numOfOriginalMicroops;
         for (int i=0; i < numOfOriginalMicroops; i++)
-            microopTemp[i] = microops[i+1];
+            microopTemp[i] = microops[i + numOfInjectedUops];
 
         delete [] microops;
         microops = microopTemp;
         microops[0]->setFirstMicroop();
         numMicroops = numOfOriginalMicroops;
-        //DPRINTF(Capability, "NUMBER Of MICROOPS AFTER EJECT: %d\n",numMicroops);
+
     }
     else if (numMicroops <= 0){
         //DPRINTF(Capability, "INVALID NUMBER OF MICROOPS\n");
@@ -478,6 +427,7 @@ void
 MacroopBase::injectMicroops(ThreadContext * _tc,
                             PCState &nextPC, TheISA::CheckType _sym)
 {
+
 
     if (_sym == TheISA::CheckType::AP_MALLOC_BASE_COLLECT){
         injectAPMallocBaseCollector(_tc, nextPC);
@@ -628,7 +578,7 @@ MacroopBase::injectAPMallocSizeCollector(ThreadContext * _tc, PCState &nextPC){
                         (1ULL << StaticInst::IsFirstMicroop) |
                         (1ULL << StaticInst::IsMicroopInjected)|
                         (1ULL << StaticInst::IsMallocSizeCollectorMicroop),
-                        InstRegIndex(X86ISA::INTREG_RDI),
+                        InstRegIndex(X86ISA::NUM_INTREGS+15),
                         InstRegIndex(X86ISA::INTREG_RDI),
                         InstRegIndex(X86ISA::NUM_INTREGS+15),
                         /*env.dataSize*/8,
@@ -673,7 +623,7 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                         (1ULL << StaticInst::IsFirstMicroop) |
                         (1ULL << StaticInst::IsMicroopInjected)|
                         (1ULL << StaticInst::IsMallocBaseCollectorMicroop),
-                        InstRegIndex(X86ISA::INTREG_RAX),
+                        InstRegIndex(X86ISA::NUM_INTREGS+15),
                         InstRegIndex(X86ISA::INTREG_RAX),
                         InstRegIndex(X86ISA::NUM_INTREGS+15),
                         /*env.dataSize*/8,
@@ -702,105 +652,115 @@ void
 MacroopBase::injectBoundsCheck(PCState &nextPC){
 
 
-    if (numMicroops > 0 && !_isInjected){
-
-        _isInjected = true;
+    if (numMicroops > 0 && !_isInjected)
+    {
 
         // remember to set and clear last micro of original microops
-
-        microops[0]->clearFirstMicroop();
-
-        StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
-
-        for (int i=0; i < numMicroops; i++)
-            microopTemp[i+1] = microops[i];
-
-
-
-        int i;
-        for (i = 0; i < numMicroops; ++i)
+        for (int idx = 0; idx < numMicroops; ++idx)
         {
-            if (microops[i]->isMemRef()){
+            // if ((microops[idx]->getName().compare("st") == 0) &&
+            //     microops[idx]->uop_pid != TheISA::PointerID(0))
+            // {
+            //     microops[0]->clearFirstMicroop();
+            //
+            //     StaticInstPtr * microopTemp =
+            //                        new StaticInstPtr[numMicroops + 1];
+            //
+            //     for (int i=0; i < numMicroops; i++)
+            //         microopTemp[i+1] = microops[i];
+            //
+            //     StaticInstPtr micro_0 = new X86ISAInst::St(machInst,
+            //                   "AP_BOUNDS_CHECK_INJECT",
+            //                   (1ULL << StaticInst::IsMicroop) |
+            //                   (1ULL << StaticInst::IsFirstMicroop) |
+            //                   (1ULL << StaticInst::IsMicroopInjected)|
+            //                   (1ULL << StaticInst::IsBoundsCheckMicroop),
+            //                   env.scale,
+            //                   InstRegIndex(env.index),
+            //                   InstRegIndex(env.base),
+            //                   microops[idx]->getDisp(),
+            //                   InstRegIndex(env.seg),
+            //                   InstRegIndex(NUM_INTREGS+15),
+            //                   2,
+            //                   env.addressSize,
+            //                   0 |
+            //                   (machInst.legacy.addr ?
+            //                   (AddrSizeFlagBit << FlagShift) : 0)
+            //                   );
+            //
+            //     microopTemp[0] = micro_0;
+            //
+            //     delete [] microops;
+            //     microops = microopTemp;
+            //     numMicroops = numMicroops + 1;
+            //     _isInjected = true;
+            // }
+            // else
+            if ((microops[idx]->getName().compare("ld") == 0) &&
+                microops[idx]->uop_pid != TheISA::PointerID(0))
+            {
+                microops[0]->clearFirstMicroop();
+
+                StaticInstPtr * microopTemp =
+                                    new StaticInstPtr[numMicroops + 1];
+
+                for (int i=0; i < numMicroops; i++)
+                    microopTemp[i+1] = microops[i];
+
+                StaticInstPtr micro_0 = (env.dataSize >= 4) ?
+                        (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
+                          "AP_BOUNDS_CHECK_INJECT",
+                          (1ULL << StaticInst::IsMicroop) |
+                          (1ULL << StaticInst::IsFirstMicroop) |
+                          (1ULL << StaticInst::IsMicroopInjected)|
+                          (1ULL << StaticInst::IsBoundsCheckMicroop),
+                          env.scale,
+                          InstRegIndex(microops[idx]->srcRegIdx(0).index()),
+                          InstRegIndex(microops[idx]->srcRegIdx(1).index()),
+                          microops[idx]->getDisp(),
+                          InstRegIndex(env.seg),
+                          InstRegIndex(NUM_INTREGS+7),
+                          env.dataSize,
+                          env.addressSize,
+                          0 | (machInst.legacy.addr ?
+                          (AddrSizeFlagBit << FlagShift) : 0))) :
+                      (StaticInstPtr)(new X86ISAInst::Ld(machInst,
+                          "AP_BOUNDS_CHECK_INJECT",
+                          (1ULL << StaticInst::IsMicroop) |
+                          (1ULL << StaticInst::IsFirstMicroop) |
+                          (1ULL << StaticInst::IsMicroopInjected)|
+                          (1ULL << StaticInst::IsBoundsCheckMicroop),
+                          env.scale,
+                          InstRegIndex(microops[idx]->srcRegIdx(0).index()),
+                          InstRegIndex(microops[idx]->srcRegIdx(1).index()),
+                          microops[idx]->getDisp(),
+                          InstRegIndex(env.seg),
+                          InstRegIndex(NUM_INTREGS+7),
+                          env.dataSize,
+                          env.addressSize,
+                          0 | (machInst.legacy.addr ?
+                          (AddrSizeFlagBit << FlagShift) : 0))
+                          );
+                microopTemp[0] = micro_0;
+
+                delete [] microops;
+                microops = microopTemp;
+                numMicroops = numMicroops + 1;
+                _isInjected = true;
                 break;
             }
+
+
+
         }
 
-        panic_if(i >= numMicroops, "Injecting to a non memory instruction!");
-
-        StaticInstPtr micro_0;
-
-        if (microops[i]->isStore()){
-            micro_0 = new X86ISAInst::St(machInst,
-                                "AP_BOUNDS_CHECK_INJECT",
-                                (1ULL << StaticInst::IsMicroop) |
-                                 (1ULL << StaticInst::IsFirstMicroop) |
-                                 (1ULL << StaticInst::IsMicroopInjected)|
-                                 (1ULL << StaticInst::IsBoundsCheckMicroop),
-                                env.scale,
-                                InstRegIndex(env.index),
-                                InstRegIndex(env.base),
-                                microops[i]->getDisp(),
-                                InstRegIndex(env.seg),
-                                InstRegIndex(NUM_INTREGS+15),
-                                2,
-                                env.addressSize,
-                                0 |
-                                (machInst.legacy.addr ?
-                                  (AddrSizeFlagBit << FlagShift) : 0)
-                                );
-        }
-        else if (microops[i]->isLoad()){
-            micro_0 = (env.dataSize >= 4) ?
-                    (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
-                                    "AP_BOUNDS_CHECK_INJECT",
-                                    (1ULL << StaticInst::IsMicroop) |
-                                    (1ULL << StaticInst::IsFirstMicroop) |
-                                    (1ULL << StaticInst::IsMicroopInjected)|
-                                    (1ULL << StaticInst::IsBoundsCheckMicroop),
-                                    env.scale,
-                                    InstRegIndex(env.index),
-                                    InstRegIndex(env.base),
-                                     microops[i]->getDisp(),
-                                    InstRegIndex(env.seg),
-                                    InstRegIndex(env.reg),
-                                    env.dataSize,
-                                    env.addressSize,
-                                    0 | (machInst.legacy.addr ?
-                                      (AddrSizeFlagBit << FlagShift) : 0))) :
-                    (StaticInstPtr)(new X86ISAInst::Ld(machInst,
-                                    "AP_BOUNDS_CHECK_INJECT",
-                                    (1ULL << StaticInst::IsMicroop) |
-                                    (1ULL << StaticInst::IsFirstMicroop) |
-                                    (1ULL << StaticInst::IsMicroopInjected)|
-                                    (1ULL << StaticInst::IsBoundsCheckMicroop),
-                                    env.scale,
-                                    InstRegIndex(env.index),
-                                    InstRegIndex(env.base),
-                                     microops[i]->getDisp(),
-                                    InstRegIndex(env.seg),
-                                    InstRegIndex(env.reg),
-                                    env.dataSize,
-                                    env.addressSize,
-                                    0 | (machInst.legacy.addr ?
-                                      (AddrSizeFlagBit << FlagShift) : 0))
-                                    );
-        }
-
-        else{
-            panic("Not a Store/Load Microop!");
-        }
-
-        microopTemp[0] = micro_0;
-
-        delete [] microops;
-        microops = microopTemp;
-        numMicroops = numMicroops + 1;
-
-
+        if (!_isInjected)
+            panic("wrong injection!");
 
     }
-    else if (numMicroops <= 0){
-        //DPRINTF(Capability, "INVALID NUMBER OF MICROOPS\n");
+
+    else if (numMicroops <= 0)
+    {
         panic("Invalid  Number Of Microops");
     }
 
@@ -831,7 +791,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsCallocSizeCollectorMicroop),
-                         InstRegIndex(X86ISA::INTREG_RDI),
+                         InstRegIndex(X86ISA::NUM_INTREGS+15),
                          InstRegIndex(X86ISA::INTREG_RDI),
                          InstRegIndex(X86ISA::NUM_INTREGS+15),
                          /*env.dataSize*/8,
@@ -880,7 +840,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsCallocBaseCollectorMicroop),
-                         InstRegIndex(X86ISA::INTREG_RAX),
+                         InstRegIndex(X86ISA::NUM_INTREGS+15),
                          InstRegIndex(X86ISA::INTREG_RAX),
                          InstRegIndex(X86ISA::NUM_INTREGS+15),
                          /*env.dataSize*/8,
@@ -930,7 +890,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsReallocSizeCollectorMicroop),
-                         InstRegIndex(X86ISA::INTREG_RDI),
+                         InstRegIndex(X86ISA::NUM_INTREGS+15),
                          InstRegIndex(X86ISA::INTREG_RDI),
                          InstRegIndex(X86ISA::NUM_INTREGS+15),
                          /*env.dataSize*/8,
@@ -980,7 +940,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsReallocBaseCollectorMicroop),
-                         InstRegIndex(X86ISA::INTREG_RAX),
+                         InstRegIndex(X86ISA::NUM_INTREGS+15),
                          InstRegIndex(X86ISA::INTREG_RAX),
                          InstRegIndex(X86ISA::NUM_INTREGS+15),
                          /*env.dataSize*/8,

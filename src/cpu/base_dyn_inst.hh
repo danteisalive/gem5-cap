@@ -324,7 +324,8 @@ class BaseDynInst : public ExecContext, public RefCounted
     void translationStarted(bool f) { instFlags[TranslationStarted] = f; }
 
     /** True if the DTB address translation has completed. */
-    bool translationCompleted() const { return instFlags[TranslationCompleted]; }
+    bool translationCompleted() const {
+                              return instFlags[TranslationCompleted]; }
     void translationCompleted(bool f) { instFlags[TranslationCompleted] = f; }
 
     /** True if this address was found to match a previous load and they issued
@@ -348,6 +349,7 @@ class BaseDynInst : public ExecContext, public RefCounted
      */
     bool isTranslationDelayed() const
     {
+        if (isBoundsCheckMicroop()) return false;
         return (translationStarted() && !translationCompleted());
     }
 
@@ -577,7 +579,9 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool isCapFetched() const {return  staticInst->isCapFetched(); }
     void setFlag(StaticInstFlags::Flags f) { staticInst->setFlag(f); }
     void resetFlag(StaticInstFlags::Flags f) { staticInst->resetFlag(f); }
-
+    void setFlag(Flags f) {instFlags[f] = true;}
+    void resetFlag(Flags f) {instFlags[f] = false;}
+    void setRegMade(bool val) {instFlags[ReqMade] = val;}
     /** Temporarily sets this instruction as a serialize before instruction. */
     void setSerializeBefore() { status.set(SerializeBefore); }
 

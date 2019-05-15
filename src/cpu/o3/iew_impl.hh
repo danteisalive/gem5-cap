@@ -1113,6 +1113,9 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
             }
 
             ldstQueue.insertLoad(inst);
+            // if (inst->isBoundsCheckMicroop()){
+            //     std::cout << inst->seqNum << std::endl;
+            // }
 
             ++iewDispLoadInsts;
 
@@ -1312,6 +1315,9 @@ DefaultIEW<Impl>::executeInsts()
 
         Fault fault = NoFault;
 
+        ThreadID tid = inst->threadNumber;
+        ThreadContext * tc = cpu->tcBase(tid);
+
         // Execute instruction.
         // Note that if the instruction faults, it will be handled
         // at the commit stage.
@@ -1324,6 +1330,11 @@ DefaultIEW<Impl>::executeInsts()
                 // Loads will mark themselves as executed, and their writeback
                 // event adds the instruction to the queue to commit
                 fault = ldstQueue.executeLoad(inst);
+
+                // if (tc->enableCapability && inst->isBoundsCheckMicroop()){
+                //     inst->fault = NoFault;
+                //     continue;
+                // }
 
                 if (inst->isTranslationDelayed() &&
                     fault == NoFault) {
@@ -1395,8 +1406,7 @@ DefaultIEW<Impl>::executeInsts()
         // This probably needs to prioritize the redirects if a different
         // scheduler is used.  Currently the scheduler schedules the oldest
         // instruction first, so the branch resolution order will be correct.
-        ThreadID tid = inst->threadNumber;
-        ThreadContext * tc = cpu->tcBase(tid);
+
 
         updateTracker(tid, inst);
 
@@ -1530,6 +1540,9 @@ DefaultIEW<Impl>::writebackInsts()
         // when it's ready to execute the strictly ordered load.
         if (!inst->isSquashed() && inst->isExecuted() && inst->getFault() == NoFault) {
             int dependents = instQueue.wakeDependents(inst);
+
+            // if (inst->isBoundsCheckMicroop())
+            //   std::cout << "wb: " << inst->seqNum << std::endl;
 
             for (int i = 0; i < inst->numDestRegs(); i++) {
                 //mark as Ready
@@ -1771,6 +1784,12 @@ DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
           }
        }
     }
+
+    if (tc->enableCapability){
+      tc->RegTrackTable = tc->CommitPointerTracker;
+    }
+
+
 }
 
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

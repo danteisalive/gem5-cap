@@ -1179,14 +1179,16 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
         if (syms_it != (tc->syms_cache).end()){
             si->injectMicroops(tc, thisPC, syms_it->second);
         }
-        ////check to see if we need to inject checks for this macroop
-         else {
-        //    ////first for all the microops in this macroop update the
-        //    //// pointer tracker and then inject microps
+        else {
               si->updatePointerTracker(tc);
-        //     // for this microop update the pointer tracker logic
-        //      si->injectCheckMicroops();
-         }
+              if (si->injectCheckMicroops())
+                si->injectMicroops(tc,
+                                   thisPC,
+                                   TheISA::CheckType::AP_BOUNDS_INJECT
+                                  );
+
+
+        }
 
 
 }
@@ -1349,6 +1351,8 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                         lookupAndUpdateLVPT(thisPC, tid, staticInst);
                         capabilityCheck(thisPC, tid, staticInst);
 
+
+
                     }
 
                     // Increment stat of fetched instructions.
@@ -1399,8 +1403,9 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             nextPC = thisPC;
 
             //lookupAndUpdateLVPT(instruction);
-
-
+            if (instruction->isBoundsCheckMicroop()){
+                instruction->setPredicate(false);
+            }
 
             // If we're branching after this instruction, quit fetching
             // from the same block.

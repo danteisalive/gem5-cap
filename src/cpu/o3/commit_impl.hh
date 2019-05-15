@@ -1154,6 +1154,9 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     // If the instruction is not executed yet, then it will need extra
     // handling.  Signal backwards that it should be executed.
+    ThreadContext * tc = cpu->tcBase(tid);
+
+
     if (!head_inst->isExecuted()) {
         // Keep this number correct.  We have not yet actually executed
         // and committed this instruction.
@@ -1289,9 +1292,15 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                     si->disassemble(head_inst->pcState().pc())
                   );
 
+    // std::cout << "Committing instruction with PC " <<
+    //              head_inst->pcState() <<
+    //           " " << si->disassemble(head_inst->pcState().pc()) <<
+    //std::endl;
+
+
 
     #define ENABLE_CAPABILITY_DEBUG 0
-    ThreadContext * tc = cpu->tcBase(tid);
+    //ThreadContext * tc = cpu->tcBase(tid);
 
     if (tc->enableCapability){
         uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
@@ -1407,15 +1416,19 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                 " P0An: " << cpu->P0An <<
                 " PnA0: " << cpu->PnA0 <<
                 " PmAn: " << cpu->PmAn <<
-                " ldsWithPid: " << cpu->ldsWithPid <<
+                " Number Of Lds: " << cpu->ldsWithPid <<
                 " Heap Access: " << cpu->heapAccesses <<
-                " Heap True Predection: " << cpu->truePredection <<
+                " True Predections: " << cpu->truePredection <<
+                " HeapPnA0: " << cpu->HeapPnA0 <<
+                " HeapPnAm: " << cpu->HeapPnAm <<
+                " Access Prediction Accuracy: " <<
+                  (double)cpu->truePredection/cpu->ldsWithPid <<
                 std::endl;
 
                 cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
                 cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
                 cpu->heapAccesses = 0; cpu->truePredection = 0;
-                cpu->ldsWithPid = 0;
+                cpu->ldsWithPid = 0; cpu->HeapPnAm = 0; cpu->HeapPnA0 = 0;
 
         }
     }
@@ -1770,21 +1783,21 @@ DefaultCommit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
       auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
       if (mtt_it != tc->CommitAliasTable.end()){
           tc->CommitPointerTracker[dest] = mtt_it->second;
+          return;
       }
-      else{
-          tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
-      }
-
-      // let's see how many of ld,ldis are for heap
-
-      // TheISA::PointerID _pid = SearchCapReg(tid, head_inst->effAddr);
-      // if (_pid != TheISA::PointerID(0)){
-      //   cpu->heapAccesses++;
-      //   if (head_inst->macroop->getMacroopPid() == _pid){
-      //     // correct guess
-      //     cpu->truePredection++;
-      //   }
+      // else{
+      //     tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
       // }
+
+      X86ISA::IntRegIndex   src_reg =
+                 (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
+
+      if (src_reg != X86ISA::INTREG_RSP){
+          if (head_inst->staticInst->checked){
+            tc->CommitPointerTracker[src_reg] = head_inst->staticInst->uop_pid;
+          }
+       }
+
     }
 
   }
