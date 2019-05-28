@@ -32,7 +32,12 @@
 #define __CPU_PRED_LVPT_HH__
 
 
-
+#include "arch/types.hh"
+#include "base/logging.hh"
+#include "base/types.hh"
+#include "config/the_isa.hh"
+#include "cpu/inst_seq.hh"
+#include "cpu/pred/sat_counter.hh"
 
 class DefaultLVPT
 {
