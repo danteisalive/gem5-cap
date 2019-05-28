@@ -181,6 +181,11 @@ namespace X86ISA
         {
             pcState.advance();
         }
+        void
+        resetPC(PCState &pcState) const
+        {
+            pcState.uReset();
+        }
     };
 }
 

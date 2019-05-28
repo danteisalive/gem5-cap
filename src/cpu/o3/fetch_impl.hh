@@ -783,6 +783,7 @@ DefaultFetch<Impl>::doSquash(const TheISA::PCState &newPC,
         macroop[tid] = squashInst->macroop;
     else
         macroop[tid] = NULL;
+
     decoder[tid]->reset();
 
     // Clear the icache miss if it's outstanding.
@@ -1027,6 +1028,31 @@ DefaultFetch<Impl>::checkSignalsAndUpdate(ThreadID tid)
 
         DPRINTF(Fetch, "[tid:%u]: Squashing instructions due to squash "
                 "from commit.\n",tid);
+        if (fromCommit->commitInfo[tid].squashDueToMispredictedPID)
+            DPRINTF(Fetch,"Squashing Due to mispredicted PID."
+                          "Squahsing PC: %s Squashing PID: %s\n",
+                        fromCommit->commitInfo[tid].pc,
+                        fromCommit->commitInfo[tid].squashedPID );
+        // if squashing due to mispredicted PID, then squash LVPT too
+        if (fromCommit->commitInfo[tid].squashDueToMispredictedPID)
+        {
+            DPRINTF(Fetch, "Squshing LVPT history until seqNum: [sn:%i] \n",
+                    fromCommit->commitInfo[tid].doneSeqNum+1);
+            LVPT->squashAndUpdate(
+                                fromCommit->commitInfo[tid].doneSeqNum+1,
+                                fromCommit->commitInfo[tid].pc,
+                                fromCommit->commitInfo[tid].squashedPID,
+                                tid
+                                );
+        }
+        else {
+           // squash due to branch mispredection or memOrderViolation
+            DPRINTF(Fetch, "Non-PID Squash."
+                           "Squshing LVPT history until seqNum: [sn:%i] \n",
+                            fromCommit->commitInfo[tid].doneSeqNum);
+            LVPT->squash(fromCommit->commitInfo[tid].doneSeqNum,
+                          tid);
+        }
         // In any case, squash.
         squash(fromCommit->commitInfo[tid].pc,
                fromCommit->commitInfo[tid].doneSeqNum,
@@ -1179,16 +1205,16 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
         if (syms_it != (tc->syms_cache).end()){
             si->injectMicroops(tc, thisPC, syms_it->second);
         }
-        else {
-              si->updatePointerTracker(tc);
-              if (si->injectCheckMicroops())
-                si->injectMicroops(tc,
-                                   thisPC,
-                                   TheISA::CheckType::AP_BOUNDS_INJECT
-                                  );
-
-
-        }
+        // else {
+        //       si->updatePointerTracker(tc);
+        //       if (si->injectCheckMicroops())
+        //         si->injectMicroops(tc,
+        //                            thisPC,
+        //                            TheISA::CheckType::AP_BOUNDS_INJECT
+        //                           );
+        //
+        //
+        // }
 
 
 }

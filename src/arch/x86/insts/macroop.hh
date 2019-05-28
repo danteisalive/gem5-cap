@@ -98,6 +98,13 @@ public:
     }
 
   public:
+
+    uint64_t
+    getNumOfMicroops()
+    {
+      return numMicroops;
+    }
+
     ExtMachInst
     getExtMachInst()
     {

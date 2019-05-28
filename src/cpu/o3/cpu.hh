@@ -517,6 +517,7 @@ class FullO3CPU : public BaseO3CPU
 
     void setArchCCReg(int reg_idx, TheISA::CCReg val, ThreadID tid);
 
+    void updatePIDHistory(DynInstPtr &inst);
 
     void updateFetchLVPT(
                       DynInstPtr &inst, TheISA::PointerID& _new_pid,

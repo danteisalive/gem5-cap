@@ -505,6 +505,8 @@ DefaultIEW<Impl>::squashDueToBranch(DynInstPtr &inst, ThreadID tid)
         toCommit->mispredictInst[tid] = inst;
         toCommit->includeSquashInst[tid] = false;
 
+        toCommit->squashDueToMispredictedPID[tid] = false;
+
         wroteToTimeBuffer = true;
 
         squashExecuteAliasTable(inst);
@@ -536,6 +538,7 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
 
         // Must include the memory violator in the squash.
         toCommit->includeSquashInst[tid] = true;
+        toCommit->squashDueToMispredictedPID[tid] = false;
 
         wroteToTimeBuffer = true;
 
@@ -558,14 +561,19 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
         toCommit->squashedSeqNum[tid] = inst->seqNum;
 
         TheISA::PCState pc = inst->pcState();
-        TheISA::advancePC(pc, inst->staticInst);
-
-        toCommit->pc[tid] = pc;
+        //TheISA::advancePC(pc, inst->staticInst);
+        // std::cout << std::dec <<"Before Wrong PID predicted: " <<
+        // pc << " " << inst->seqNum <<  std::endl;
+        //TheISA::resetPC(pc, inst->staticInst);
+        toCommit->pc[tid] = inst->pcState();;
+        // std::cout << std::dec << "After Wrong PID predicted: " <<
+        // pc << " " << inst->seqNum <<  std::endl;
         toCommit->mispredictInst[tid] = NULL;
-
+        toCommit->squashedPID[tid] = inst->macroop->getMacroopPid();
+        toCommit->squashDueToMispredictedPID[tid] = true;
         // Must include the memory violator in the squash? I dont think so
         // we will just update the PID and continue running
-        toCommit->includeSquashInst[tid] = false;
+        toCommit->includeSquashInst[tid] = true;
 
         wroteToTimeBuffer = true;
 

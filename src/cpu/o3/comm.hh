@@ -198,6 +198,10 @@ struct DefaultIEWDefaultCommit {
     bool branchMispredict[Impl::MaxThreads];
     bool branchTaken[Impl::MaxThreads];
     bool includeSquashInst[Impl::MaxThreads];
+
+    TheISA::PointerID squashedPID[Impl::MaxThreads];
+    bool squashDueToMispredictedPID[Impl::MaxThreads];
+
 };
 
 template<class Impl>
@@ -225,6 +229,7 @@ struct TimeBufStruct {
         bool predIncorrect;
         bool branchMispredict;
         bool branchTaken;
+
     };
 
     decodeComm decodeInfo[Impl::MaxThreads];
@@ -312,6 +317,9 @@ struct TimeBufStruct {
         /// Hack for now to send back an strictly ordered access to
         /// the IEW stage.
         bool strictlyOrdered; // *I
+
+        TheISA::PointerID squashedPID;
+        bool squashDueToMispredictedPID;
 
     };
 

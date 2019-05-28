@@ -888,7 +888,9 @@ DefaultCommit<Impl>::commit()
             toIEW->commitInfo[tid].doneSeqNum = squashed_inst;
 
             toIEW->commitInfo[tid].squash = true;
-
+            toIEW->commitInfo[tid].squashedPID = fromIEW->squashedPID[tid];
+            toIEW->commitInfo[tid].squashDueToMispredictedPID =
+                                    fromIEW->squashDueToMispredictedPID[tid];
             // Send back the rob squashing signal so other stages know that
             // the ROB is in the process of squashing.
             toIEW->commitInfo[tid].robSquashing = true;
@@ -1292,12 +1294,13 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                     si->disassemble(head_inst->pcState().pc())
                   );
 
-    // std::cout << "Committing instruction with PC " <<
-    //              head_inst->pcState() <<
+    // std::cout << head_inst->seqNum << " " << head_inst->pcState() <<
     //           " " << si->disassemble(head_inst->pcState().pc()) <<
-    //std::endl;
+    // std::endl;
 
-
+    if (tc->enableCapability){
+      cpu->updatePIDHistory(head_inst);
+    }
 
     #define ENABLE_CAPABILITY_DEBUG 0
     //ThreadContext * tc = cpu->tcBase(tid);
@@ -1479,10 +1482,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
        );
        crf_it->second.setCSRBit(0);  // this cap is valid now
 
-       DPRINTF(Capability,"REALLOC (%lu) = %#lx ---> %s\n",
-                                       crf_it->second.getSize() ,
-                                       crf_it->second.getBaseAddr(),
-                                       tc->PID);
+       // DPRINTF(Capability,"REALLOC (%lu) = %#lx ---> %s\n",
+       //                                 crf_it->second.getSize() ,
+       //                                 crf_it->second.getBaseAddr(),
+       //                                 tc->PID);
 
        for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
           TheISA::PointerID _pid = TheISA::PointerID(0);
@@ -1523,9 +1526,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           )
         {
 
-          DPRINTF(Capability,"REALLOC CALLED for (%lu)  ---> %s\n",
-                                          _base_addr ,
-                                          _pid);
+          // DPRINTF(Capability,"REALLOC CALLED for (%lu)  ---> %s\n",
+          //                                 _base_addr ,
+          //                                 _pid);
 
             tc->CapRegsFile.erase(_pid);
 
@@ -1582,10 +1585,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
         crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-        DPRINTF(Capability,"CALLOC(%lu) = %#lx ---> %s\n",
-                                        crf_it->second.getSize() ,
-                                        crf_it->second.getBaseAddr(),
-                                        tc->PID);
+        // DPRINTF(Capability,"CALLOC(%lu) = %#lx ---> %s\n",
+        //                                 crf_it->second.getSize() ,
+        //                                 crf_it->second.getBaseAddr(),
+        //                                 tc->PID);
 
 
         for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1644,10 +1647,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-            DPRINTF(Capability,"MALLOC(%lu) = %#lx ---> %s\n",
-                                            crf_it->second.getSize() ,
-                                            crf_it->second.getBaseAddr(),
-                                            tc->PID);
+            // DPRINTF(Capability,"MALLOC(%lu) = %#lx ---> %s\n",
+            //                                 crf_it->second.getSize() ,
+            //                                 crf_it->second.getBaseAddr(),
+            //                                 tc->PID);
 
 
           for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1692,19 +1695,13 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
 
           uint64_t _base_addr = cpu->readArchIntReg(X86ISA::INTREG_RDI, tid);
           TheISA::PointerID _pid = TheISA::PointerID(0);
-          //int _begin = 0,_end = 0;
-          // for (auto& capElem: tc->CapRegsFile){
-          //     if (capElem.second.getBaseAddr() == _base_addr){
-          //         _pid = capElem.first;
-          //     }
-          // }
           _pid = SearchCapReg(tid, _base_addr);
           if (_pid != TheISA::PointerID(0) /*&&
           (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
           ){
              NumOfAllocations--;
-             DPRINTF(Capability,"FREE(%llx) --> %s\n", _base_addr, _pid);
-              tc->CapRegsFile.erase(_pid);
+             // DPRINTF(Capability,"FREE(%llx) --> %s\n", _base_addr, _pid);
+             //  tc->CapRegsFile.erase(_pid);
 
               // erase from RegTrackTable
             for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++) {
@@ -1717,9 +1714,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
                     mtt_it != tc->CommitAliasTable.cend(); /* no increment */)
               {
                   if (mtt_it->second.getPID() == _pid.getPID()) {
-                    //std::cout << "Deleted from CommitAliasTable! Mem[" <<
-                    //mtt_it->first <<"][" << mtt_it->second << "]"<<'\n';
-                    //std::cout << "called from free!" << std::endl;
                     mtt_it = tc->CommitAliasTable.erase(mtt_it);
                   }
                   else {

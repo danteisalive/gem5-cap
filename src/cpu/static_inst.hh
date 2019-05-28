@@ -302,6 +302,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     }
 
     virtual void advancePC(TheISA::PCState &pcState) const = 0;
+    virtual void resetPC(TheISA::PCState &pcState) const = 0;
 
     /**
      * Return the microop that goes with a particular micropc. This should
@@ -314,6 +315,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual void injectMicroops(ThreadContext * _tc, TheISA::PCState &nextPC, TheISA::CheckType _sym);
     virtual void undoInjecttion();
 
+    virtual uint64_t getNumOfMicroops();
     virtual bool injectCheckMicroops();
     virtual void undoCheckMicroops();
     virtual void updatePointerTracker(ThreadContext * tc);

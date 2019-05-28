@@ -38,7 +38,8 @@ DefaultLVPT::DefaultLVPT(unsigned _numEntries,
                        unsigned _tagBits,
                        unsigned _instShiftAmt,
                        unsigned _num_threads)
-    : numEntries(_numEntries),
+    : predHist(_num_threads),
+      numEntries(_numEntries),
       tagBits(_tagBits),
       instShiftAmt(_instShiftAmt),
       log2NumThreads(floorLog2(_num_threads))
@@ -164,13 +165,61 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
 }
 
 void
-DefaultLVPT::update(
+DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
+                    const InstSeqNum &seqNum,
                     Addr instPC,
                     const TheISA::PointerID &target,
                     ThreadID tid, bool predict
                    )
 {
 
+
+    unsigned lvpt_idx = getIndex(instPC, tid);
+
+    assert(lvpt_idx < numEntries);
+
+
+    // make a history for the entry which we are going to update
+    // no matter it's predected right or not
+    LVPTHistory *history = new LVPTHistory;
+
+
+    history->localCtrEntry.write(localCtrs[lvpt_idx].read());
+    history->localBiasEntry = localBiases[lvpt_idx];
+    history->lvptEntry.tag = lvpt[lvpt_idx].tag;
+    history->lvptEntry.tid = lvpt[lvpt_idx].tid;
+    history->lvptEntry.valid = lvpt[lvpt_idx].valid;
+    history->lvptEntry.target = lvpt[lvpt_idx].target;
+
+    void* lvptHistory = static_cast<void*>(history);
+
+
+
+    PIDPredictorHistory predict_record(seqNum, pc.instAddr(),
+                                       predict, lvptHistory,
+                                       tid, lvpt_idx
+                                     );
+
+    predict_record.targetPID = target;
+
+    //predHist[tid].push_front(predict_record);
+    predHist[tid].insert(std::pair<InstSeqNum,PIDPredictorHistory>
+                        (seqNum, predict_record)
+                        );
+
+    DPRINTF(Capability, "[tid:%i]: [sn:%i]: History entry added."
+            "predHist.size(): %i\n", tid, seqNum, predHist[tid].size());
+
+    update(instPC, target, tid, predict);
+
+}
+
+void
+DefaultLVPT::update(Addr instPC,
+                    const TheISA::PointerID &target,
+                    ThreadID tid, bool predict
+                   )
+{
 
     unsigned lvpt_idx = getIndex(instPC, tid);
 
@@ -211,4 +260,134 @@ DefaultLVPT::update(
     lvpt[lvpt_idx].valid = true;
     lvpt[lvpt_idx].target = target;
     lvpt[lvpt_idx].tag = getTag(instPC);
+
+}
+
+
+void
+DefaultLVPT::squashAndUpdate(const InstSeqNum &squashed_sn,
+                             const TheISA::PCState &pc,
+                            TheISA::PointerID& corr_pid,
+                            ThreadID tid
+                            )
+{
+
+  DPRINTF(Capability, "[tid:%i]: Squashing all histories unitl: [sn:%i]"
+          "\n", tid, squashed_sn);
+
+    unsigned lvpt_idx = getIndex(pc.instAddr(), tid);
+
+    History &pred_hist = predHist[tid];
+
+    assert(lvpt_idx < numEntries);
+    // first squash all histories afte the squashed_sn e.g squashed_sn = 604
+    // then all histories > 604 wil be removed
+    // this brings back the LVPT to the point right before the midpredicted PID
+
+    squash(squashed_sn, tid);
+
+    assert(!pred_hist.empty());
+    // then we can update the LVPT with the right history
+
+    auto pred_hist_it = pred_hist.find(squashed_sn);
+    DPRINTF(Capability, "[tid:%i]: SEQ: [sn:%i] [sn:%i]"
+            "\n", tid, pred_hist_it->second.seqNum ,squashed_sn);
+    assert(pred_hist_it->second.seqNum == squashed_sn);
+
+    LVPTHistory *history =
+          static_cast<LVPTHistory*>(pred_hist_it->second.lvptEntryHistory);
+
+    assert(pred_hist_it->second.lvptIdx == lvpt_idx);
+
+    lvpt[lvpt_idx].tag = history->lvptEntry.tag;
+    lvpt[lvpt_idx].tid = history->lvptEntry.tid;
+    lvpt[lvpt_idx].valid = history->lvptEntry.valid;
+    lvpt[lvpt_idx].target = history->lvptEntry.target;
+    localCtrs[lvpt_idx].write(history->localCtrEntry.read());
+    localBiases[lvpt_idx] = history->localBiasEntry;
+
+    delete history;
+
+    pred_hist.erase(pred_hist_it);
+    //now update with correct pid
+    update(pc.instAddr(), corr_pid, tid, true);
+
+}
+
+
+void
+DefaultLVPT::squash(const InstSeqNum &squashed_sn, ThreadID tid)
+{
+    History &pred_hist = predHist[tid];
+
+    // bring back the LVPT to a state right before the squash
+
+    for (auto pred_hist_it = pred_hist.cbegin(),
+         next_it = pred_hist_it;
+        pred_hist_it != pred_hist.cend();
+        pred_hist_it = next_it)
+    {
+       ++next_it;
+       if (pred_hist_it->second.seqNum > squashed_sn)
+       {
+          LVPTHistory *history =
+             static_cast<LVPTHistory*>(pred_hist_it->second.lvptEntryHistory);
+
+          uint64_t lvpt_idx = pred_hist_it->second.lvptIdx;
+
+          lvpt[lvpt_idx].tag = history->lvptEntry.tag;
+          lvpt[lvpt_idx].tid = history->lvptEntry.tid;
+          lvpt[lvpt_idx].valid = history->lvptEntry.valid;
+          lvpt[lvpt_idx].target = history->lvptEntry.target;
+          localCtrs[lvpt_idx].write(history->localCtrEntry.read());
+          localBiases[lvpt_idx] = history->localBiasEntry;
+
+          delete history;
+
+          DPRINTF(Capability, "[tid:%i]: Removing history for [sn:%i] "
+                 "PC %#x.\n", tid, pred_hist_it->second.seqNum,
+                 pred_hist_it->second.pc);
+
+          pred_hist.erase(pred_hist_it);
+
+       }
+
+    }
+
+
+}
+
+void
+DefaultLVPT::updatePIDHistory(const InstSeqNum &done_sn, ThreadID tid)
+{
+
+    History &pred_hist = predHist[tid];
+
+    DPRINTF(Capability, "[tid:%i]: Committing predictions until "
+            "[sn:%lli].\n", tid, done_sn);
+
+
+
+    for (auto pred_hist_it = pred_hist.cbegin(),
+         next_it = pred_hist_it;
+        pred_hist_it != pred_hist.cend();
+        pred_hist_it = next_it)
+    {
+       ++next_it;
+       if (pred_hist_it->second.seqNum <= done_sn)
+       {
+         LVPTHistory *history =
+             static_cast<LVPTHistory*>(pred_hist_it->second.lvptEntryHistory);
+
+         delete history;
+
+         DPRINTF(Capability, "[tid:%i]: Removing history for [sn:%i] "
+                 "PC %#x.\n", tid, pred_hist_it->second.seqNum,
+                 pred_hist_it->second.pc);
+
+         pred_hist.erase(pred_hist_it);
+
+       }
+
+    }
 }

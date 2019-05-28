@@ -1564,6 +1564,14 @@ FullO3CPU<Impl>::setArchCCReg(int reg_idx, CCReg val, ThreadID tid)
     regFile.setCCReg(phys_reg, val);
 }
 
+template <class Impl>
+void
+FullO3CPU<Impl>::updatePIDHistory(DynInstPtr &inst)
+{
+    fetch.getFetchLVPT()->updatePIDHistory(inst->seqNum,
+                                           inst->threadNumber
+                                           );
+}
 
 template <class Impl>
 void
@@ -1571,12 +1579,21 @@ FullO3CPU<Impl>::updateFetchLVPT(
                       DynInstPtr &inst, TheISA::PointerID& _new_pid,
                       bool predict)
 {
-    fetch.getFetchLVPT()->update(
+    fetch.getFetchLVPT()->updateAndSnapshot(
+                    inst->pcState(),
+                    inst->seqNum,
                     inst->pcState().instAddr(),
                     _new_pid,
                     inst->threadNumber,
                     predict
                     );
+
+    // fetch.getFetchLVPT()->update(
+    //                             inst->pcState().instAddr(),
+    //                             _new_pid,
+    //                             inst->threadNumber,
+    //                             predict
+    //                           );
 }
 
 template <class Impl>

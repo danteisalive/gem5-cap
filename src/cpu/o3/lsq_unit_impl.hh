@@ -994,18 +994,6 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         iewStage->activityThisCycle();
     } else {
 
-        // if (tc->enableCapability && inst->isBoundsCheckMicroop()){
-        //     //inst->forwardOldRegs();;
-        //     if (!(inst->hasRequest() && inst->strictlyOrdered()) ||
-        //          inst->isAtCommit())
-        //     {
-        //       inst->setExecuted();
-        //     }
-        //
-        //     iewStage->instToCommit(inst);
-        //     iewStage->activityThisCycle();
-        //     return NoFault;
-        // }
         assert(inst->effAddrValid());
         int load_idx = inst->lqIdx;
         incrLdIdx(load_idx);
@@ -1047,12 +1035,6 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
 
      ThreadContext * tc = cpu->tcBase(tid);
-    // if (tc->enableCapability && store_inst->isBoundsCheckMicroop()){
-    //     store_inst->setExecuted();
-    //     store_inst->setCompleted();
-    //     store_inst->setCanCommit();
-    //     return store_fault;
-    // }
 
 
     if (store_inst->isTranslationDelayed() &&
@@ -1768,7 +1750,7 @@ template <class Impl>
 bool
 LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 {
-
+    #define ENABLE_PREDICTOR_DEBUG 0
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
 
@@ -1807,17 +1789,26 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                         exe_alias_table->second.pid != TheISA::PointerID(0)){
                        cpu->PmAn++;
                  }
-                 if (0){
+                 if (ENABLE_PREDICTOR_DEBUG){
                    std::cout << std::hex <<
                    "EXECUTE: False Prediction Load Instruction: " <<
                    inst->pcState().instAddr() << " " <<
+                   std::dec  <<inst->seqNum<< " " <<
                    "Predicted: " << inst->macroop->getMacroopPid() << " " <<
                    "Actual: " << exe_alias_table->second.pid << std::endl;
                  }
-                 inst->macroop->getMacroopPid() = exe_alias_table->second.pid;
-               return true;
+                 inst->macroop->setMacroopPid(exe_alias_table->second.pid);
+                 return true;
              }
              else {
+                 if (ENABLE_PREDICTOR_DEBUG){
+                   std::cout << std::hex <<
+                   "EXECUTE: True Prediction Load Instruction: " <<
+                   inst->pcState().instAddr() << " " <<
+                   std::dec  <<inst->seqNum<< " " <<
+                   "Predicted: " << inst->macroop->getMacroopPid() << " " <<
+                   "Actual: " << exe_alias_table->second.pid << std::endl;
+                 }
                  cpu->updateFetchLVPT(inst, exe_alias_table->second.pid, true);
                  return false;
              }
@@ -1835,86 +1826,61 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                         commit_alias_table->second != TheISA::PointerID(0)){
                      cpu->PmAn++;
                }
-               if (0){
+               if (ENABLE_PREDICTOR_DEBUG){
                  std::cout << std::hex <<
                  "EXECUTE: False Prediction Load Instruction: " <<
                  inst->pcState().instAddr() << " " <<
+                 std::dec  <<inst->seqNum<< " " <<
                  "Predicted: " << inst->macroop->getMacroopPid() << " " <<
                  "Actual: " << commit_alias_table->second << std::endl;
                }
-               inst->macroop->getMacroopPid() = commit_alias_table->second;
-             return true;
+               inst->macroop->setMacroopPid(commit_alias_table->second);
+               return true;
            }
            else {
                cpu->updateFetchLVPT(inst, commit_alias_table->second, true);
-               if (0){
+               if (ENABLE_PREDICTOR_DEBUG){
                  std::cout << std::hex <<
                  "EXECUTE: True Prediction Load Instruction: " <<
                  inst->pcState().instAddr() << " " <<
+                 std::dec  <<inst->seqNum<< " " <<
                  "Predicted: " << inst->macroop->getMacroopPid() << " " <<
                  "Actual: " << commit_alias_table->second << std::endl;
                }
+
                return false;
            }
          }
          // this is not a pointer refill so we need to check whether
          // LVPT predicted right or not
          else {
-           //let's see whether this is a heap access or not
-           //heap accesses can be made only with ld
-            if (si->getName().compare("ld") == 0){
-               X86ISA::IntRegIndex   src_reg =
-                          (X86ISA::IntRegIndex)inst->srcRegIdx(1).index();
-               if (src_reg != X86ISA::INTREG_RSP){
-                 // src reg is not rsp which is always for stack
-                   cpu->ldsWithPid++;
-                   TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
-                   if (_pid != TheISA::PointerID(0)){ // heap access?
-                     cpu->heapAccesses++;
-                     if (inst->staticInst->uop_pid == _pid){
-                       // correct guess
-                       cpu->truePredection++;
-                       inst->staticInst->checked = true;
-                       //cpu->updateFetchLVPT(inst, _pid, true);
-                       return false;
-                     }
-                     else {
-                       // this is heap access and we have miss prediction
-                       ///cpu->updateFetchLVPT(inst, _pid, false);
-                        cpu->HeapPnAm++;
-                        inst->staticInst->uop_pid = _pid;
-                        inst->staticInst->checked = true;
-                        return false; // for now "false"
-                     }
-                   }
-                   else {
-                     // this is not a heap but we need to make sure that
-                     // we did not accidentaly assign a PID to it
-                     if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
-                       cpu->truePredection++;
-                       inst->staticInst->checked = true;
-                       return false;
-                     }
-                     else {
-                       cpu->HeapPnA0++;
-                       inst->staticInst->uop_pid = TheISA::PointerID(0);
-                       inst->staticInst->checked = true;
-                       return false;
-                     }
-
-                   }
-                }
-            }
 
            TheISA::PointerID _pid_t  = TheISA::PointerID{0};
            if (inst->macroop->getMacroopPid() != TheISA::PointerID(0)){
                cpu->updateFetchLVPT(inst, _pid_t, false);
                cpu->FalsePredict++;
                cpu->PnA0++;
-               inst->macroop->getMacroopPid() = TheISA::PointerID(0);
+               inst->macroop->setMacroopPid(TheISA::PointerID(0));
+               if (ENABLE_PREDICTOR_DEBUG){
+                 std::cout << std::hex <<
+                 "EXECUTE: False Prediction Load Instruction: " <<
+                 inst->pcState().instAddr() << " " <<
+                 std::dec  <<inst->seqNum<< " " <<
+                 "Predicted: " << inst->macroop->getMacroopPid() << " " <<
+                 "Actual: " << _pid_t << std::endl;
+               }
                return true;
            }
            else {
+               if (ENABLE_PREDICTOR_DEBUG)
+               {
+                 std::cout << std::hex <<
+                 "EXECUTE: True Prediction Load Instruction: " <<
+                 inst->pcState().instAddr() << " " <<
+                  std::dec  <<inst->seqNum<< " " <<
+                 "Predicted: " << inst->macroop->getMacroopPid() << " " <<
+                 "Actual: " << _pid_t << std::endl;
+               }
                cpu->updateFetchLVPT(inst, _pid_t, true);
                return false;
            }

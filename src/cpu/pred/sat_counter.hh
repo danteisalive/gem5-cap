@@ -108,6 +108,10 @@ class SatCounter
     uint8_t read() const
     { return counter; }
 
+    void write(uint8_t cnt){
+      counter = cnt;
+    }
+
   private:
     uint8_t initialVal;
     uint8_t maxVal;

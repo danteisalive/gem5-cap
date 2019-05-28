@@ -31,11 +31,8 @@
 #ifndef __CPU_PRED_LVPT_HH__
 #define __CPU_PRED_LVPT_HH__
 
-#include "arch/types.hh"
-#include "base/logging.hh"
-#include "base/types.hh"
-#include "config/the_isa.hh"
-#include "cpu/pred/sat_counter.hh"
+
+
 
 class DefaultLVPT
 {
@@ -93,10 +90,79 @@ class DefaultLVPT
      *  @param target_PC The target address of the branch.
      *  @param tid The thread id.
      */
-    void update(Addr instPC, const TheISA::PointerID &targetPC,
-                ThreadID tid, bool predict);
+    void updateAndSnapshot(
+                        TheISA::PCState pc,
+                        const InstSeqNum &seqNum,
+                        Addr instPC,
+                        const TheISA::PointerID &target,
+                        ThreadID tid, bool predict
+                      );
+
+    void update(Addr instPC,
+                const TheISA::PointerID &target,
+                ThreadID tid, bool predict
+               );
+
+    void squashAndUpdate(const InstSeqNum &squashed_sn,
+                const TheISA::PCState &pc,
+                TheISA::PointerID& corr_pid, ThreadID tid);
+
+    void squash(const InstSeqNum &squashed_sn, ThreadID tid);
+
+    void updatePIDHistory(const InstSeqNum &done_sn, ThreadID tid);
 
   private:
+    struct PIDPredictorHistory {
+        /**
+         * Makes a predictor history struct that contains any
+         * information needed to update the predictor, BTB, and RAS.
+         */
+        PIDPredictorHistory(const InstSeqNum &seq_num, Addr instPC,
+                         bool pred_result, void *history,
+                         ThreadID _tid, uint64_t lvpt_idx)
+            : seqNum(seq_num), pc(instPC), lvptEntryHistory(history),
+              targetPID(TheISA::PointerID(0)),
+              tid(_tid), predResult(pred_result), lvptIdx(lvpt_idx)
+        {}
+
+        bool operator==(const PIDPredictorHistory &entry) const {
+            return this->seqNum == entry.seqNum;
+        }
+
+        /** The sequence number for the predictor history entry. */
+        InstSeqNum seqNum;
+
+        /** The PC associated with the sequence number. */
+        Addr pc;
+
+        /** Pointer to the history object passed back from the branch
+         * predictor.  It is used to update or restore state of the
+         * branch predictor.
+         */
+        void *lvptEntryHistory;
+
+        TheISA::PointerID targetPID{0};
+
+        /** The thread id. */
+        ThreadID tid;
+
+        /** Whether or not it was predicted taken. */
+        bool predResult;
+
+        uint64_t lvptIdx;
+
+
+    };
+
+    struct LVPTHistory {
+        LVPTEntry   lvptEntry;
+        int         localBiasEntry;
+        SatCounter  localCtrEntry;
+    };
+
+    typedef std::map<InstSeqNum,PIDPredictorHistory> History;
+
+    std::vector<History> predHist;
     /** Returns the index into the LVPT, based on the branch's PC.
      *  @param inst_PC The branch to look up.
      *  @return Returns the index into the LVPT.

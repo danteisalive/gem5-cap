@@ -191,6 +191,7 @@
                 "smtLSQThreshold": 100, 
                 "fetchTrapLatency": 1, 
                 "iewToRenameDelay": 1, 
+                "LVPTTagSize": 16, 
                 "itb": {
                     "name": "itb", 
                     "eventq_index": 0, 
@@ -225,10 +226,10 @@
                 "renameToDecodeDelay": 1, 
                 "do_quiesce": true, 
                 "renameToROBDelay": 1, 
+                "commitToFetchDelay": 1, 
                 "power_model": [], 
                 "max_insts_all_threads": 0, 
                 "decodeWidth": 8, 
-                "commitToFetchDelay": 1, 
                 "needsTSO": true, 
                 "smtIQThreshold": 100, 
                 "workload": [
@@ -793,6 +794,7 @@
                     "path": "system.cpu.fuPool", 
                     "type": "FUPool"
                 }, 
+                "LVPTInstShiftAmt": 0, 
                 "socket_id": 0, 
                 "renameToFetchDelay": 1, 
                 "icache": {
@@ -885,8 +887,8 @@
                 "wait_for_remote_gdb": false, 
                 "cacheStorePorts": 200, 
                 "simpoint_start_insts": [], 
-                "max_insts_any_thread": 5000000000, 
-                "smtROBThreshold": 100, 
+                "max_insts_any_thread": 50000, 
+                "LVPTEntries": 4096, 
                 "numIQEntries": 64, 
                 "branchPred": {
                     "numThreads": 1, 
@@ -924,7 +926,7 @@
                         "cxx_class": "X86ISA::ISA"
                     }
                 ], 
-                "smtROBPolicy": "Partitioned", 
+                "renameToIEWDelay": 2, 
                 "iewToFetchDelay": 1, 
                 "do_statistics_insts": true, 
                 "dispatchWidth": 8, 
@@ -1263,6 +1265,7 @@
                 "clk_domain": "system.cpu_clk_domain", 
                 "function_trace_start": 0, 
                 "smtFetchPolicy": "SingleThread", 
+                "smtROBThreshold": 100, 
                 "profile": 0, 
                 "icache_port": {
                     "peer": "system.cpu.icache.cpu_side", 
@@ -1276,7 +1279,7 @@
                 "trapLatency": 13, 
                 "iewToDecodeDelay": 1, 
                 "numPhysCCRegs": 1280, 
-                "renameToIEWDelay": 2, 
+                "smtROBPolicy": "Partitioned", 
                 "apic_clk_domain": {
                     "name": "apic_clk_domain", 
                     "clk_domain": "system.cpu_clk_domain", 

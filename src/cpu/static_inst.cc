@@ -57,6 +57,12 @@ class NopStaticInst : public StaticInst
         pcState.advance();
     }
 
+    void
+    resetPC(TheISA::PCState &pcState) const override
+    {
+        pcState.uReset();
+    }
+
     std::string
     generateDisassembly(Addr pc, const SymbolTable *symtab) const override
     {
@@ -138,6 +144,11 @@ StaticInst::updatePointerTracker(ThreadContext * tc){
 bool
 StaticInst::injectCheckMicroops(){
     panic("injectCheckMicroops: This should only be called by a macroop");
+}
+
+uint64_t
+StaticInst::getNumOfMicroops(){
+    panic("getNumOfMicroops: This should only be called by a macroop");
 }
 
 void

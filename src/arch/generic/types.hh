@@ -245,6 +245,12 @@ class UPCState : public SimplePCState<MachInst>
         _nupc = 1;
     }
 
+    void
+    uReset(){
+      _upc = 0;
+      _nupc = 1;
+    }
+
     bool
     operator == (const UPCState<MachInst> &opc) const
     {

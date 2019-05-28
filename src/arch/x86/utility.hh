@@ -91,7 +91,11 @@ namespace X86ISA
     {
         inst->advancePC(pc);
     }
-
+    inline void
+    resetPC(PCState &pc, const StaticInstPtr &inst)
+    {
+        inst->resetPC(pc);
+    }
     inline uint64_t
     getExecutingAsid(ThreadContext *tc)
     {
