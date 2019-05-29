@@ -1943,23 +1943,27 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
   }
 
   // still dont know how I can safely handel this
-  // TODO: need to change place of this coede
+  // TODO: need to change place of this code
   uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
   if (prevRSPValue < newRSPValue){
-      for (auto mtt_it = tc->ExecuteAliasTable.cbegin();
-                    mtt_it != tc->ExecuteAliasTable.cend();
-                    /* no increment */)
-      {
-          if (mtt_it->first < newRSPValue &&
-              mtt_it->first >= prevRSPValue)
-          {
-              mtt_it = tc->ExecuteAliasTable.erase(mtt_it);
-          }
-          else {
-              ++mtt_it;
-          }
-      }
+      auto exe_low_it =
+                tc->ExecuteAliasTable.lower_bound(prevRSPValue);
+      if ((exe_low_it != tc->ExecuteAliasTable.end())){
 
+        auto exe_high_it =
+                  tc->ExecuteAliasTable.upper_bound(newRSPValue-1);
+
+        if ((exe_high_it != tc->ExecuteAliasTable.end())){
+           tc->ExecuteAliasTable.erase(exe_low_it,exe_high_it);
+        }
+        else {
+            tc->ExecuteAliasTable.erase(
+                                      exe_low_it,
+                                      tc->ExecuteAliasTable.end()
+                                      );
+        }
+
+      }
   }
   prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
 

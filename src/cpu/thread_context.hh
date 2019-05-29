@@ -128,7 +128,7 @@ class ThreadContext
 
     enum COLLECTOR_STATUS
     {
-      NONE, MALLOC_SIZE, CALLOC_SIZE, REALLOC_SIZE
+      NONE, MALLOC_SIZE, CALLOC_SIZE, REALLOC_SIZE, FREE_CALL
     };
 
     bool DisablePointerTracker;
