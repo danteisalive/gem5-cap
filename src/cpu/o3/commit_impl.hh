@@ -1482,10 +1482,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
        );
        crf_it->second.setCSRBit(0);  // this cap is valid now
 
-       // DPRINTF(Capability,"REALLOC (%lu) = %#lx ---> %s\n",
-       //                                 crf_it->second.getSize() ,
-       //                                 crf_it->second.getBaseAddr(),
-       //                                 tc->PID);
+       DPRINTF(Capability,"REALLOC (%lu) = %#lx ---> %s\n",
+                                       crf_it->second.getSize() ,
+                                       crf_it->second.getBaseAddr(),
+                                       tc->PID);
 
        for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
           TheISA::PointerID _pid = TheISA::PointerID(0);
@@ -1521,14 +1521,12 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
             }
         }
 
-        if (_pid != TheISA::PointerID(0) /*&&
-            (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
-          )
+        if (_pid != TheISA::PointerID(0))
         {
 
-          // DPRINTF(Capability,"REALLOC CALLED for (%lu)  ---> %s\n",
-          //                                 _base_addr ,
-          //                                 _pid);
+          DPRINTF(Capability,"REALLOC CALLED for (%lu)  ---> %s\n",
+                                          _base_addr ,
+                                          _pid);
 
             tc->CapRegsFile.erase(_pid);
 
@@ -1585,10 +1583,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
         crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-        // DPRINTF(Capability,"CALLOC(%lu) = %#lx ---> %s\n",
-        //                                 crf_it->second.getSize() ,
-        //                                 crf_it->second.getBaseAddr(),
-        //                                 tc->PID);
+        DPRINTF(Capability,"CALLOC(%lu) = %#lx ---> %s\n",
+                                        crf_it->second.getSize() ,
+                                        crf_it->second.getBaseAddr(),
+                                        tc->PID);
 
 
         for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1608,9 +1606,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
               tc->RegTrackTable[(X86ISA::IntRegIndex)i] = _pid;
         }
 
-        //tc->LRUCapCache.LRUCache_Access(
-        //(Addr)cpu->readArchIntReg(X86ISA::INTREG_RAX, tid)
-                                        //);
 
         tc->RegTrackTable[X86ISA::INTREG_RAX] = tc->PID;
 
@@ -1647,10 +1642,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-            // DPRINTF(Capability,"MALLOC(%lu) = %#lx ---> %s\n",
-            //                                 crf_it->second.getSize() ,
-            //                                 crf_it->second.getBaseAddr(),
-            //                                 tc->PID);
+            DPRINTF(Capability,"MALLOC(%lu) = %#lx ---> %s\n",
+                                            crf_it->second.getSize() ,
+                                            crf_it->second.getBaseAddr(),
+                                            tc->PID);
 
 
           for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1676,7 +1671,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           tc->RegTrackTable[X86ISA::INTREG_RAX] = tc->PID;
 
           tc->stopTracking = false;
-          //tc->DisablePointerTracker = false;
+
 
       }
     else if (head_inst->isMallocSizeCollectorMicroop()){
@@ -1696,12 +1691,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           uint64_t _base_addr = cpu->readArchIntReg(X86ISA::INTREG_RDI, tid);
           TheISA::PointerID _pid = TheISA::PointerID(0);
           _pid = SearchCapReg(tid, _base_addr);
-          if (_pid != TheISA::PointerID(0) /*&&
-          (tc->CapRegsFile.find(_pid) != tc->CapRegsFile.end())*/
-          ){
+          if (_pid != TheISA::PointerID(0)){
              NumOfAllocations--;
-             // DPRINTF(Capability,"FREE(%llx) --> %s\n", _base_addr, _pid);
-             //  tc->CapRegsFile.erase(_pid);
+             DPRINTF(Capability,"FREE(%llx) --> %s\n", _base_addr, _pid);
+              tc->CapRegsFile.erase(_pid);
 
               // erase from RegTrackTable
             for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++) {
@@ -1809,6 +1802,7 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
 
   // sanitization
   if (head_inst->isMicroopInjected()) return;
+  if (head_inst->isBoundsCheckMicroop()) return;
   if (tc->stopTracking) return;
 
 

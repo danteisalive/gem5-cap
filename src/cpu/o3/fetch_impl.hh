@@ -562,8 +562,6 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
                                         StaticInstPtr &inst)
 {
 
-    // inst->uop_pid =
-    //       LVPT->lookup(inst->pcState().instAddr(), inst->threadNumber);
     inst->setMacroopPid(LVPT->lookup(thisPC.instAddr(), tid));
 }
 
@@ -1047,7 +1045,7 @@ DefaultFetch<Impl>::checkSignalsAndUpdate(ThreadID tid)
         }
         else {
            // squash due to branch mispredection or memOrderViolation
-            DPRINTF(Fetch, "Non-PID Squash."
+            DPRINTF(Fetch, "Non-PID Squash. "
                            "Squshing LVPT history until seqNum: [sn:%i] \n",
                             fromCommit->commitInfo[tid].doneSeqNum);
             LVPT->squash(fromCommit->commitInfo[tid].doneSeqNum,
@@ -1213,7 +1211,6 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
         //                            TheISA::CheckType::AP_BOUNDS_INJECT
         //                           );
         //
-        //
         // }
 
 
@@ -1376,9 +1373,6 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                     if (staticInst->isMacroop() && tc->enableCapability){
                         lookupAndUpdateLVPT(thisPC, tid, staticInst);
                         capabilityCheck(thisPC, tid, staticInst);
-
-
-
                     }
 
                     // Increment stat of fetched instructions.
@@ -1393,7 +1387,6 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 } else {
                     // We need more bytes for this instruction so blkOffset and
                     // pcOffset will be updated
-                   // std::cout << "maybe here!\n";
                     break;
                 }
             }
@@ -1428,7 +1421,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
             nextPC = thisPC;
 
-            //lookupAndUpdateLVPT(instruction);
+
             if (instruction->isBoundsCheckMicroop()){
                 instruction->setPredicate(false);
             }

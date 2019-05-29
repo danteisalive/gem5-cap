@@ -1066,9 +1066,11 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
     }
 
     panic_if(!store_inst->effAddrValid(), "store effAddr is not valid!");
+
     if (tc->enableCapability){
       updateAliasTable( tid, store_inst);
     }
+
     return checkViolations(load_idx, store_inst);
 
 }
@@ -1902,6 +1904,7 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
   // sanitization
   if (inst->isMicroopInjected()) return;
+  if (inst->isBoundsCheckMicroop()) return;
   if (tc->ExeStopTracking) return;
 
   if ((si->getName().compare("st") == 0) ||
@@ -1963,6 +1966,7 @@ LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
 }
 
+// this function is fast because Execute alias table size is small
 template <class Impl>
 void
 LSQUnit<Impl>::squashExecuteAliasTable(DynInstPtr& inst,
@@ -2042,5 +2046,53 @@ LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
 
   }
 
+}
+
+template <class Impl>
+void
+LSQUnit<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
+{
+    //ThreadContext * tc = cpu->tcBase(tid);
+    const StaticInstPtr si = inst->staticInst;
+  //let's see whether this is a heap access or not
+    //heap accesses can be made only with ld
+    if (si->getName().compare("ld") == 0){
+        X86ISA::IntRegIndex   src_reg =
+                   (X86ISA::IntRegIndex)inst->srcRegIdx(1).index();
+        if (src_reg != X86ISA::INTREG_RSP){
+          // src reg is not rsp which is always for stack
+            cpu->ldsWithPid++;
+            TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
+            if (_pid != TheISA::PointerID(0)){ // heap access?
+              cpu->heapAccesses++;
+              if (inst->staticInst->uop_pid == _pid){
+                // correct guess
+                cpu->truePredection++;
+                inst->staticInst->checked = true;
+              }
+              else {
+                // this is heap access and we have miss prediction
+                ///cpu->updateFetchLVPT(inst, _pid, false);
+                 cpu->HeapPnAm++;
+                 inst->staticInst->uop_pid = _pid;
+                 inst->staticInst->checked = true;
+              }
+            }
+            else {
+              // this is not a heap but we need to make sure that
+              // we did not accidentaly assign a PID to it
+              if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
+                cpu->truePredection++;
+                inst->staticInst->checked = true;
+              }
+              else {
+                cpu->HeapPnA0++;
+                inst->staticInst->uop_pid = TheISA::PointerID(0);
+                inst->staticInst->checked = true;
+              }
+
+            }
+         }
+    }
 }
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

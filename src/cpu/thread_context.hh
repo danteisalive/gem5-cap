@@ -126,6 +126,11 @@ class ThreadContext
     //temprory
     typedef std::map<Addr, TheISA::Capability> CapabilityData;
 
+    enum COLLECTOR_STATUS
+    {
+      NONE, MALLOC_SIZE, CALLOC_SIZE, REALLOC_SIZE
+    };
+
     bool DisablePointerTracker;
     bool stopTracking;
     bool ExeStopTracking;
@@ -143,6 +148,7 @@ class ThreadContext
     TheISA::LRUCache                            LRUCapCache{128, 16, 2048};
     TheISA::LRUAliasCache                       ExeAliasCache{1, 1, 2048};
     TheISA::LRUPIDCache                         LRUPidCache{128};
+    COLLECTOR_STATUS                            Collector_Status;
 
     enum Status
     {

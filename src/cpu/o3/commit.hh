@@ -260,6 +260,7 @@ class DefaultCommit
     void squashFromSquashAfter(ThreadID tid);
 
     void squashExecuteAliasTable(DynInstPtr &inst, bool equal);
+
     /**
      * Handle squashing from instruction with SquashAfter set.
      *

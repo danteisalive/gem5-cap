@@ -370,33 +370,6 @@ bool MacroopBase::injectCheckMicroops(){
 
 }
 
-void MacroopBase::undoCheckMicroops(){
-
-  if (numMicroops > 0 &&  _isInjected){
-
-      _isInjected = false;
-
-
-      StaticInstPtr * microopTemp = new StaticInstPtr[numOfOriginalMicroops];
-
-      for (int i=0; i < numOfOriginalMicroops; i++)
-          microopTemp[i] = microops[i+1];
-
-      delete [] microops;
-      microops = microopTemp;
-      microops[0]->setFirstMicroop();
-      numMicroops = numOfOriginalMicroops;
-  }
-  else if (numMicroops <= 0){
-      //DPRINTF(Capability, "INVALID NUMBER OF MICROOPS\n");
-      panic("Invalid  Number Of Microops");
-  }
-
-
-}
-
-
-
 void MacroopBase::undoInjecttion(){
     if (numMicroops > 0 &&  _isInjected){
 

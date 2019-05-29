@@ -160,7 +160,7 @@ class DerivO3CPU(BaseCPU):
                                                        Parent.numThreads),
                                        "Branch Predictor")
 
-    LVPTEntries = Param.Unsigned(4096, "Number of LVPT entries")
+    LVPTEntries = Param.Unsigned(1024, "Number of LVPT entries")
     LVPTTagSize = Param.Unsigned(16, "Size of the LVPT tags, in bits")
     LVPTInstShiftAmt = Param.Unsigned(0, "bits to shift instructions by")
     needsTSO = Param.Bool(buildEnv['TARGET_ISA'] == 'x86',

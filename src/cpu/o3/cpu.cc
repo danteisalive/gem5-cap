@@ -402,6 +402,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         o3_tc->stopTracking = false;
         o3_tc->ExeStopTracking = false;
         o3_tc->DisablePointerTracker = true;
+        o3_tc->Collector_Status = ThreadContext::NONE;
 
         DPRINTF(Capability, "SymbolFile[%i] process is %s\n",
                         tid, params->symbol_file);
