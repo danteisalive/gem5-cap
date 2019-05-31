@@ -1413,6 +1413,13 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
               }
             }
 
+            for (auto& elem: tc->CommitAliasTable){
+              if (elem.second.getPID() == 885){
+                  std::cout << elem.first << " --> " << elem.second << "\n";
+              }
+            }
+
+
             std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
             " CommitAliasTable Size: " <<
             tc->CommitAliasTable.size() <<
@@ -1485,9 +1492,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
 
     if (head_inst->isReallocBaseCollectorMicroop()){
 
-        // if (tc->Collector_Status != ThreadContext::REALLOC_SIZE)
-        //      std::cout << "FUCK REALLOC BASE: " <<
-        //      head_inst->pcState() << std::endl;
+        if (tc->Collector_Status != ThreadContext::REALLOC_SIZE)
+             std::cout << "FUCK REALLOC BASE: " <<
+             head_inst->pcState() << std::endl;
 
         ThreadContext::CapabilityRegistersFileIter crf_it =
                                                  tc->CapRegsFile.find(tc->PID);
@@ -1500,9 +1507,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
        );
        crf_it->second.setCSRBit(0);  // this cap is valid now
 
-       // std::cout << std::dec << "REALLOC(" << crf_it->second.getSize() <<
-       //           ") = " << std::hex << crf_it->second.getBaseAddr()
-       //               << " ---> " << tc->PID << "\n";
+       std::cout << std::dec << "REALLOC(" << crf_it->second.getSize() <<
+                 ") = " << std::hex << crf_it->second.getBaseAddr()
+                     << " ---> " << tc->PID << "\n";
 
        for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
           TheISA::PointerID _pid = TheISA::PointerID(0);
@@ -1526,9 +1533,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
     }
     else if (head_inst->isReallocSizeCollectorMicroop()){
 
-      // if (tc->Collector_Status != ThreadContext::NONE)
-      //        std::cout << "FUCK REALLOC SIZE: " <<
-      //        head_inst->pcState() << std::endl;
+      if (tc->Collector_Status != ThreadContext::NONE)
+             std::cout << "FUCK REALLOC SIZE: " <<
+             head_inst->pcState() << std::endl;
 
       uint64_t _base_addr = cpu->readArchIntReg(X86ISA::INTREG_RDI, tid);
 
@@ -1546,8 +1553,8 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
         if (_pid != TheISA::PointerID(0))
         {
 
-          // std::cout << "REALLOC CALLED for (" << _base_addr
-          //               << ") " << " ---> " << _pid << "\n";
+          std::cout << "REALLOC CALLED for (" << _base_addr
+                        << ") " << " ---> " << _pid << "\n";
 
             tc->CapRegsFile.erase(_pid);
 
@@ -1593,9 +1600,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
     }
     else if (head_inst->isCallocBaseCollectorMicroop()){
 
-        // if (tc->Collector_Status != ThreadContext::CALLOC_SIZE)
-        //      std::cout << "FUCK CALLOC BASE: " <<
-        //      head_inst->pcState() << std::endl;
+        if (tc->Collector_Status != ThreadContext::CALLOC_SIZE)
+             std::cout << "FUCK CALLOC BASE: " <<
+             head_inst->pcState() << std::endl;
 
         ThreadContext::CapabilityRegistersFileIter crf_it =
                                                 tc->CapRegsFile.find(tc->PID);
@@ -1609,9 +1616,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
         crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-        // std::cout << std::dec << "CALLOC(" << crf_it->second.getSize() <<
-        //           ") = " << std::hex << crf_it->second.getBaseAddr()
-        //               << " ---> " << tc->PID << "\n";
+        std::cout << std::dec << "CALLOC(" << crf_it->second.getSize() <<
+                  ") = " << std::hex << crf_it->second.getBaseAddr()
+                      << " ---> " << tc->PID << "\n";
 
 
         for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1638,9 +1645,11 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
         tc->Collector_Status = ThreadContext::NONE;
     }
     else if (head_inst->isCallocSizeCollectorMicroop()){
-      // if (tc->Collector_Status != ThreadContext::NONE)
-      //        std::cout << "FUCK CALLOC SIZE: " <<
-      //        head_inst->pcState() << std::endl;
+
+      if (tc->Collector_Status != ThreadContext::NONE)
+             std::cout << "FUCK CALLOC SIZE: " <<
+             head_inst->pcState() << std::endl;
+
         /*Insert into the capability regs file */
         NumOfAllocations++;
         TheISA::PointerID  _pid = tc->PID + 1;
@@ -1660,9 +1669,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
     }
     else if (head_inst->isMallocBaseCollectorMicroop()){
 
-          // if (tc->Collector_Status != ThreadContext::MALLOC_SIZE)
-          //     std::cout << "FUCK MALLOC BASE: " <<
-          //     head_inst->pcState() << std::endl;
+          if (tc->Collector_Status != ThreadContext::MALLOC_SIZE)
+              std::cout << "FUCK MALLOC BASE: " <<
+              head_inst->pcState() << std::endl;
 
           ThreadContext::CapabilityRegistersFileIter crf_it =
                                               tc->CapRegsFile.find(tc->PID);
@@ -1676,10 +1685,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           crf_it->second.setCSRBit(0);  // this cap is valid now
 
 
-            // std::cout << std::dec << "MALLOC(" <<
-            //             crf_it->second.getSize() <<
-            //           ") = " << std::hex << crf_it->second.getBaseAddr()
-            //               << " ---> " << tc->PID << "\n";
+            std::cout << std::dec << "MALLOC(" <<
+                        crf_it->second.getSize() <<
+                      ") = " << std::hex << crf_it->second.getBaseAddr()
+                          << " ---> " << tc->PID << "\n";
 
           // put the entry in the reg track table
           for (int i = 0; i < X86ISA::NUM_INTREGS; i++){
@@ -1707,9 +1716,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
       }
     else if (head_inst->isMallocSizeCollectorMicroop()){
 
-         // if (tc->Collector_Status != ThreadContext::NONE)
-         //        std::cout << "FUCK MALLOC SIZE: " <<
-         //        head_inst->pcState() << std::endl;
+         if (tc->Collector_Status != ThreadContext::NONE)
+                std::cout << "FUCK MALLOC SIZE: " <<
+                head_inst->pcState() << std::endl;
 
           /*Insert into the capability regs file */
           TheISA::PointerID  _pid = tc->PID + 1;
@@ -1734,8 +1743,8 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &head_inst)
           _pid = SearchCapReg(tid, _base_addr);
           if (_pid != TheISA::PointerID(0)){
              NumOfAllocations--;
-             // std::cout << std::hex <<"FREE(" << _base_addr
-             //               << ") " << " ---> " << _pid << "\n";
+             std::cout << std::hex <<"FREE(" << _base_addr
+                           << ") " << " ---> " << _pid << "\n";
               tc->CapRegsFile.erase(_pid);
 
               // erase from RegTrackTable
