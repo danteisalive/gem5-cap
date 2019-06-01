@@ -1010,6 +1010,7 @@ template <class Impl>
 bool
 DefaultFetch<Impl>::checkSignalsAndUpdate(ThreadID tid)
 {
+    ThreadContext * tc = cpu->tcBase(tid);
     // Update the per thread stall statuses.
     if (fromDecode->decodeBlock[tid]) {
         stalls[tid].decode = true;
@@ -1026,31 +1027,34 @@ DefaultFetch<Impl>::checkSignalsAndUpdate(ThreadID tid)
 
         DPRINTF(Fetch, "[tid:%u]: Squashing instructions due to squash "
                 "from commit.\n",tid);
-        if (fromCommit->commitInfo[tid].squashDueToMispredictedPID)
-            DPRINTF(Fetch,"Squashing Due to mispredicted PID."
-                          "Squahsing PC: %s Squashing PID: %s\n",
-                        fromCommit->commitInfo[tid].pc,
-                        fromCommit->commitInfo[tid].squashedPID );
-        // if squashing due to mispredicted PID, then squash LVPT too
-        if (fromCommit->commitInfo[tid].squashDueToMispredictedPID)
-        {
-            DPRINTF(Fetch, "Squshing LVPT history until seqNum: [sn:%i] \n",
-                    fromCommit->commitInfo[tid].doneSeqNum+1);
-            LVPT->squashAndUpdate(
-                                fromCommit->commitInfo[tid].doneSeqNum+1,
-                                fromCommit->commitInfo[tid].pc,
-                                fromCommit->commitInfo[tid].squashedPID,
-                                tid
-                                );
-        }
-        else {
-           // squash due to branch mispredection or memOrderViolation
-            DPRINTF(Fetch, "Non-PID Squash. "
-                           "Squshing LVPT history until seqNum: [sn:%i] \n",
-                            fromCommit->commitInfo[tid].doneSeqNum);
-            LVPT->squash(fromCommit->commitInfo[tid].doneSeqNum,
-                          tid);
-        }
+      if (tc->enableCapability)
+      {
+          if (fromCommit->commitInfo[tid].squashDueToMispredictedPID)
+              DPRINTF(Fetch,"Squashing Due to mispredicted PID."
+                            "Squahsing PC: %s Squashing PID: %s\n",
+                          fromCommit->commitInfo[tid].pc,
+                          fromCommit->commitInfo[tid].squashedPID );
+          // if squashing due to mispredicted PID, then squash LVPT too
+          if (fromCommit->commitInfo[tid].squashDueToMispredictedPID)
+          {
+              DPRINTF(Fetch, "Squshing LVPT history until seqNum: [sn:%i] \n",
+                      fromCommit->commitInfo[tid].doneSeqNum+1);
+              LVPT->squashAndUpdate(
+                                  fromCommit->commitInfo[tid].doneSeqNum+1,
+                                  fromCommit->commitInfo[tid].pc,
+                                  fromCommit->commitInfo[tid].squashedPID,
+                                  tid
+                                  );
+          }
+          else {
+             // squash due to branch mispredection or memOrderViolation
+              DPRINTF(Fetch, "Non-PID Squash. "
+                             "Squshing LVPT history until seqNum: [sn:%i] \n",
+                              fromCommit->commitInfo[tid].doneSeqNum);
+              LVPT->squash(fromCommit->commitInfo[tid].doneSeqNum,
+                            tid);
+          }
+      }
         // In any case, squash.
         squash(fromCommit->commitInfo[tid].pc,
                fromCommit->commitInfo[tid].doneSeqNum,
@@ -1422,7 +1426,9 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             nextPC = thisPC;
 
 
-            if (instruction->isBoundsCheckMicroop()){
+            if (tc->enableCapability &&
+                instruction->isBoundsCheckMicroop())
+            {
                 instruction->setPredicate(false);
             }
 

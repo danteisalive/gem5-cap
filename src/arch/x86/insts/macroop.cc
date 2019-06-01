@@ -301,25 +301,25 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc)
                 }
            }
 
-           // else if ((si->getName().compare("st") == 0) &&
-           //     (!si->checked))
-           // {
-           //      X86ISA::IntRegIndex   src_reg =
-           //                (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
-           //
-           //
-           //      if ((src_reg >= X86ISA::INTREG_RAX) &&
-           //          (src_reg < X86ISA::NUM_INTREGS + 15) &&
-           //          (src_reg != X86ISA::INTREG_RSP))
-           //      {
-           //        if (tc->RegTrackTable.find(src_reg) !=
-           //            tc->RegTrackTable.end()){
-           //          if (tc->RegTrackTable[src_reg] != TheISA::PointerID(0)){
-           //             si->uop_pid = tc->RegTrackTable[src_reg];
-           //          }
-           //        }
-           //      }
-           // }
+           else if ((si->getName().compare("st") == 0) &&
+               (!si->checked))
+           {
+                X86ISA::IntRegIndex   src_reg =
+                          (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
+
+
+                if ((src_reg >= X86ISA::INTREG_RAX) &&
+                    (src_reg < X86ISA::NUM_INTREGS + 15) &&
+                    (src_reg != X86ISA::INTREG_RSP))
+                {
+                  if (tc->RegTrackTable.find(src_reg) !=
+                      tc->RegTrackTable.end()){
+                    if (tc->RegTrackTable[src_reg] != TheISA::PointerID(0)){
+                       si->uop_pid = tc->RegTrackTable[src_reg];
+                    }
+                  }
+                }
+           }
 
           if (si->isLastMicroop()){
               for (int i = X86ISA::NUM_INTREGS;
@@ -355,6 +355,11 @@ bool MacroopBase::injectCheckMicroops(){
       for (i = 0; i < numMicroops; ++i)
       {
           if ((microops[i]->getName().compare("ld") == 0) &&
+              microops[i]->uop_pid != TheISA::PointerID(0))
+          {
+              return true;
+          }
+          else if ((microops[i]->getName().compare("st") == 0) &&
               microops[i]->uop_pid != TheISA::PointerID(0))
           {
               return true;
@@ -631,45 +636,61 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
         // remember to set and clear last micro of original microops
         for (int idx = 0; idx < numMicroops; ++idx)
         {
-            // if ((microops[idx]->getName().compare("st") == 0) &&
-            //     microops[idx]->uop_pid != TheISA::PointerID(0))
-            // {
-            //     microops[0]->clearFirstMicroop();
-            //
-            //     StaticInstPtr * microopTemp =
-            //                        new StaticInstPtr[numMicroops + 1];
-            //
-            //     for (int i=0; i < numMicroops; i++)
-            //         microopTemp[i+1] = microops[i];
-            //
-            //     StaticInstPtr micro_0 = new X86ISAInst::St(machInst,
-            //                   "AP_BOUNDS_CHECK_INJECT",
-            //                   (1ULL << StaticInst::IsMicroop) |
-            //                   (1ULL << StaticInst::IsFirstMicroop) |
-            //                   (1ULL << StaticInst::IsMicroopInjected)|
-            //                   (1ULL << StaticInst::IsBoundsCheckMicroop),
-            //                   env.scale,
-            //                   InstRegIndex(env.index),
-            //                   InstRegIndex(env.base),
-            //                   microops[idx]->getDisp(),
-            //                   InstRegIndex(env.seg),
-            //                   InstRegIndex(NUM_INTREGS+15),
-            //                   2,
-            //                   env.addressSize,
-            //                   0 |
-            //                   (machInst.legacy.addr ?
-            //                   (AddrSizeFlagBit << FlagShift) : 0)
-            //                   );
-            //
-            //     microopTemp[0] = micro_0;
-            //
-            //     delete [] microops;
-            //     microops = microopTemp;
-            //     numMicroops = numMicroops + 1;
-            //     _isInjected = true;
-            // }
-            // else
-            if ((microops[idx]->getName().compare("ld") == 0) &&
+            if ((microops[idx]->getName().compare("st") == 0) &&
+                microops[idx]->uop_pid != TheISA::PointerID(0))
+            {
+              microops[0]->clearFirstMicroop();
+
+              StaticInstPtr * microopTemp =
+                                  new StaticInstPtr[numMicroops + 1];
+
+              for (int i=0; i < numMicroops; i++)
+                  microopTemp[i+1] = microops[i];
+
+              StaticInstPtr micro_0 = (env.dataSize >= 4) ?
+                      (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
+                        "AP_BOUNDS_CHECK_INJECT",
+                        (1ULL << StaticInst::IsMicroop) |
+                        (1ULL << StaticInst::IsFirstMicroop) |
+                        (1ULL << StaticInst::IsMicroopInjected)|
+                        (1ULL << StaticInst::IsBoundsCheckMicroop),
+                        env.scale,
+                        InstRegIndex(microops[idx]->srcRegIdx(0).index()),
+                        InstRegIndex(microops[idx]->srcRegIdx(1).index()),
+                        microops[idx]->getDisp(),
+                        InstRegIndex(env.seg),
+                        InstRegIndex(NUM_INTREGS+21),
+                        env.dataSize,
+                        env.addressSize,
+                        0 | (machInst.legacy.addr ?
+                        (AddrSizeFlagBit << FlagShift) : 0))) :
+                    (StaticInstPtr)(new X86ISAInst::Ld(machInst,
+                        "AP_BOUNDS_CHECK_INJECT",
+                        (1ULL << StaticInst::IsMicroop) |
+                        (1ULL << StaticInst::IsFirstMicroop) |
+                        (1ULL << StaticInst::IsMicroopInjected)|
+                        (1ULL << StaticInst::IsBoundsCheckMicroop),
+                        env.scale,
+                        InstRegIndex(microops[idx]->srcRegIdx(0).index()),
+                        InstRegIndex(microops[idx]->srcRegIdx(1).index()),
+                        microops[idx]->getDisp(),
+                        InstRegIndex(env.seg),
+                        InstRegIndex(NUM_INTREGS+21),
+                        env.dataSize,
+                        env.addressSize,
+                        0 | (machInst.legacy.addr ?
+                        (AddrSizeFlagBit << FlagShift) : 0))
+                        );
+              microopTemp[0] = micro_0;
+
+              delete [] microops;
+              microops = microopTemp;
+              numMicroops = numMicroops + 1;
+              _isInjected = true;
+              break;
+            }
+
+            else if ((microops[idx]->getName().compare("ld") == 0) &&
                 microops[idx]->uop_pid != TheISA::PointerID(0))
             {
                 microops[0]->clearFirstMicroop();
