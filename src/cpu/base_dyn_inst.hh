@@ -639,6 +639,10 @@ class BaseDynInst : public ExecContext, public RefCounted
     /** Returns the logical register index of the i'th source register. */
     const RegId& srcRegIdx(int i) const { return staticInst->srcRegIdx(i); }
 
+    void addSrcReg(RegId regIdx){staticInst->addSrcReg(regIdx);}
+    void addDestReg(RegId regIdx){staticInst->addDestReg(regIdx);}
+    void removeSrcReg(){staticInst->removeSrcReg();}
+    void removeDestReg(){staticInst->removeDestReg();}
     /** Return the size of the instResult queue. */
     uint8_t resultSize() { return instResult.size(); }
 

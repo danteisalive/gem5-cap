@@ -44,7 +44,7 @@
 
 namespace X86ISA
 {
-    const int NumMicroIntRegs = 16;
+    const int NumMicroIntRegs = 19;
 
     const int NumImplicitIntRegs = 6;
     //1. The lower part of the result of multiplication.

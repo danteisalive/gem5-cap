@@ -132,6 +132,29 @@ class StaticInst : public RefCounted, public StaticInstFlags
     int8_t numCCDestRegs() const { return _numCCDestRegs; }
     //@}
 
+    void addSrcReg(RegId regIdx)
+    {
+        assert(_numSrcRegs + 1  < TheISA::MaxInstSrcRegs);
+        _srcRegIdx[_numSrcRegs] = regIdx;
+        _numSrcRegs++;
+    }
+
+    void addDestReg (RegId regIdx)
+    {
+        assert(_numDestRegs + 1 < TheISA::MaxInstDestRegs);
+        _destRegIdx[_numDestRegs] = regIdx;
+        _numDestRegs++;
+    }
+
+    void removeSrcReg()
+    {
+        _numSrcRegs--;
+    }
+
+    void removeDestReg ()
+    {
+        _numDestRegs--;
+    }
     /// @name Flag accessors.
     /// These functions are used to access the values of the various
     /// instruction property flags.  See StaticInst::Flags for descriptions

@@ -1294,9 +1294,11 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                     si->disassemble(head_inst->pcState().pc())
                   );
 
-    // std::cout << head_inst->seqNum << " " << head_inst->pcState() <<
-    //           " " << si->disassemble(head_inst->pcState().pc()) <<
-    // std::endl;
+    std::cout << head_inst->seqNum << " " << head_inst->pcState() <<
+              " " << si->disassemble(head_inst->pcState().pc()) <<
+              " " << TheISA::MaxInstDestRegs <<
+              " " << TheISA::MaxInstSrcRegs <<
+    std::endl;
 
     if (tc->enableCapability){
       cpu->updatePIDHistory(head_inst);

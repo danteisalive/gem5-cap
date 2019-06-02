@@ -149,7 +149,7 @@ namespace X86ISA
         NUM_INTREGS
     };
 
-    static inline std::string 
+    static inline std::string
     IntRegIndexStr (int Idx)
     {
         switch(Idx){
@@ -187,10 +187,10 @@ namespace X86ISA
             case 31: return "t15";
             case 66: return "dh";
             case 65: return "ch";
-            default: 
+            default:
                 panic("IntRegIndexStr shoudln't be here!");
         }
-        
+
 
     }
     // This needs to be large enough to miss all the other bits of an index.
