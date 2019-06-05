@@ -95,6 +95,7 @@ void initCPU(ThreadContext *tc, int cpuId)
         tc->setIntReg(INTREG_IMPLICIT(index), 0);
     }
 
+    tc->setIntReg(INTREG_R16,1);
     // Set integer register EAX to 0 to indicate that the optional BIST
     // passed. No BIST actually runs, but software may still check this
     // register for errors.

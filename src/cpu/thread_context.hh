@@ -114,8 +114,8 @@ class ThreadContext
     //typedef std::map<TheISA::Range, TheISA::PointerID> RangeCapabilityCache;
     typedef std::map<TheISA::PointerID, TheISA::Capability>
                                                     CapabilityRegistersFile;
-    typedef std::map<X86ISA::IntRegIndex, TheISA::PointerID>
-                                                    PointerTrackTable;
+    //typedef std::map<X86ISA::IntRegIndex, TheISA::PointerID>
+      //                                              PointerTrackTable;
 
     typedef std::map<Addr, TheISA::PointerID>       ComAliasTable;
     typedef std::map<Addr, TheISA::AliasTableEntry> ExeAliasTable;
@@ -139,9 +139,8 @@ class ThreadContext
 
     SymbolCache                                 syms_cache;
     TheISA::PointerID                           PID = TheISA::PointerID(0);
-    //TheISA::StackID                             SID = TheISA::StackID(0);
-    PointerTrackTable                           RegTrackTable;
-    PointerTrackTable                           CommitPointerTracker;
+    TheISA::PointerID
+                             PointerTrackerTable[TheISA::NumIntRegsToTrack];
     ComAliasTable                               CommitAliasTable;
     ExeAliasTable                               ExecuteAliasTable;
     CapabilityRegistersFile                     CapRegsFile;

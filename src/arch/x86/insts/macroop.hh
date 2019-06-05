@@ -141,11 +141,14 @@ public:
 
     }
 
+    bool filterInst(ThreadContext * tc);
     bool injectCheckMicroops();
 
-    void updatePointerTracker(ThreadContext * tc);
+    void updatePointerTracker(ThreadContext * tc, PCState &nextPC);
 
-    void injectMicroops( ThreadContext * _tc, PCState &nextPC, TheISA::CheckType _sym);
+    void injectMicroops( ThreadContext * _tc, PCState &nextPC,
+                         TheISA::CheckType _sym
+                       );
 
     void injectAPMallocBaseCollector(ThreadContext * _tc,PCState &nextPC);
     void injectAPMallocSizeCollector(ThreadContext * _tc,PCState &nextPC);

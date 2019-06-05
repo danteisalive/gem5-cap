@@ -21,319 +21,316 @@
 namespace X86ISA
 {
 
-void MacroopBase::updatePointerTracker(ThreadContext * tc)
+bool MacroopBase::filterInst(ThreadContext * tc) {
+
+    return false;
+}
+
+void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
   {
+      if (_isInjected) panic("tracking an injected microp!");
+
+      if (tc->stopTracking) return; //OK
+      // its like we are executing microps here
       for (size_t i = 0; i < numMicroops; i++) {
+          const StaticInstPtr si = microops[i];
+          #define ENABLE_CAPABILITY_DEBUG 0
 
-           const StaticInstPtr si = microops[i];
-           #define ENABLE_CAPABILITY_DEBUG 0
-
-           // sanitization
-           //if (tc->DisablePointerTracker) return;
-           if (si->isMicroopInjected()) return;
-           if (tc->stopTracking) return;
-
-
-          if ((si->getName().compare("and") == 0)){
-
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg()  &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(1).index();
-                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                                si->destRegIdx(0).index();
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src2 < X86ISA::INTREG_RAX ||
-                      src2 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-
-                  TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-                  TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
-
-                  if (src1 == src2)
-                  {
-                    tc->RegTrackTable[dest] = _pid_src1;
-                  }
-                  else
-                  {
-                    if ( _pid_src1 != TheISA::PointerID(0) &&
-                         _pid_src2 == TheISA::PointerID(0))
+          // //let's see whether this is a heap access or not
+          // This should be done before chaning pointer track table state
+          //  to our knowledge:
+          // (base >=0 && base < 16) and base == 32 could be used for
+          //  addresing.
+          // if the base reg is RSP then it's not a heap access
+           if (si->isLoad() && !si->checked)
+           {
+                int base = si->getBase();
+                if ((base != 4) &&
+                   ((base >=0 && base <= 15) || (base == 23)))
+                {
+                    if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
                     {
-                         tc->RegTrackTable[dest] = _pid_src1;
+                       si->uop_pid = tc->PointerTrackerTable[base];
+                       std::cout << "LD NEED AN INJECTION: " <<
+                            si->uop_pid << " " << tc->CapRegsFile.size() <<
+                            nextPC <<
+                            std::endl;
                     }
-                    else if ( _pid_src1 == TheISA::PointerID(0) &&
-                              _pid_src2 != TheISA::PointerID(0))
-                    {
-                         tc->RegTrackTable[dest] = _pid_src2;
-                    }
-                    else
-                    {
-                         tc->RegTrackTable[dest] = TheISA::PointerID(0);
-                    }
-                  }
+
+                }
+           }
+           else if (si->isStore() && !si->checked)
+           {
+               int base = si->getBase();
+               if ((base != 4) &&
+                   ((base >=0 && base <= 15) || (base == 23)))
+               {
+                   if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
+                   {
+                      si->uop_pid = tc->PointerTrackerTable[base];
+                      std::cout << "ST NEED AN INJECTION: " <<
+                           si->uop_pid << " " << tc->CapRegsFile.size() <<
+                           nextPC <<
+                           std::endl;
+                   }
+
                }
-          }
-          else if ((si->getName().compare("xor") == 0)){
-            if (si->destRegIdx(0).isIntReg() &&
-                si->srcRegIdx(0).isIntReg()  &&
-                si->srcRegIdx(1).isIntReg())
-            {
-                X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                            si->srcRegIdx(0).index();
-                X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                            si->srcRegIdx(1).index();
-                X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                            si->destRegIdx(0).index();
-
-                if (dest < X86ISA::INTREG_RAX ||
-                    dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src1 < X86ISA::INTREG_RAX ||
-                    src1 >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src2 < X86ISA::INTREG_RAX ||
-                    src2 >= X86ISA::NUM_INTREGS + 15)
-                      return;
-
-                tc->RegTrackTable[dest] = TheISA::PointerID(0);
-            }
-
-          }
-          else if ((si->getName().compare("sub") == 0) ||
-                   (si->getName().compare("sbb") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg()  &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(1).index();
-                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                                si->destRegIdx(0).index();
-
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src2 < X86ISA::INTREG_RAX ||
-                      src2 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-
-                  TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-                  TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
-
-                  if (_pid_src1 != TheISA::PointerID(0) &&
-                      _pid_src2 != TheISA::PointerID(0))
-                  {
-                      tc->RegTrackTable[dest] = TheISA::PointerID(0);
-                  }
-                  else if (_pid_src1 != TheISA::PointerID(0))
-                  {
-                      tc->RegTrackTable[dest] = _pid_src1;
-                  }
-                  else if (_pid_src2 != TheISA::PointerID(0))
-                  {
-                      tc->RegTrackTable[dest] = _pid_src2;
-                  }
-            }
-          }
-          else if ((si->getName().compare("add") == 0) ||
-                   (si->getName().compare("adc") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg()  &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(1).index();
-                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                                si->destRegIdx(0).index();
-
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src2 < X86ISA::INTREG_RAX ||
-                      src2 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-
-                  TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-                  TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
-
-
-                  if (_pid_src1 != TheISA::PointerID(0) &&
-                      _pid_src2 != TheISA::PointerID(0))
-                  {
-                      tc->RegTrackTable[dest] = TheISA::PointerID(0);
-                  }
-                  else if (_pid_src1 != TheISA::PointerID(0))
-                  {
-                      tc->RegTrackTable[dest] = _pid_src1;
-                  }
-                  else if (_pid_src2 != TheISA::PointerID(0)){
-                      tc->RegTrackTable[dest] = _pid_src2;
-                  }
-              }
-          }
-          else if ((si->getName().compare("andi") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg())
-              {
-                  X86ISA::IntRegIndex   src1 =
-                          (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   dest =
-                          (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-
-                  TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-                  tc->RegTrackTable[dest] = _pid_src1;
-              }
-          }
-
-          else if ((si->getName().compare("addi") == 0) ||
-                  (si->getName().compare("adci") == 0) ||
-                  (si->getName().compare("subi") == 0) ||
-                  (si->getName().compare("sbbi") == 0)
-                  )
-          {
-            if (si->destRegIdx(0).isIntReg() &&
-                si->srcRegIdx(0).isIntReg())
-            {
-                X86ISA::IntRegIndex   src1 =
-                        (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
-                X86ISA::IntRegIndex   dest =
-                        (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-
-                if (dest < X86ISA::INTREG_RAX ||
-                    dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src1 < X86ISA::INTREG_RAX ||
-                            src1 >= X86ISA::NUM_INTREGS + 15)
-                      return;
-
-
-                TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-                tc->RegTrackTable[dest] = _pid_src1;
-            }
-          }
-
-          else if ((si->getName().compare("mov") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                X86ISA::IntRegIndex   src1 =
-                            (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
-                X86ISA::IntRegIndex   dest =
-                            (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-                if (dest < X86ISA::INTREG_RAX ||
-                    dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src1 < X86ISA::INTREG_RAX ||
-                    src1 >= X86ISA::NUM_INTREGS + 15)
-                      return;
-
-                TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-                tc->RegTrackTable[dest] = _pid_src1;
-              }
-
-          }
-
-          else if ((si->getName().compare("ld") == 0) ||
-                   (si->getName().compare("ldis") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg()){
-                  X86ISA::IntRegIndex   dest =
-                          (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
-
-                tc->RegTrackTable[dest] = macroop_pid;
-
-              }
-          }
-
-
-          //let's see whether this is a heap access or not
-          //heap accesses can be made only with ld
-
-           if ((si->getName().compare("ld") == 0) &&
-               (!si->checked))
-           {
-                X86ISA::IntRegIndex   src_reg =
-                          (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
-
-                if ((src_reg >= X86ISA::INTREG_RAX) &&
-                    (src_reg < X86ISA::NUM_INTREGS + 15) &&
-                    (src_reg != X86ISA::INTREG_RSP))
-                {
-                  if (tc->RegTrackTable.find(src_reg) !=
-                      tc->RegTrackTable.end()){
-                    if (tc->RegTrackTable[src_reg] != TheISA::PointerID(0)){
-                       si->uop_pid = tc->RegTrackTable[src_reg];
-                    }
-                  }
-                }
            }
 
-           else if ((si->getName().compare("st") == 0) &&
-               (!si->checked))
-           {
-                X86ISA::IntRegIndex   src_reg =
-                          (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
 
+          // if ((si->getName().compare("and") == 0)){
+          //
+          //     if (si->destRegIdx(0).isIntReg() &&
+          //         si->srcRegIdx(0).isIntReg()  &&
+          //         si->srcRegIdx(1).isIntReg())
+          //     {
+          //         X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+          //                                       si->srcRegIdx(0).index();
+          //         X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+          //                                       si->srcRegIdx(1).index();
+          //         X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+          //                                       si->destRegIdx(0).index();
+          //         if (dest < X86ISA::INTREG_RAX ||
+          //             dest >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //         if (src1 < X86ISA::INTREG_RAX ||
+          //             src1 >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //         if (src2 < X86ISA::INTREG_RAX ||
+          //             src2 >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //
+          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+          //         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+          //
+          //         if (src1 == src2)
+          //         {
+          //           tc->RegTrackTable[dest] = _pid_src1;
+          //         }
+          //         else
+          //         {
+          //           if ( _pid_src1 != TheISA::PointerID(0) &&
+          //                _pid_src2 == TheISA::PointerID(0))
+          //           {
+          //                tc->RegTrackTable[dest] = _pid_src1;
+          //           }
+          //           else if ( _pid_src1 == TheISA::PointerID(0) &&
+          //                     _pid_src2 != TheISA::PointerID(0))
+          //           {
+          //                tc->RegTrackTable[dest] = _pid_src2;
+          //           }
+          //           else
+          //           {
+          //                tc->RegTrackTable[dest] = TheISA::PointerID(0);
+          //           }
+          //         }
+          //      }
+          // }
+          // else if ((si->getName().compare("xor") == 0)){
+          //   if (si->destRegIdx(0).isIntReg() &&
+          //       si->srcRegIdx(0).isIntReg()  &&
+          //       si->srcRegIdx(1).isIntReg())
+          //   {
+          //       X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+          //                                   si->srcRegIdx(0).index();
+          //       X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+          //                                   si->srcRegIdx(1).index();
+          //       X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+          //                                   si->destRegIdx(0).index();
+          //
+          //       if (dest < X86ISA::INTREG_RAX ||
+          //           dest >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //       if (src1 < X86ISA::INTREG_RAX ||
+          //           src1 >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //       if (src2 < X86ISA::INTREG_RAX ||
+          //           src2 >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //
+          //       tc->RegTrackTable[dest] = TheISA::PointerID(0);
+          //   }
+          //
+          // }
+          // else if ((si->getName().compare("sub") == 0) ||
+          //          (si->getName().compare("sbb") == 0))
+          // {
+          //     if (si->destRegIdx(0).isIntReg() &&
+          //         si->srcRegIdx(0).isIntReg()  &&
+          //         si->srcRegIdx(1).isIntReg())
+          //     {
+          //         X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+          //                                       si->srcRegIdx(0).index();
+          //         X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+          //                                       si->srcRegIdx(1).index();
+          //         X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+          //                                       si->destRegIdx(0).index();
+          //
+          //         if (dest < X86ISA::INTREG_RAX ||
+          //             dest >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //         if (src1 < X86ISA::INTREG_RAX ||
+          //             src1 >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //         if (src2 < X86ISA::INTREG_RAX ||
+          //             src2 >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //
+          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+          //         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+          //
+          //         if (_pid_src1 != TheISA::PointerID(0) &&
+          //             _pid_src2 != TheISA::PointerID(0))
+          //         {
+          //             tc->RegTrackTable[dest] = TheISA::PointerID(0);
+          //         }
+          //         else if (_pid_src1 != TheISA::PointerID(0))
+          //         {
+          //             tc->RegTrackTable[dest] = _pid_src1;
+          //         }
+          //         else if (_pid_src2 != TheISA::PointerID(0))
+          //         {
+          //             tc->RegTrackTable[dest] = _pid_src2;
+          //         }
+          //   }
+          // }
+          // else if ((si->getName().compare("add") == 0) ||
+          //          (si->getName().compare("adc") == 0))
+          // {
+          //     if (si->destRegIdx(0).isIntReg() &&
+          //         si->srcRegIdx(0).isIntReg()  &&
+          //         si->srcRegIdx(1).isIntReg())
+          //     {
+          //         X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+          //                                       si->srcRegIdx(0).index();
+          //         X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+          //                                       si->srcRegIdx(1).index();
+          //         X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+          //                                       si->destRegIdx(0).index();
+          //
+          //         if (dest < X86ISA::INTREG_RAX ||
+          //             dest >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //         if (src1 < X86ISA::INTREG_RAX ||
+          //             src1 >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //         if (src2 < X86ISA::INTREG_RAX ||
+          //             src2 >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //
+          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+          //         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
+          //
+          //
+          //         if (_pid_src1 != TheISA::PointerID(0) &&
+          //             _pid_src2 != TheISA::PointerID(0))
+          //         {
+          //             tc->RegTrackTable[dest] = TheISA::PointerID(0);
+          //         }
+          //         else if (_pid_src1 != TheISA::PointerID(0))
+          //         {
+          //             tc->RegTrackTable[dest] = _pid_src1;
+          //         }
+          //         else if (_pid_src2 != TheISA::PointerID(0)){
+          //             tc->RegTrackTable[dest] = _pid_src2;
+          //         }
+          //     }
+          // }
+          // else if ((si->getName().compare("andi") == 0))
+          // {
+          //     if (si->destRegIdx(0).isIntReg() &&
+          //         si->srcRegIdx(0).isIntReg())
+          //     {
+          //         X86ISA::IntRegIndex   src1 =
+          //                 (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
+          //         X86ISA::IntRegIndex   dest =
+          //                 (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+          //
+          //         if (dest < X86ISA::INTREG_RAX ||
+          //             dest >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //         if (src1 < X86ISA::INTREG_RAX ||
+          //             src1 >= X86ISA::NUM_INTREGS + 15)
+          //               return;
+          //
+          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+          //         tc->RegTrackTable[dest] = _pid_src1;
+          //     }
+          // }
+          //
+          // else if ((si->getName().compare("addi") == 0) ||
+          //         (si->getName().compare("adci") == 0) ||
+          //         (si->getName().compare("subi") == 0) ||
+          //         (si->getName().compare("sbbi") == 0)
+          //         )
+          // {
+          //   if (si->destRegIdx(0).isIntReg() &&
+          //       si->srcRegIdx(0).isIntReg())
+          //   {
+          //       X86ISA::IntRegIndex   src1 =
+          //               (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
+          //       X86ISA::IntRegIndex   dest =
+          //               (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+          //
+          //       if (dest < X86ISA::INTREG_RAX ||
+          //           dest >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //       if (src1 < X86ISA::INTREG_RAX ||
+          //                   src1 >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //
+          //
+          //       TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+          //       tc->RegTrackTable[dest] = _pid_src1;
+          //   }
+          // }
+          //
+          // else if ((si->getName().compare("mov") == 0))
+          // {
+          //     if (si->destRegIdx(0).isIntReg() &&
+          //         si->srcRegIdx(1).isIntReg())
+          //     {
+          //       X86ISA::IntRegIndex   src1 =
+          //                   (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
+          //       X86ISA::IntRegIndex   dest =
+          //                   (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+          //       if (dest < X86ISA::INTREG_RAX ||
+          //           dest >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //       if (src1 < X86ISA::INTREG_RAX ||
+          //           src1 >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //
+          //       TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
+          //       tc->RegTrackTable[dest] = _pid_src1;
+          //     }
+          //
+          // }
+          //
+          // else if ((si->getName().compare("ld") == 0) ||
+          //          (si->getName().compare("ldis") == 0))
+          // {
+          //     if (si->destRegIdx(0).isIntReg()){
+          //         X86ISA::IntRegIndex   dest =
+          //                 (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+          //         if (dest < X86ISA::INTREG_RAX ||
+          //             dest >= X86ISA::NUM_INTREGS + 15)
+          //             return;
+          //
+          //       tc->RegTrackTable[dest] = macroop_pid;
+          //
+          //     }
+          // }
 
-                if ((src_reg >= X86ISA::INTREG_RAX) &&
-                    (src_reg < X86ISA::NUM_INTREGS + 15) &&
-                    (src_reg != X86ISA::INTREG_RSP))
-                {
-                  if (tc->RegTrackTable.find(src_reg) !=
-                      tc->RegTrackTable.end()){
-                    if (tc->RegTrackTable[src_reg] != TheISA::PointerID(0)){
-                       si->uop_pid = tc->RegTrackTable[src_reg];
-                    }
-                  }
-                }
-           }
 
           if (si->isLastMicroop()){
-              for (int i = X86ISA::NUM_INTREGS;
-                    i < X86ISA::NUM_INTREGS + 16;
-                    ++i)
+              for (int i = 16;i < TheISA::NumIntRegsToTrack; ++i)
               {
-                  tc->RegTrackTable[(X86ISA::IntRegIndex)i] =
-                                                  TheISA::PointerID(0);
+                  tc->PointerTrackerTable[i] = TheISA::PointerID(0);
               }
           }
 
        }
-
-
 
   }
 
@@ -394,9 +391,10 @@ void MacroopBase::undoInjecttion(){
         numMicroops = numOfOriginalMicroops;
 
         // for (size_t i = 0; i < numMicroops; i++) {
-        //     if (microops[i]->uop_pid != TheISA::PointerID(0)){
-        //       assert((microops[i]->getName().compare("ld") == 0) ||
-        //              (microops[i]->getName().compare("st") == 0));
+        //     if (microops[i]->uop_pid != TheISA::PointerID(0) &&
+        //         (microops[i]->getName().compare("ld") == 0)){
+        //       // assert((microops[i]->getName().compare("ld") == 0) ||
+        //       //        (microops[i]->getName().compare("st") == 0));
         //       microops[i]->removeSrcReg();
         //     }
         // }
@@ -423,7 +421,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
             if ((microops[idx]->getName().compare("st") == 0) &&
                 microops[idx]->uop_pid != TheISA::PointerID(0))
             {
-              //microops[idx]->addSrcReg(InstRegIndex(NUM_INTREGS+23));
+              //microops[idx]->addSrcReg(InstRegIndex(NUM_INTREGS+18));
 
               microops[0]->clearFirstMicroop();
 
@@ -445,7 +443,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                         InstRegIndex(microops[idx]->srcRegIdx(1).index()),
                         microops[idx]->getDisp(),
                         InstRegIndex(env.seg),
-                        InstRegIndex(NUM_INTREGS+23),
+                        InstRegIndex(NUM_INTREGS+18),
                         env.dataSize,
                         env.addressSize,
                         0 | (machInst.legacy.addr ?
@@ -461,7 +459,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                         InstRegIndex(microops[idx]->srcRegIdx(1).index()),
                         microops[idx]->getDisp(),
                         InstRegIndex(env.seg),
-                        InstRegIndex(NUM_INTREGS+23),
+                        InstRegIndex(NUM_INTREGS+18),
                         env.dataSize,
                         env.addressSize,
                         0 | (machInst.legacy.addr ?
@@ -479,7 +477,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
             else if ((microops[idx]->getName().compare("ld") == 0) &&
                 microops[idx]->uop_pid != TheISA::PointerID(0))
             {
-                //microops[idx]->addSrcReg(InstRegIndex(NUM_INTREGS+23));
+                //microops[idx]->addSrcReg(InstRegIndex(NUM_INTREGS+18));
 
                 microops[0]->clearFirstMicroop();
 
@@ -501,7 +499,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                           InstRegIndex(microops[idx]->srcRegIdx(1).index()),
                           microops[idx]->getDisp(),
                           InstRegIndex(env.seg),
-                          InstRegIndex(NUM_INTREGS+23),
+                          InstRegIndex(NUM_INTREGS+18),
                           env.dataSize,
                           env.addressSize,
                           0 | (machInst.legacy.addr ?
@@ -517,7 +515,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                           InstRegIndex(microops[idx]->srcRegIdx(1).index()),
                           microops[idx]->getDisp(),
                           InstRegIndex(env.seg),
-                          InstRegIndex(NUM_INTREGS+23),
+                          InstRegIndex(NUM_INTREGS+18),
                           env.dataSize,
                           env.addressSize,
                           0 | (machInst.legacy.addr ?
@@ -606,11 +604,13 @@ MacroopBase::injectAPFreeRet(ThreadContext * _tc, PCState &nextPC){
                           (1ULL << StaticInst::IsMicroop) |
                           (1ULL << StaticInst::IsFirstMicroop) |
                           (1ULL << StaticInst::IsMicroopInjected)|
+                          (1ULL << StaticInst::IsSerializing)|
+                          (1ULL << StaticInst::IsSerializeBefore)|
                           (1ULL << StaticInst::IsFreeRetMicroop),
-                          InstRegIndex(X86ISA::NUM_INTREGS+22),
+                          InstRegIndex(X86ISA::NUM_INTREGS+17),
                           InstRegIndex(X86ISA::INTREG_RDI),
-                          InstRegIndex(X86ISA::NUM_INTREGS+22),
-                          /*env.dataSize*/8,
+                          InstRegIndex(X86ISA::NUM_INTREGS+17),
+                          8,
                           0);
 
 
@@ -654,11 +654,13 @@ if (numMicroops > 0 && !_isInjected){
                         (1ULL << StaticInst::IsMicroop) |
                         (1ULL << StaticInst::IsFirstMicroop) |
                         (1ULL << StaticInst::IsMicroopInjected)|
+                        (1ULL << StaticInst::IsSerializing)|
+                        (1ULL << StaticInst::IsSerializeBefore)|
                         (1ULL << StaticInst::IsFreeCallMicroop),
-                        InstRegIndex(X86ISA::NUM_INTREGS+22),
+                        InstRegIndex(X86ISA::NUM_INTREGS+17),
                         InstRegIndex(X86ISA::INTREG_RDI),
-                        InstRegIndex(X86ISA::NUM_INTREGS+22),
-                        /*env.dataSize*/8,
+                        InstRegIndex(X86ISA::NUM_INTREGS+17),
+                        8,
                         0);
 
 
@@ -691,30 +693,47 @@ MacroopBase::injectAPMallocSizeCollector(ThreadContext * _tc, PCState &nextPC){
         microops[0]->clearFirstMicroop();
 
 
-        StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
+        StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
         for (int i=0; i < numMicroops; i++)
-            microopTemp[i+1] = microops[i];
+            microopTemp[i+2] = microops[i];
+
+        StaticInstPtr micro_1 = new X86ISAInst::AddImmBig(
+                        machInst,
+                        "AP_MALLOC_SIZE_COLLECT_INJECT",
+                        (1ULL << StaticInst::IsMicroop) |
+                        (1ULL << StaticInst::IsMicroopInjected)|
+                        (1ULL << StaticInst::IsSerializing)|
+                        (1ULL << StaticInst::IsSerializeBefore),
+                        InstRegIndex(X86ISA::INTREG_R16),
+                        1,
+                        InstRegIndex(X86ISA::INTREG_R16),
+                        8,
+                        0);
 
         StaticInstPtr micro_0 = new X86ISAInst::Mov(
                         machInst,
-                        "AP_MAALOC_SIZE_COLLECT_INJECT",
+                        "AP_MALLOC_SIZE_COLLECT_INJECT",
                         (1ULL << StaticInst::IsMicroop) |
-                        (1ULL << StaticInst::IsFirstMicroop) |
+                        (1ULL << StaticInst::IsMallocSizeCollectorMicroop)|
                         (1ULL << StaticInst::IsMicroopInjected)|
-                        (1ULL << StaticInst::IsMallocSizeCollectorMicroop),
-                        InstRegIndex(X86ISA::NUM_INTREGS+22),
+                        (1ULL << StaticInst::IsFirstMicroop)|
+                        (1ULL << StaticInst::IsSerializing)|
+                        (1ULL << StaticInst::IsSerializeBefore),
+                        InstRegIndex(X86ISA::NUM_INTREGS+17),
                         InstRegIndex(X86ISA::INTREG_RDI),
-                        InstRegIndex(X86ISA::NUM_INTREGS+22),
-                        /*env.dataSize*/8,
+                        InstRegIndex(X86ISA::NUM_INTREGS+17),
+                        8,
                         0);
 
 
+
         microopTemp[0]   = micro_0;
+        microopTemp[1]   = micro_1;
 
         delete [] microops;
         microops = microopTemp;
-        numMicroops = numMicroops + 1;
+        numMicroops = numMicroops + 2;
 
     }
     else if (numMicroops <= 0){
@@ -736,32 +755,45 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
         microops[0]->clearFirstMicroop();
 
 
-        StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
+        StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
         for (int i=0; i < numMicroops; i++)
-            microopTemp[i+1] = microops[i];
+            microopTemp[i+2] = microops[i];
 
         StaticInstPtr micro_0 = new X86ISAInst::Mov(
+                              machInst,
+                              "AP_MALLOC_BASE_COLLECT_INJECT",
+                              (1ULL << StaticInst::IsMicroop) |
+                              (1ULL << StaticInst::IsFirstMicroop) |
+                              (1ULL << StaticInst::IsMicroopInjected)|
+                              (1ULL << StaticInst::IsSerializing)|
+                              (1ULL << StaticInst::IsSerializeBefore),
+                              InstRegIndex(X86ISA::INTREG_R16),
+                              InstRegIndex(X86ISA::INTREG_R16),
+                              InstRegIndex(X86ISA::INTREG_R16),
+                              8,
+                              0);
+
+        StaticInstPtr micro_1 = new X86ISAInst::Mov(
                         machInst,
                         "AP_MALLOC_BASE_COLLECT_INJECT",
                         (1ULL << StaticInst::IsMicroop) |
-                        (1ULL << StaticInst::IsFirstMicroop) |
                         (1ULL << StaticInst::IsMicroopInjected)|
-                        (1ULL << StaticInst::IsMallocBaseCollectorMicroop),
-                        InstRegIndex(X86ISA::NUM_INTREGS+22),
+                        (1ULL << StaticInst::IsMallocBaseCollectorMicroop)|
+                        (1ULL << StaticInst::IsSerializing)|
+                        (1ULL << StaticInst::IsSerializeBefore),
+                        InstRegIndex(X86ISA::NUM_INTREGS+17),
                         InstRegIndex(X86ISA::INTREG_RAX),
-                        InstRegIndex(X86ISA::NUM_INTREGS+22),
-                        /*env.dataSize*/8,
+                        InstRegIndex(X86ISA::NUM_INTREGS+17),
+                        8,
                         0);
 
-
-        microopTemp[0]   = micro_0;
+        microopTemp[0] = micro_0;
+        microopTemp[1] = micro_1;
 
         delete [] microops;
         microops = microopTemp;
-        numMicroops = numMicroops + 1;
-
-
+        numMicroops = numMicroops + 2;
 
     }
     else if (numMicroops <= 0){
@@ -799,9 +831,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsCallocSizeCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          InstRegIndex(X86ISA::INTREG_RDI),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          /*env.dataSize*/8,
                          0);
 
@@ -848,9 +880,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsCallocBaseCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          InstRegIndex(X86ISA::INTREG_RAX),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          /*env.dataSize*/8,
                          0);
 
@@ -898,9 +930,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsReallocSizeCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          InstRegIndex(X86ISA::INTREG_RDI),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          /*env.dataSize*/8,
                          0);
 
@@ -948,9 +980,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                          (1ULL << StaticInst::IsFirstMicroop) |
                          (1ULL << StaticInst::IsMicroopInjected)|
                          (1ULL << StaticInst::IsReallocBaseCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          InstRegIndex(X86ISA::INTREG_RAX),
-                         InstRegIndex(X86ISA::NUM_INTREGS+22),
+                         InstRegIndex(X86ISA::NUM_INTREGS+17),
                          /*env.dataSize*/8,
                          0);
 

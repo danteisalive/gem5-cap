@@ -97,7 +97,7 @@ class DependencyGraph
 
     /** Clears the producing instruction. */
     void clearInst(PhysRegIndex idx)
-    { dependGraph[idx].inst = NULL; }
+    {dependGraph[idx].inst = NULL;}
 
     /** Removes an instruction from a single linked list. */
     void remove(PhysRegIndex idx, DynInstPtr &inst_to_remove);

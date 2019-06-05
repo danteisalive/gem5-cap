@@ -999,9 +999,9 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         incrLdIdx(load_idx);
 
         // check PID for this load here
-        if (tc->enableCapability && mispredictedPID(tid, inst)){
-            loadWithWrongPID = inst;
-        }
+        // if (tc->enableCapability && mispredictedPID(tid, inst)){
+        //     loadWithWrongPID = inst;
+        // }
 
 
         if (checkLoads)
@@ -1067,9 +1067,9 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
     panic_if(!store_inst->effAddrValid(), "store effAddr is not valid!");
 
-    if (tc->enableCapability){
-      updateAliasTable( tid, store_inst);
-    }
+     if (tc->enableCapability){
+    //   updateAliasTable( tid, store_inst);
+     }
 
     return checkViolations(load_idx, store_inst);
 
@@ -2041,10 +2041,10 @@ LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
 
       auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
       if (mtt_it != tc->CommitAliasTable.end()){
-          tc->CommitPointerTracker[dest] = mtt_it->second;
+        //  tc->CommitPointerTracker[dest] = mtt_it->second;
       }
       else{
-          tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
+        //  tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
       }
     }
 

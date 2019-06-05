@@ -47,6 +47,7 @@
 #include "cpu/static_inst_fwd.hh"
 #include "cpu/thread_context.hh"
 #include "enums/StaticInstFlags.hh"
+#include "mem/request.hh"
 #include "sim/byteswap.hh"
 
 // forward declarations
@@ -335,15 +336,32 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     virtual StaticInstPtr * getMicroops() const;
 
-    virtual void injectMicroops(ThreadContext * _tc, TheISA::PCState &nextPC, TheISA::CheckType _sym);
+    virtual void injectMicroops(ThreadContext * _tc,
+                                TheISA::PCState &nextPC,
+                                TheISA::CheckType _sym
+                               );
+
     virtual void undoInjecttion();
 
     virtual uint64_t getNumOfMicroops();
     virtual bool injectCheckMicroops();
-    virtual void undoCheckMicroops();
-    virtual void updatePointerTracker(ThreadContext * tc);
+    virtual void updatePointerTracker(
+                            ThreadContext * tc, TheISA::PCState &nextPC);
+    virtual bool filterInst(ThreadContext * tc);
 
     virtual uint64_t getDisp();
+    virtual uint8_t getScale();
+    virtual RegIndex getIndex();
+    virtual RegIndex getBase();
+    virtual uint8_t getSegment();
+    virtual uint8_t getMemOpDataSize();
+    virtual uint8_t getAddressSize();
+    virtual Request::FlagsType getMemFlags();
+    virtual RegIndex getMemOpDataRegIndex();
+    virtual uint8_t getRegOpDataSize();
+    virtual RegIndex getRegOpSrc1RegIdx();
+    virtual RegIndex getRegOpSrc2RegIdx();
+    virtual RegIndex getRegOpDestRegIdx();
     virtual void setDisp(uint64_t displacement);
 
     virtual std::string getInstName();

@@ -504,6 +504,10 @@ class BaseDynInst : public ExecContext, public RefCounted
         return !(tempPC == predPC);
     }
 
+    uint64_t readIntCapReg(int idx){
+        return cpu->readIntReg(_srcRegIdx[idx]);
+    }
+
     //
     //  Instruction types.  Forward checks to StaticInst object.
     //

@@ -123,9 +123,9 @@ StaticInst::injectMicroops(ThreadContext * _tc,
     panic("injectMicroops: This should only be called by a macroop");
 }
 
-void
-StaticInst::undoCheckMicroops(){
-    panic("undoCheckMicroops: This should only be called by a macroop");
+bool
+StaticInst::filterInst(ThreadContext * tc){
+    panic("filterInst: This should only be called by a macroop");
 }
 
 void StaticInst::setMacroopPid(TheISA::PointerID _pid){
@@ -137,7 +137,7 @@ TheISA::PointerID StaticInst::getMacroopPid(){
 }
 
 void
-StaticInst::updatePointerTracker(ThreadContext * tc){
+StaticInst::updatePointerTracker(ThreadContext * tc, TheISA::PCState &nextPC){
     panic("updatePointerTracker: This should only be called by a macroop");
 }
 
@@ -164,10 +164,66 @@ StaticInst::getDisp(){
 
 }
 
+
+uint8_t
+StaticInst::getScale(){
+  panic("getScale: This should only be called by a MemOp");
+}
+RegIndex
+StaticInst::getIndex(){
+  panic("getIndex: This should only be called by a MemOp");
+}
+RegIndex
+StaticInst::getBase(){
+  panic("getBase: This should only be called by a MemOp");
+}
+uint8_t
+StaticInst::getSegment(){
+  panic("getSegment: This should only be called by a MemOp");
+}
+uint8_t
+StaticInst::getMemOpDataSize(){
+  panic("getMemOpDataSize: This should only be called by a MemOp");
+}
+uint8_t
+StaticInst::getAddressSize(){
+  panic("getAddressSize: This should only be called by a MemOp");
+}
+
+Request::FlagsType
+StaticInst::getMemFlags(){
+  panic("getMemFlags: This should only be called by a MemOp");
+}
+
 void
 StaticInst::setDisp(uint64_t displacement){
 
     panic("setDisp: This should only be called by a MemOp");
+}
+
+RegIndex
+StaticInst::getMemOpDataRegIndex(){
+    panic("getMemOpDataRegIndex: This should only be called by a MemOp");
+}
+
+
+RegIndex
+StaticInst::getRegOpSrc1RegIdx(){
+  panic("getRegOpSrc1RegIdx: This should only be called by a MemOp");
+}
+RegIndex
+StaticInst::getRegOpDestRegIdx(){
+  panic("getRegOpDestRegIdx: This should only be called by a MemOp");
+}
+
+uint8_t
+StaticInst::getRegOpDataSize(){
+  panic("getRegOpDataSize: This should only be called by a MemOp");
+}
+
+RegIndex
+StaticInst::getRegOpSrc2RegIdx(){
+  panic("getRegOpSrc2RegIdx: This should only be called by a MemOp");
 }
 
 const char*

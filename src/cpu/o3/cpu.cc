@@ -429,8 +429,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
             else fatal("Can't open symbols file");
         }
 
-        for (int i = 0; i < X86ISA::NUM_INTREGS + 128; i++)
-           o3_tc->RegTrackTable[(X86ISA::IntRegIndex)i] = TheISA::PointerID(0);
+        for (int i = 0; i < TheISA::NumIntRegsToTrack; i++)
+           o3_tc->PointerTrackerTable[i] = TheISA::PointerID(0);
 
          NumOfAliasTableAccess = 0;
          FalsePredict = 0; PnA0 = 0; P0An=0; PmAn = 0; heapAccesses = 0;

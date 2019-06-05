@@ -233,6 +233,8 @@ class DefaultIEW
     void checkMisprediction(DynInstPtr &inst);
     void updateTracker(ThreadID tid, DynInstPtr &head_inst);
     void squashExecuteAliasTable(DynInstPtr &inst);
+    void collector(ThreadID tid, DynInstPtr &head_inst);
+    TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
   private:
     /** Sends commit proper information for a squash due to a branch
      * mispredict.

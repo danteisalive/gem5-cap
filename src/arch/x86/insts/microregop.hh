@@ -74,6 +74,19 @@ namespace X86ISA
         uint64_t genFlags(uint64_t oldFlags, uint64_t flagMask,
                 uint64_t _dest, uint64_t _src1, uint64_t _src2,
                 bool subtract = false) const;
+
+        public:
+
+          RegIndex getRegOpSrc1RegIdx(){
+            return src1;
+          }
+          RegIndex getRegOpDestRegIdx(){
+            return dest;
+          }
+
+          uint8_t getRegOpDataSize(){
+            return dataSize;
+          }
     };
 
     class RegOp : public RegOpBase
@@ -96,6 +109,14 @@ namespace X86ISA
 
         std::string generateDisassembly(Addr pc,
             const SymbolTable *symtab) const;
+
+        public:
+
+        RegIndex getRegOpSrc2RegIdx(){
+          return src2;
+        }
+
+
     };
 
     class RegOpImm : public RegOpBase

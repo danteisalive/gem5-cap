@@ -140,8 +140,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
 
 #endif
     uint64_t   fetchCycle;
-    uint64_t   decodeCycle;  
-    uint64_t   renameCycle; 
+    uint64_t   decodeCycle;
+    uint64_t   renameCycle;
     uint64_t   dispatchCycle;
     uint64_t   issueCycle;
     uint64_t   completeCycle;
@@ -279,6 +279,11 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     IntReg readIntRegOperand(const StaticInst *si, int idx)
     {
         return this->cpu->readIntReg(this->_srcRegIdx[idx]);
+    }
+
+    IntReg readDestReg(const StaticInst *si, int idx)
+    {
+      return this->cpu->readIntReg(this->_destRegIdx[idx]);
     }
 
     FloatReg readFloatRegOperand(const StaticInst *si, int idx)
@@ -438,4 +443,3 @@ class BaseO3DynInst : public BaseDynInst<Impl>
 };
 
 #endif // __CPU_O3_ALPHA_DYN_INST_HH__
-

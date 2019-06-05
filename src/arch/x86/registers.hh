@@ -57,6 +57,7 @@ const int NumMiscRegs = NUM_MISCREGS;
 
 const int NumIntArchRegs = NUM_INTREGS;
 const int NumIntRegs = NumIntArchRegs + NumMicroIntRegs + NumImplicitIntRegs;
+const int NumIntRegsToTrack = NumIntArchRegs + NumMicroIntRegs;
 const int NumCCRegs = NUM_CCREGS;
 
 #define ISA_HAS_CC_REGS

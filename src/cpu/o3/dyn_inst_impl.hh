@@ -137,6 +137,7 @@ BaseO3DynInst<Impl>::execute()
 
     this->fault = this->staticInst->execute(this, this->traceData);
 
+
     this->thread->noSquashFromTC = no_squash_from_TC;
 
     return this->fault;

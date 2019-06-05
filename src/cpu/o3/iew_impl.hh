@@ -1396,6 +1396,9 @@ DefaultIEW<Impl>::executeInsts()
             // will be replaced and we will lose it.
             if (inst->getFault() == NoFault) {
                 inst->execute();
+                if (inst->isMicroopInjected()){
+                   collector(tid, inst);
+                }
                 if (!inst->readPredicate())
                     inst->forwardOldRegs();
             }
@@ -1416,7 +1419,7 @@ DefaultIEW<Impl>::executeInsts()
         // instruction first, so the branch resolution order will be correct.
 
 
-        updateTracker(tid, inst);
+        //updateTracker(tid, inst);
 
 
         if (!fetchRedirect[tid] ||
@@ -1548,9 +1551,6 @@ DefaultIEW<Impl>::writebackInsts()
         // when it's ready to execute the strictly ordered load.
         if (!inst->isSquashed() && inst->isExecuted() && inst->getFault() == NoFault) {
             int dependents = instQueue.wakeDependents(inst);
-
-            // if (inst->isBoundsCheckMicroop())
-            //   std::cout << "wb: " << inst->seqNum << std::endl;
 
             for (int i = 0; i < inst->numDestRegs(); i++) {
                 //mark as Ready
@@ -1767,10 +1767,13 @@ DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
 
 template <class Impl>
 void
-DefaultIEW<Impl>::updateTracker(ThreadID tid, DynInstPtr &head_inst)
+DefaultIEW<Impl>::updateTracker(ThreadID tid, DynInstPtr &inst)
 {
     ThreadContext * tc = cpu->tcBase(tid);
-    tc->ExeStopTracking = tc->stopTracking;
+
+    if (tc->ExeStopTracking){
+        std::cout << inst->pcState() << " " << inst->seqNum << std::endl;
+    }
 
 }
 
@@ -1793,11 +1796,120 @@ DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
        }
     }
 
-    if (tc->enableCapability){
-      tc->RegTrackTable = tc->CommitPointerTracker;
+    //update the PointerTracker
+    //if (tc->enableCapability){
+      //tc->RegTrackTable = tc->CommitPointerTracker;
+    //}
+
+
+}
+
+
+template <class Impl>
+void
+DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
+{
+  ThreadContext * tc = cpu->tcBase(tid);
+
+  if (tc->enableCapability){
+
+    if (inst->isMallocSizeCollectorMicroop()){
+
+          std::cout << std::hex << "IEW: MALLOC SIZE: " <<
+                  inst->readDestReg(inst->staticInst.get(),0) <<
+                  " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
+                  " " << inst->seqNum <<
+                  std::endl;
+
+          uint64_t _pid_num=cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
+          uint64_t _pid_size=inst->readDestReg(inst->staticInst.get(),0);
+          tc->CapRegsFile.insert(
+                     std::pair<TheISA::PointerID, TheISA::Capability>
+                    (TheISA::PointerID(_pid_num),TheISA::Capability()));
+
+          TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
+          //tc->CapRegsFile[_pid].setCSRBit(0); // size collected in IEW stage
+          tc->CapRegsFile[_pid].seqNum = inst->seqNum;
+          tc->CapRegsFile[_pid].setSize(_pid_size);
+
+          tc->ExeStopTracking = true;
+
+      }
+
+    else if (inst->isMallocBaseCollectorMicroop()){
+
+        std::cout << std::hex << "IEW: MALLOC BASE: " <<
+                    inst->readDestReg(inst->staticInst.get(),0) <<
+                    " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
+                    " " <<  inst->seqNum <<
+                    std::endl;
+
+        uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
+        uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+
+        TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
+        tc->CapRegsFile[_pid].setBaseAddr(_pid_base);
+        //tc->CapRegsFile[_pid].setCSRBit(1); // base collected in IEW stage
+        tc->CapRegsFile[_pid].seqNum = inst->seqNum;
+
+        tc->ExeStopTracking = false;
+
+    }
+
+    else if (inst->isFreeCallMicroop()){
+
+        std::cout << std::hex << "IEW: FREE CALL: " <<
+                  inst->readDestReg(inst->staticInst.get(),0) <<
+                  " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
+                  " " << inst->seqNum <<
+                  std::endl;
+
+        uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+        //check whether we have the cap for this AP or not
+        TheISA::PointerID _pid = SearchCapReg(tid,_pid_base);
+        if (_pid != TheISA::PointerID(0)){
+           // we can't still say that this is getting freed yet
+            tc->CapRegsFile[_pid].setCSRBit(1); // free is called for this AP
+            tc->CapRegsFile[_pid].seqNum = inst->seqNum;
+        }
+
+        tc->ExeStopTracking = true;
+
+    }
+    else if (inst->isFreeRetMicroop()){
+
+      std::cout << std::hex << "IEW: FREE RET: " <<
+                inst->readDestReg(inst->staticInst.get(),0) <<
+                " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
+                " " << inst->seqNum <<
+                std::endl;
+
+      // do nothing, just start tracking again.
+      // in commit we will check whether freeing was succesful or not
+      tc->ExeStopTracking = false;
     }
 
 
+
+  }
+
+}
+
+template <class Impl>
+TheISA::PointerID
+DefaultIEW<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
+{
+  ThreadContext * tc = cpu->tcBase(tid);
+
+  TheISA::PointerID _pid = TheISA::PointerID(0);
+  for (auto& capElem : tc->CapRegsFile){
+      if (capElem.second.contains(_addr)){
+          _pid = capElem.first;
+          break;
+      }
+  }
+
+  return _pid;
 }
 
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

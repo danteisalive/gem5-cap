@@ -146,6 +146,11 @@ namespace X86ISA
         INTREG_R15W = INTREG_R15,
         INTREG_R15B = INTREG_R15,
 
+        INTREG_R16,
+        INTREG_R16D = INTREG_R16,
+        INTREG_R16W = INTREG_R16,
+        INTREG_R16B = INTREG_R16,
+
         NUM_INTREGS
     };
 

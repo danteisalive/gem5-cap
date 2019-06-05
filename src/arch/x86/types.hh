@@ -62,7 +62,7 @@ namespace X86ISA
   public:
 
       PointerID(){
-
+          id = 0;
       }
 
       PointerID(uint64_t _id){
@@ -580,39 +580,33 @@ namespace X86ISA
         return os;
     }
 
-    class EmitterID: public PointerID
-    {
-    public:
-        EmitterID(uint64_t _emitter_ip): PointerID(_emitter_ip){}
-        EmitterID(): PointerID(){}
-        ~EmitterID(){}
-        uint64_t getEID() {return getPID();}
-
-    };
-
     class Capability
     {
         private:
-            uint64_t begin;
-            uint64_t end;
+            int64_t begin;
+            int64_t end;
             int64_t size;
-            std::bitset<16> CSR;
+            std::bitset<16> CSR;  //b0 = Executed, b1 = Commited
 
+        public:
+          uint64_t seqNum;
 
         public:
             Capability (){
                 size = -1;
-                begin = 0;
+                begin = -1;
+                end = -1;
+                seqNum = 0;
                 CSR.reset();
             }
 
             Capability(uint64_t _size)
             {
-                begin = 0;
-                end = 0;
+                begin = -1;
+                end = -1;
                 size = _size;
+                seqNum = 0;
                 CSR.reset();
-                //CSR.set(0, 1);
             }
             ~Capability(){
 
@@ -630,7 +624,7 @@ namespace X86ISA
                 end = cap.end;
                 size = cap.size;
                 CSR = cap.CSR;
-
+                seqNum = cap.seqNum;
                 // return the existing object so we can chain this operator
                 return *this;
             }
@@ -641,14 +635,15 @@ namespace X86ISA
                 end = _cap.end;
                 size = _cap.size;
                 CSR = _cap.CSR;
+                seqNum = _cap.seqNum;
             }
 
 
             void setBaseAddr(uint64_t _addr){
-                                            if (size < 0) assert(0);
-                                            begin = _addr;
-                                            end = begin + size;
-                                                        }
+                                              if (size < 0) assert(0);
+                                              begin = _addr;
+                                              end = begin + size;
+                                            }
             void            setSize (uint64_t _size){ size = _size;}
             uint64_t        getSize(){ return size; }
             uint64_t        getEndAddr(){ return begin + size;}
@@ -659,13 +654,13 @@ namespace X86ISA
             std::bitset<16> getCSR(){return CSR;}
             void            reset(){ CSR.reset(); };
 
-            bool contains(Addr _addr){
-                //assert(end);
-                if (end == 0) return false;
-                if (_addr >= begin && _addr <= end)
-                    return true;
-                else
-                    return false;
+            bool contains(uint64_t _addr){
+                // return false because cap is not commited yet
+                if (!CSR.test(0)) return false;
+                // check to make sure that we have both begin and end
+                if (CSR.test(0)) { assert(begin > 0); assert(size > 0);}
+                if (_addr >= begin && _addr <= end)  return true;
+                else return false;
             }
 
     };
@@ -678,88 +673,6 @@ namespace X86ISA
         STACK_W_RTT,
         STACK_WO_RTT
     };
-
-    class StackID : public PointerID
-    {
-
-    public:
-        typedef std::map<RegIndex,
-                    std::tuple<EmitterID, PointerID, Capability>>
-                                                      RegisterTrackingTable;
-        typedef std::tuple<EmitterID, PointerID, Capability> RTTEntry;
-    private:
-        RegisterTrackingTable RTT ;
-        std::vector<Addr> stack_pointers_addr ;
-        StackType stack_type;
-        Addr stack_addr;
-    public:
-        StackID(): PointerID() {}
-        StackID(uint64_t _sid): PointerID(_sid){}
-        StackID(Addr _stack_addr, StackType _stack_type):
-            PointerID(), stack_type(_stack_type), stack_addr(_stack_addr)
-        {}
-
-        ~StackID(){}
-
-        uint64_t    getSID() const { return getPID();}
-        void        setStackType(StackType _stack_type){
-                                              stack_type = _stack_type;}
-        void        setStackAddr(Addr _stack_addr){ stack_addr = _stack_addr; }
-        StackType   getStackType() const {return stack_type;}
-        Addr        getStackAddr() const {return stack_addr;}
-
-
-
-        StackID& operator = (const StackID& _sid)
-            {
-                // self-assignment guard
-                if (this == &_sid)
-                    return *this;
-
-                // do the copy
-                this->stack_addr = _sid.stack_addr;
-                this->stack_type = _sid.stack_type;
-                this->RTT                   = _sid.RTT;
-                this->stack_pointers_addr   = _sid.stack_pointers_addr;
-                this->setPID(_sid.getPID());
-
-                // return the existing object so we can chain this operator
-                return *this;
-        }
-
-        StackID operator + (uint64_t _val)
-        {
-            setPID(getPID() + _val);
-            StackID temp(*this);
-            //temp.id += _val;
-
-            return temp;
-
-        }
-
-        StackID(const StackID& _SID) : PointerID(_SID.getPID())
-        {
-            this->stack_addr            = _SID.stack_addr;
-            this->stack_type            = _SID.stack_type;
-            this->RTT                   = _SID.RTT;
-            this->stack_pointers_addr   = _SID.stack_pointers_addr;
-        }
-
-
-
-
-    };
-
-    inline static std::ostream &
-            operator << (std::ostream & os, const StackID & _sid)
-    {
-        ccprintf(os, "STACK CREATED FOR STACK ADDR: %#lx  TYPE: %d ID: %s\n",
-                _sid.getStackAddr(),
-                _sid.getStackType(),
-                _sid.getSID()
-                );
-        return os;
-    }
 
     enum CheckType {
         BOUNDS = 0,

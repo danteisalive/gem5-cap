@@ -94,7 +94,31 @@ namespace X86ISA
         void setDisp(uint64_t displacement){
             disp = displacement;
         }
+        uint8_t getScale(){
+          return scale;
+        }
+        RegIndex getIndex(){
+          return index;
+        }
+        RegIndex getBase(){
+          return base;
+        }
+        uint8_t getSegment(){
+          return segment;
+        }
+        uint8_t getDataSize(){
+          return dataSize;
+        }
+        uint8_t getAddressSize(){
+          return addressSize;
+        }
+
+        Request::FlagsType getMemFlags(){
+          return memFlags;
+        }
+
     };
+
 
     /**
      * Base class for load and store ops using one register
@@ -124,6 +148,10 @@ namespace X86ISA
 
         std::string generateDisassembly(Addr pc,
             const SymbolTable *symtab) const;
+
+      RegIndex getMemOpDataRegIndex(){
+        return data;
+      }
     };
 
     /**
