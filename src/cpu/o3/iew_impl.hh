@@ -1809,17 +1809,19 @@ template <class Impl>
 void
 DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 {
+  #define ENABLE_COLLECTOR_DEBUG 0
   ThreadContext * tc = cpu->tcBase(tid);
 
   if (tc->enableCapability){
 
     if (inst->isMallocSizeCollectorMicroop()){
 
-          std::cout << std::hex << "IEW: MALLOC SIZE: " <<
+        if (ENABLE_COLLECTOR_DEBUG)
+          {std::cout << std::hex << "IEW: MALLOC SIZE: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                   " " << inst->seqNum <<
-                  std::endl;
+                  std::endl;}
 
           uint64_t _pid_num=cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
           uint64_t _pid_size=inst->readDestReg(inst->staticInst.get(),0);
@@ -1837,12 +1839,12 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       }
 
     else if (inst->isMallocBaseCollectorMicroop()){
-
-        std::cout << std::hex << "IEW: MALLOC BASE: " <<
+      if (ENABLE_COLLECTOR_DEBUG)
+        {std::cout << std::hex << "IEW: MALLOC BASE: " <<
                     inst->readDestReg(inst->staticInst.get(),0) <<
                     " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                     " " <<  inst->seqNum <<
-                    std::endl;
+                    std::endl;}
 
         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
@@ -1857,12 +1859,12 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
     }
 
     else if (inst->isFreeCallMicroop()){
-
-        std::cout << std::hex << "IEW: FREE CALL: " <<
+      if (ENABLE_COLLECTOR_DEBUG)
+      {std::cout << std::hex << "IEW: FREE CALL: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                   " " << inst->seqNum <<
-                  std::endl;
+                  std::endl;}
 
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
         //check whether we have the cap for this AP or not
@@ -1877,12 +1879,12 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
     }
     else if (inst->isFreeRetMicroop()){
-
-      std::cout << std::hex << "IEW: FREE RET: " <<
+      if (ENABLE_COLLECTOR_DEBUG)
+        {std::cout << std::hex << "IEW: FREE RET: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                 " " << inst->seqNum <<
-                std::endl;
+                std::endl;}
 
       // do nothing, just start tracking again.
       // in commit we will check whether freeing was succesful or not

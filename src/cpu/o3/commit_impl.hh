@@ -1486,17 +1486,19 @@ template <class Impl>
 void
 DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 {
+  #define ENABLE_COLLECTOR_DEBUG 0
+
   ThreadContext * tc = cpu->tcBase(tid);
 
   if (tc->enableCapability){
 
     if (inst->isMallocSizeCollectorMicroop()){
-
-        std::cout << std::hex << "COMMIT: MALLOC SIZE: " <<
+      if (ENABLE_COLLECTOR_DEBUG)
+        {std::cout << std::hex << "COMMIT: MALLOC SIZE: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                 " " << inst->seqNum <<
-                std::endl;
+                std::endl;}
 
         //first check whether everything is correct or not
         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
@@ -1513,11 +1515,12 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
     else if (inst->isMallocBaseCollectorMicroop()){
 
-        std::cout << std::hex << "COMMIT: MALLOC BASE: " <<
+      if (ENABLE_COLLECTOR_DEBUG)
+        {std::cout << std::hex << "COMMIT: MALLOC BASE: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                   " " << inst->seqNum <<
-                  std::endl;
+                  std::endl;}
 
         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
@@ -1535,11 +1538,12 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
     else if (inst->isFreeCallMicroop()){
 
-      std::cout << std::hex << "COMMIT: FREE CALL: " <<
+      if (ENABLE_COLLECTOR_DEBUG)
+        {std::cout << std::hex << "COMMIT: FREE CALL: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                 " " << inst->seqNum <<
-                std::endl;
+                std::endl;}
       uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
       //check whether we have the cap for this AP or not
       TheISA::PointerID _pid = SearchCapReg(tid,_pid_base);
@@ -1556,12 +1560,12 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
     }
     else if (inst->isFreeRetMicroop()){
-
-      std::cout << std::hex << "COMMIT: FREE RET: " <<
+      if (ENABLE_COLLECTOR_DEBUG)
+        {std::cout << std::hex << "COMMIT: FREE RET: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                 " " << inst->seqNum <<
-                std::endl;
+                std::endl;}
       // do nothing
     }
 
