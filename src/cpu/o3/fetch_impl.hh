@@ -561,7 +561,6 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
                                         ThreadID tid,
                                         StaticInstPtr &inst)
 {
-
     inst->setMacroopPid(LVPT->lookup(thisPC.instAddr(), tid));
 }
 
@@ -1426,9 +1425,9 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             nextPC = thisPC;
 
 
-            if (tc->enableCapability &&
-                instruction->isBoundsCheckMicroop())
+            if (tc->enableCapability && instruction->isBoundsCheckMicroop())
             {
+                cpu->NumOfInjectedBoundsCheck++;
                 instruction->setPredicate(false);
             }
 

@@ -1338,71 +1338,86 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
            )
         {
 
-            uint64_t _pid = 0;
-            uint64_t num = 0;
-            for (size_t i = 1; i < tc->PID.getPID(); i++) {
-              uint64_t _num = 0;
-              for (auto& elem: tc->CommitAliasTable){
-                  if (elem.second.getPID() == i){
-                      _num++;
-                  }
-              }
-              if (_num >= num){
-                num = _num;
-                _pid = i;
-              }
-            }
+            // uint64_t _pid = 0;
+            // uint64_t num = 0;
+            // for (size_t i = 1; i < tc->PID.getPID(); i++) {
+            //   uint64_t _num = 0;
+            //   for (auto& elem: tc->CommitAliasTable){
+            //       if (elem.second.getPID() == i){
+            //           _num++;
+            //       }
+            //   }
+            //   if (_num >= num){
+            //     num = _num;
+            //     _pid = i;
+            //   }
+            // }
 
-            uint64_t _allocs = 0;
-            for (size_t i = 1; i < tc->PID.getPID(); i++) {
+            // uint64_t _allocs = 0;
+            // for (size_t i = 1; i < tc->PID.getPID(); i++) {
+            //
+            //   for (auto& elem: tc->CommitAliasTable){
+            //       if (elem.second.getPID() == i){
+            //           _allocs++;
+            //           break;
+            //       }
+            //   }
+            // }
 
-              for (auto& elem: tc->CommitAliasTable){
-                  if (elem.second.getPID() == i){
-                      _allocs++;
-                      break;
-                  }
-              }
-            }
-
-            std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
+            std::cout <<
+            "--------------------START OF EPOCH----------------------------" <<
+            std::endl << std::dec << cpu->thread[tid]->numInsts.value() <<
+            std::endl <<
             " CommitAliasTable Size: " <<
-            tc->CommitAliasTable.size() <<
-            " ExecuteAliasTable Size: " <<
-            tc->ExecuteAliasTable.size() <<
+            tc->CommitAliasTable.size() << std::endl <<
+            // " ExecuteAliasTable Size: " <<
+            // tc->ExecuteAliasTable.size() <<
             " NumOfAllocations: " << tc->CapRegsFile.size() <<
-            " Highest Number of Element: " <<
-            " PID(" << _pid << ")" << "[" << num << "]" <<
+            // " Highest Number of Element: " <<
+            // " PID(" << _pid << ")" << "[" << num << "]" <<
             std::endl;
 
             double accuracy =
             (double)(cpu->NumOfAliasTableAccess - cpu->FalsePredict) /
             cpu->NumOfAliasTableAccess;
-
-            std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
+            //
+             std::cout << std::dec << //cpu->thread[tid]->numInsts.value() <<
             " Number of Execute Alias Table accesses: " <<
-            cpu->NumOfAliasTableAccess <<
-            " Prediction Accuracy(1e6 Instr.): " << accuracy <<
-            " NumOfMissPredictions: " << cpu->FalsePredict <<
+            cpu->NumOfAliasTableAccess << std::endl <<
+            " Prediction Accuracy(1e6 Instr.): " << accuracy << std::endl <<
+            " NumOfMissPredictions: " << cpu->FalsePredict <<std::endl <<
             " P0An: " << cpu->P0An <<
             " PnA0: " << cpu->PnA0 <<
-            " PmAn: " << cpu->PmAn <<
-            " Number Of Lds: " << cpu->ldsWithPid <<
-            " Heap Access: " << cpu->heapAccesses <<
+            " PmAn: " << cpu->PmAn <<std::endl <<
+            " Number Of Mem Refs: " << cpu->numOfMemRefs <<
+            // " Heap Access: " << cpu->heapAccesses <<
             " True Predections: " << cpu->truePredection <<
-            " HeapPnA0: " << cpu->HeapPnA0 <<
-            " HeapPnAm: " << cpu->HeapPnAm <<
-            " Access Prediction Accuracy: " <<
-                  (double)cpu->truePredection/cpu->ldsWithPid <<
+            " PnA0: " << cpu->HeapPnA0 <<
+            " PnAm: " << cpu->HeapPnAm <<std::endl <<
+            " Pointer Tracker Prediction Accuracy: " <<
+                  (double)cpu->truePredection/cpu->numOfMemRefs <<std::endl <<
+            " NumOfInjectedBoundsCheck: " <<
+            cpu->NumOfInjectedBoundsCheck <<std::endl <<
+            " NumOfExecutedBoundsCheck: " <<
+            cpu->NumOfExecutedBoundsCheck <<std::endl <<
+            " NumOfCommitedBoundsCheck: " <<
+            cpu->NumOfCommitedBoundsCheck <<std::endl <<
             std::endl;
 
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
             cpu->heapAccesses = 0; cpu->truePredection = 0;
-            cpu->ldsWithPid = 0; cpu->HeapPnAm = 0; cpu->HeapPnA0 = 0;
+            cpu->numOfMemRefs = 0; cpu->HeapPnAm = 0; cpu->HeapPnA0 = 0;
+            cpu->NumOfCommitedBoundsCheck = 0;
+            cpu->NumOfInjectedBoundsCheck = 0;
+            cpu->NumOfExecutedBoundsCheck = 0;
 
         }
     }
 
+    if (tc->enableCapability && head_inst->isBoundsCheckMicroop()){
+        cpu->NumOfCommitedBoundsCheck++;
+    }
     // Update the commit rename map
     for (int i = 0; i < head_inst->numDestRegs(); i++) {
         renameMap[tid]->setEntry(head_inst->flattenedDestRegIdx(i),

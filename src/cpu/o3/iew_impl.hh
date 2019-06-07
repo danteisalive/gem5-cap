@@ -1568,6 +1568,10 @@ DefaultIEW<Impl>::writebackInsts()
               if (inst->isMemRef()){
                 checkAccuracy(inst->threadNumber,inst);
               }
+
+              if (tc->enableCapability && inst->isBoundsCheckMicroop()){
+                  cpu->NumOfExecutedBoundsCheck++;
+              }
             }
 
             for (int i = 0; i < inst->numDestRegs(); i++) {
@@ -2118,12 +2122,15 @@ DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
     //ThreadContext * tc = cpu->tcBase(tid);
     const StaticInstPtr si = inst->staticInst;
   //let's see whether this is a heap access or not
-    //heap accesses can be made only with ld
+    //heap accesses can be made only with ld and st
+    // this is defeniltly a memory access (any kind)
+
     if ((si->getName().compare("ld") == 0) ||
         (si->getName().compare("st") == 0)){
+        cpu->numOfMemRefs++;
         if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
+
           // src reg is not rsp which is always for stack
-            cpu->ldsWithPid++;
             TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
             if (_pid != TheISA::PointerID(0)){ // heap access?
               cpu->heapAccesses++;
@@ -2134,7 +2141,6 @@ DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
               }
               else {
                 // this is heap access and we have miss prediction
-                ///cpu->updateFetchLVPT(inst, _pid, false);
                  cpu->HeapPnAm++;
                  inst->staticInst->uop_pid = _pid;
                  inst->staticInst->checked = true;
@@ -2155,6 +2161,10 @@ DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
 
             }
          }
+         else {
+           cpu->truePredection++;
+         }
     }
+
 }
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__
