@@ -28,6 +28,7 @@ bool MacroopBase::filterInst(ThreadContext * tc) {
 
 void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 {
+      #define ENABLE_POINTER_TRACKER_DEBUG 0
       if (_isInjected) panic("tracking an injected macroop!");
 
       // this is probably a a little late but still can be effective
@@ -35,7 +36,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
       // its like we are executing microps here
       for (size_t i = 0; i < numMicroops; i++) {
           const StaticInstPtr si = microops[i];
-          #define ENABLE_CAPABILITY_DEBUG 0
+
 
           // //let's see whether this is a heap access or not
           // This should be done before chaning pointer track table state
@@ -53,10 +54,11 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                     if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
                     {
                        si->uop_pid = tc->PointerTrackerTable[base];
-                       std::cout << "LD NEED AN INJECTION: " <<
+                       if (ENABLE_POINTER_TRACKER_DEBUG)
+                       {std::cout << "LD NEED AN INJECTION: " <<
                             si->uop_pid << " " << tc->CapRegsFile.size() <<
                             nextPC <<
-                            std::endl;
+                            std::endl;}
                     }
 
                 }
@@ -72,259 +74,261 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                    if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
                    {
                       si->uop_pid = tc->PointerTrackerTable[base];
-                      std::cout << "ST NEED AN INJECTION: " <<
-                           si->uop_pid << " " << tc->CapRegsFile.size() <<
-                           nextPC <<
-                           std::endl;
+                      if (ENABLE_POINTER_TRACKER_DEBUG){
+                        std::cout << "ST NEED AN INJECTION: " <<
+                             si->uop_pid << " " << tc->CapRegsFile.size() <<
+                             nextPC <<
+                             std::endl;
+                      }
                    }
 
                }
            }
 
 
-          // if ((si->getName().compare("and") == 0)){
-          //
-          //     if (si->destRegIdx(0).isIntReg() &&
-          //         si->srcRegIdx(0).isIntReg()  &&
-          //         si->srcRegIdx(1).isIntReg())
-          //     {
-          //         X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-          //                                       si->srcRegIdx(0).index();
-          //         X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-          //                                       si->srcRegIdx(1).index();
-          //         X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-          //                                       si->destRegIdx(0).index();
-          //         if (dest < X86ISA::INTREG_RAX ||
-          //             dest >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //         if (src1 < X86ISA::INTREG_RAX ||
-          //             src1 >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //         if (src2 < X86ISA::INTREG_RAX ||
-          //             src2 >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //
-          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-          //         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
-          //
-          //         if (src1 == src2)
-          //         {
-          //           tc->RegTrackTable[dest] = _pid_src1;
-          //         }
-          //         else
-          //         {
-          //           if ( _pid_src1 != TheISA::PointerID(0) &&
-          //                _pid_src2 == TheISA::PointerID(0))
-          //           {
-          //                tc->RegTrackTable[dest] = _pid_src1;
-          //           }
-          //           else if ( _pid_src1 == TheISA::PointerID(0) &&
-          //                     _pid_src2 != TheISA::PointerID(0))
-          //           {
-          //                tc->RegTrackTable[dest] = _pid_src2;
-          //           }
-          //           else
-          //           {
-          //                tc->RegTrackTable[dest] = TheISA::PointerID(0);
-          //           }
-          //         }
-          //      }
-          // }
-          // else if ((si->getName().compare("xor") == 0)){
-          //   if (si->destRegIdx(0).isIntReg() &&
-          //       si->srcRegIdx(0).isIntReg()  &&
-          //       si->srcRegIdx(1).isIntReg())
-          //   {
-          //       X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-          //                                   si->srcRegIdx(0).index();
-          //       X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-          //                                   si->srcRegIdx(1).index();
-          //       X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-          //                                   si->destRegIdx(0).index();
-          //
-          //       if (dest < X86ISA::INTREG_RAX ||
-          //           dest >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //       if (src1 < X86ISA::INTREG_RAX ||
-          //           src1 >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //       if (src2 < X86ISA::INTREG_RAX ||
-          //           src2 >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //
-          //       tc->RegTrackTable[dest] = TheISA::PointerID(0);
-          //   }
-          //
-          // }
-          // else if ((si->getName().compare("sub") == 0) ||
-          //          (si->getName().compare("sbb") == 0))
-          // {
-          //     if (si->destRegIdx(0).isIntReg() &&
-          //         si->srcRegIdx(0).isIntReg()  &&
-          //         si->srcRegIdx(1).isIntReg())
-          //     {
-          //         X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-          //                                       si->srcRegIdx(0).index();
-          //         X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-          //                                       si->srcRegIdx(1).index();
-          //         X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-          //                                       si->destRegIdx(0).index();
-          //
-          //         if (dest < X86ISA::INTREG_RAX ||
-          //             dest >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //         if (src1 < X86ISA::INTREG_RAX ||
-          //             src1 >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //         if (src2 < X86ISA::INTREG_RAX ||
-          //             src2 >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //
-          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-          //         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
-          //
-          //         if (_pid_src1 != TheISA::PointerID(0) &&
-          //             _pid_src2 != TheISA::PointerID(0))
-          //         {
-          //             tc->RegTrackTable[dest] = TheISA::PointerID(0);
-          //         }
-          //         else if (_pid_src1 != TheISA::PointerID(0))
-          //         {
-          //             tc->RegTrackTable[dest] = _pid_src1;
-          //         }
-          //         else if (_pid_src2 != TheISA::PointerID(0))
-          //         {
-          //             tc->RegTrackTable[dest] = _pid_src2;
-          //         }
-          //   }
-          // }
-          // else if ((si->getName().compare("add") == 0) ||
-          //          (si->getName().compare("adc") == 0))
-          // {
-          //     if (si->destRegIdx(0).isIntReg() &&
-          //         si->srcRegIdx(0).isIntReg()  &&
-          //         si->srcRegIdx(1).isIntReg())
-          //     {
-          //         X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-          //                                       si->srcRegIdx(0).index();
-          //         X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-          //                                       si->srcRegIdx(1).index();
-          //         X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-          //                                       si->destRegIdx(0).index();
-          //
-          //         if (dest < X86ISA::INTREG_RAX ||
-          //             dest >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //         if (src1 < X86ISA::INTREG_RAX ||
-          //             src1 >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //         if (src2 < X86ISA::INTREG_RAX ||
-          //             src2 >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //
-          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-          //         TheISA::PointerID _pid_src2 = tc->RegTrackTable[src2];
-          //
-          //
-          //         if (_pid_src1 != TheISA::PointerID(0) &&
-          //             _pid_src2 != TheISA::PointerID(0))
-          //         {
-          //             tc->RegTrackTable[dest] = TheISA::PointerID(0);
-          //         }
-          //         else if (_pid_src1 != TheISA::PointerID(0))
-          //         {
-          //             tc->RegTrackTable[dest] = _pid_src1;
-          //         }
-          //         else if (_pid_src2 != TheISA::PointerID(0)){
-          //             tc->RegTrackTable[dest] = _pid_src2;
-          //         }
-          //     }
-          // }
-          // else if ((si->getName().compare("andi") == 0))
-          // {
-          //     if (si->destRegIdx(0).isIntReg() &&
-          //         si->srcRegIdx(0).isIntReg())
-          //     {
-          //         X86ISA::IntRegIndex   src1 =
-          //                 (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
-          //         X86ISA::IntRegIndex   dest =
-          //                 (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-          //
-          //         if (dest < X86ISA::INTREG_RAX ||
-          //             dest >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //         if (src1 < X86ISA::INTREG_RAX ||
-          //             src1 >= X86ISA::NUM_INTREGS + 15)
-          //               return;
-          //
-          //         TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-          //         tc->RegTrackTable[dest] = _pid_src1;
-          //     }
-          // }
-          //
-          // else if ((si->getName().compare("addi") == 0) ||
-          //         (si->getName().compare("adci") == 0) ||
-          //         (si->getName().compare("subi") == 0) ||
-          //         (si->getName().compare("sbbi") == 0)
-          //         )
-          // {
-          //   if (si->destRegIdx(0).isIntReg() &&
-          //       si->srcRegIdx(0).isIntReg())
-          //   {
-          //       X86ISA::IntRegIndex   src1 =
-          //               (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
-          //       X86ISA::IntRegIndex   dest =
-          //               (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-          //
-          //       if (dest < X86ISA::INTREG_RAX ||
-          //           dest >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //       if (src1 < X86ISA::INTREG_RAX ||
-          //                   src1 >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //
-          //
-          //       TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-          //       tc->RegTrackTable[dest] = _pid_src1;
-          //   }
-          // }
-          //
-          // else if ((si->getName().compare("mov") == 0))
-          // {
-          //     if (si->destRegIdx(0).isIntReg() &&
-          //         si->srcRegIdx(1).isIntReg())
-          //     {
-          //       X86ISA::IntRegIndex   src1 =
-          //                   (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
-          //       X86ISA::IntRegIndex   dest =
-          //                   (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-          //       if (dest < X86ISA::INTREG_RAX ||
-          //           dest >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //       if (src1 < X86ISA::INTREG_RAX ||
-          //           src1 >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //
-          //       TheISA::PointerID _pid_src1 = tc->RegTrackTable[src1];
-          //       tc->RegTrackTable[dest] = _pid_src1;
-          //     }
-          //
-          // }
-          //
-          // else if ((si->getName().compare("ld") == 0) ||
-          //          (si->getName().compare("ldis") == 0))
-          // {
-          //     if (si->destRegIdx(0).isIntReg()){
-          //         X86ISA::IntRegIndex   dest =
-          //                 (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-          //         if (dest < X86ISA::INTREG_RAX ||
-          //             dest >= X86ISA::NUM_INTREGS + 15)
-          //             return;
-          //
-          //       tc->RegTrackTable[dest] = macroop_pid;
-          //
-          //     }
-          // }
+          if ((si->getName().compare("and") == 0)){
+
+              if (si->destRegIdx(0).isIntReg() &&
+                  si->srcRegIdx(0).isIntReg()  &&
+                  si->srcRegIdx(1).isIntReg())
+              {
+                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                                si->srcRegIdx(0).index();
+                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                                si->srcRegIdx(1).index();
+                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                                si->destRegIdx(0).index();
+                  if (dest < X86ISA::INTREG_RAX ||
+                      dest > X86ISA::NUM_INTREGS + 15)
+                        return;
+                  if (src1 < X86ISA::INTREG_RAX ||
+                      src1 > X86ISA::NUM_INTREGS + 15)
+                        return;
+                  if (src2 < X86ISA::INTREG_RAX ||
+                      src2 > X86ISA::NUM_INTREGS + 15)
+                        return;
+
+                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
+                  TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
+
+                  if (src1 == src2)
+                  {
+                    tc->PointerTrackerTable[dest] = _pid_src1;
+                  }
+                  else
+                  {
+                    if ( _pid_src1 != TheISA::PointerID(0) &&
+                         _pid_src2 == TheISA::PointerID(0))
+                    {
+                         tc->PointerTrackerTable[dest] = _pid_src1;
+                    }
+                    else if ( _pid_src1 == TheISA::PointerID(0) &&
+                              _pid_src2 != TheISA::PointerID(0))
+                    {
+                         tc->PointerTrackerTable[dest] = _pid_src2;
+                    }
+                    else
+                    {
+                         tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
+                    }
+                  }
+               }
+          }
+          else if ((si->getName().compare("xor") == 0)){
+            if (si->destRegIdx(0).isIntReg() &&
+                si->srcRegIdx(0).isIntReg()  &&
+                si->srcRegIdx(1).isIntReg())
+            {
+                X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                            si->srcRegIdx(0).index();
+                X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                            si->srcRegIdx(1).index();
+                X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                            si->destRegIdx(0).index();
+
+                if (dest < X86ISA::INTREG_RAX ||
+                    dest >= X86ISA::NUM_INTREGS + 15)
+                      return;
+                if (src1 < X86ISA::INTREG_RAX ||
+                    src1 >= X86ISA::NUM_INTREGS + 15)
+                      return;
+                if (src2 < X86ISA::INTREG_RAX ||
+                    src2 >= X86ISA::NUM_INTREGS + 15)
+                      return;
+
+                tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
+            }
+
+          }
+          else if ((si->getName().compare("sub") == 0) ||
+                   (si->getName().compare("sbb") == 0))
+          {
+              if (si->destRegIdx(0).isIntReg() &&
+                  si->srcRegIdx(0).isIntReg()  &&
+                  si->srcRegIdx(1).isIntReg())
+              {
+                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                                si->srcRegIdx(0).index();
+                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                                si->srcRegIdx(1).index();
+                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                                si->destRegIdx(0).index();
+
+                  if (dest < X86ISA::INTREG_RAX ||
+                      dest >= X86ISA::NUM_INTREGS + 15)
+                        return;
+                  if (src1 < X86ISA::INTREG_RAX ||
+                      src1 >= X86ISA::NUM_INTREGS + 15)
+                        return;
+                  if (src2 < X86ISA::INTREG_RAX ||
+                      src2 >= X86ISA::NUM_INTREGS + 15)
+                        return;
+
+                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
+                  TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
+
+                  if (_pid_src1 != TheISA::PointerID(0) &&
+                      _pid_src2 != TheISA::PointerID(0))
+                  {
+                      tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
+                  }
+                  else if (_pid_src1 != TheISA::PointerID(0))
+                  {
+                      tc->PointerTrackerTable[dest] = _pid_src1;
+                  }
+                  else if (_pid_src2 != TheISA::PointerID(0))
+                  {
+                      tc->PointerTrackerTable[dest] = _pid_src2;
+                  }
+            }
+          }
+          else if ((si->getName().compare("add") == 0) ||
+                   (si->getName().compare("adc") == 0))
+          {
+              if (si->destRegIdx(0).isIntReg() &&
+                  si->srcRegIdx(0).isIntReg()  &&
+                  si->srcRegIdx(1).isIntReg())
+              {
+                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
+                                                si->srcRegIdx(0).index();
+                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
+                                                si->srcRegIdx(1).index();
+                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
+                                                si->destRegIdx(0).index();
+
+                  if (dest < X86ISA::INTREG_RAX ||
+                      dest >= X86ISA::NUM_INTREGS + 15)
+                        return;
+                  if (src1 < X86ISA::INTREG_RAX ||
+                      src1 >= X86ISA::NUM_INTREGS + 15)
+                        return;
+                  if (src2 < X86ISA::INTREG_RAX ||
+                      src2 >= X86ISA::NUM_INTREGS + 15)
+                        return;
+
+                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
+                  TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
+
+
+                  if (_pid_src1 != TheISA::PointerID(0) &&
+                      _pid_src2 != TheISA::PointerID(0))
+                  {
+                      tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
+                  }
+                  else if (_pid_src1 != TheISA::PointerID(0))
+                  {
+                      tc->PointerTrackerTable[dest] = _pid_src1;
+                  }
+                  else if (_pid_src2 != TheISA::PointerID(0)){
+                      tc->PointerTrackerTable[dest] = _pid_src2;
+                  }
+              }
+          }
+          else if ((si->getName().compare("andi") == 0))
+          {
+              if (si->destRegIdx(0).isIntReg() &&
+                  si->srcRegIdx(0).isIntReg())
+              {
+                  X86ISA::IntRegIndex   src1 =
+                          (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
+                  X86ISA::IntRegIndex   dest =
+                          (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+
+                  if (dest < X86ISA::INTREG_RAX ||
+                      dest >= X86ISA::NUM_INTREGS + 15)
+                        return;
+                  if (src1 < X86ISA::INTREG_RAX ||
+                      src1 >= X86ISA::NUM_INTREGS + 15)
+                        return;
+
+                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
+                  tc->PointerTrackerTable[dest] = _pid_src1;
+              }
+          }
+
+          else if ((si->getName().compare("addi") == 0) ||
+                  (si->getName().compare("adci") == 0) ||
+                  (si->getName().compare("subi") == 0) ||
+                  (si->getName().compare("sbbi") == 0)
+                  )
+          {
+            if (si->destRegIdx(0).isIntReg() &&
+                si->srcRegIdx(0).isIntReg())
+            {
+                X86ISA::IntRegIndex   src1 =
+                        (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
+                X86ISA::IntRegIndex   dest =
+                        (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+
+                if (dest < X86ISA::INTREG_RAX ||
+                    dest >= X86ISA::NUM_INTREGS + 15)
+                      return;
+                if (src1 < X86ISA::INTREG_RAX ||
+                            src1 >= X86ISA::NUM_INTREGS + 15)
+                      return;
+
+
+                TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
+                tc->PointerTrackerTable[dest] = _pid_src1;
+            }
+          }
+
+          else if ((si->getName().compare("mov") == 0))
+          {
+              if (si->destRegIdx(0).isIntReg() &&
+                  si->srcRegIdx(1).isIntReg())
+              {
+                X86ISA::IntRegIndex   src1 =
+                            (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
+                X86ISA::IntRegIndex   dest =
+                            (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+                if (dest < X86ISA::INTREG_RAX ||
+                    dest >= X86ISA::NUM_INTREGS + 15)
+                      return;
+                if (src1 < X86ISA::INTREG_RAX ||
+                    src1 >= X86ISA::NUM_INTREGS + 15)
+                      return;
+
+                TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
+                tc->PointerTrackerTable[dest] = _pid_src1;
+              }
+
+          }
+
+          else if ((si->getName().compare("ld") == 0) ||
+                   (si->getName().compare("ldis") == 0))
+          {
+              if (si->destRegIdx(0).isIntReg()){
+                  X86ISA::IntRegIndex   dest =
+                          (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+                  if (dest < X86ISA::INTREG_RAX ||
+                      dest >= X86ISA::NUM_INTREGS + 15)
+                      return;
+
+                tc->PointerTrackerTable[dest] = macroop_pid;
+
+              }
+          }
 
 
           if (si->isLastMicroop()){

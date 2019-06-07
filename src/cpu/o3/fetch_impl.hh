@@ -1207,15 +1207,15 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, Stat
         if (syms_it != (tc->syms_cache).end()){
             si->injectMicroops(tc, thisPC, syms_it->second);
         }
-        // else {
-        //       si->updatePointerTracker(tc,thisPC);
-        //       if (si->injectCheckMicroops())
-        //         si->injectMicroops(tc,
-        //                            thisPC,
-        //                            TheISA::CheckType::AP_BOUNDS_INJECT
-        //                           );
-        //
-        // }
+        else {
+              si->updatePointerTracker(tc,thisPC);
+              if (si->injectCheckMicroops())
+                si->injectMicroops(tc,
+                                   thisPC,
+                                   TheISA::CheckType::AP_BOUNDS_INJECT
+                                  );
+
+        }
 
 
 }

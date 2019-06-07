@@ -1556,13 +1556,18 @@ DefaultIEW<Impl>::writebackInsts()
 
             if (tc->enableCapability){
 
+              // only stores can update ExeAliasTable
               if (inst->isStore())
               {
                 updateAliasTable(inst->threadNumber, inst);
               }
-
+              //for all instructions
               updateStackAliasTable(inst->threadNumber, inst);
 
+              // only check for mememory refrence instuctions
+              if (inst->isMemRef()){
+                checkAccuracy(inst->threadNumber,inst);
+              }
             }
 
             for (int i = 0; i < inst->numDestRegs(); i++) {
@@ -1797,12 +1802,6 @@ DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
        }
     }
 
-    //update the PointerTracker
-    //if (tc->enableCapability){
-      //tc->RegTrackTable = tc->CommitPointerTracker;
-    //}
-
-
 }
 
 
@@ -1854,6 +1853,8 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         tc->CapRegsFile[_pid].seqNum = inst->seqNum;
 
         tc->ExeStopTracking = false;
+        // rax now is a pointer
+        tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
 
     }
 
@@ -1898,7 +1899,8 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         }
 
         tc->ExeStopTracking = true;
-
+        // RDI is not a pointer anymore
+        tc->PointerTrackerTable[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
 
     }
     else if (inst->isFreeRetMicroop()){
@@ -1911,6 +1913,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       // do nothing, just start tracking again.
       // in commit we will check whether freeing was succesful or not
       tc->ExeStopTracking = false;
+
     }
 
   }
@@ -2107,4 +2110,51 @@ DefaultIEW<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &inst)
 
 }
 
+
+template <class Impl>
+void
+DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
+{
+    //ThreadContext * tc = cpu->tcBase(tid);
+    const StaticInstPtr si = inst->staticInst;
+  //let's see whether this is a heap access or not
+    //heap accesses can be made only with ld
+    if ((si->getName().compare("ld") == 0) ||
+        (si->getName().compare("st") == 0)){
+        if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
+          // src reg is not rsp which is always for stack
+            cpu->ldsWithPid++;
+            TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
+            if (_pid != TheISA::PointerID(0)){ // heap access?
+              cpu->heapAccesses++;
+              if (inst->staticInst->uop_pid == _pid){
+                // correct guess
+                cpu->truePredection++;
+                inst->staticInst->checked = true;
+              }
+              else {
+                // this is heap access and we have miss prediction
+                ///cpu->updateFetchLVPT(inst, _pid, false);
+                 cpu->HeapPnAm++;
+                 inst->staticInst->uop_pid = _pid;
+                 inst->staticInst->checked = true;
+              }
+            }
+            else {
+              // this is not a heap but we need to make sure that
+              // we did not accidentaly assign a PID to it
+              if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
+                cpu->truePredection++;
+                inst->staticInst->checked = true;
+              }
+              else {
+                cpu->HeapPnA0++;
+                inst->staticInst->uop_pid = TheISA::PointerID(0);
+                inst->staticInst->checked = true;
+              }
+
+            }
+         }
+    }
+}
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

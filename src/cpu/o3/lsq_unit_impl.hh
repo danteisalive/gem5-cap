@@ -1923,15 +1923,16 @@ LSQUnit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
 
 template <class Impl>
 void
-LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
+LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &inst)
 {
 
   ThreadContext * tc = cpu->tcBase(tid);
-  const StaticInstPtr si = head_inst->staticInst;
+  const StaticInstPtr si = inst->staticInst;
 
 
   // sanitization
-  if (head_inst->isMicroopInjected()) return;
+  if (inst->isBoundsCheckMicroop()) return;
+  if (inst->isMicroopInjected()) return;
   if (tc->ExeStopTracking) return;
 
 
@@ -1939,13 +1940,13 @@ LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
       (si->getName().compare("ldis") == 0))
   {
 
-    if (head_inst->destRegIdx(0).isIntReg()){
+    if (inst->destRegIdx(0).isIntReg()){
         X86ISA::IntRegIndex   dest =
-                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
+                        (X86ISA::IntRegIndex)inst->destRegIdx(0).index();
         if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
             return;
 
-      auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
+      auto mtt_it = tc->CommitAliasTable.find(inst->effAddr);
       if (mtt_it != tc->CommitAliasTable.end()){
         //  tc->CommitPointerTracker[dest] = mtt_it->second;
       }
@@ -1958,51 +1959,4 @@ LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
 
 }
 
-template <class Impl>
-void
-LSQUnit<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
-{
-    //ThreadContext * tc = cpu->tcBase(tid);
-    const StaticInstPtr si = inst->staticInst;
-  //let's see whether this is a heap access or not
-    //heap accesses can be made only with ld
-    if (si->getName().compare("ld") == 0){
-        X86ISA::IntRegIndex   src_reg =
-                   (X86ISA::IntRegIndex)inst->srcRegIdx(1).index();
-        if (src_reg != X86ISA::INTREG_RSP){
-          // src reg is not rsp which is always for stack
-            cpu->ldsWithPid++;
-            TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
-            if (_pid != TheISA::PointerID(0)){ // heap access?
-              cpu->heapAccesses++;
-              if (inst->staticInst->uop_pid == _pid){
-                // correct guess
-                cpu->truePredection++;
-                inst->staticInst->checked = true;
-              }
-              else {
-                // this is heap access and we have miss prediction
-                ///cpu->updateFetchLVPT(inst, _pid, false);
-                 cpu->HeapPnAm++;
-                 inst->staticInst->uop_pid = _pid;
-                 inst->staticInst->checked = true;
-              }
-            }
-            else {
-              // this is not a heap but we need to make sure that
-              // we did not accidentaly assign a PID to it
-              if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
-                cpu->truePredection++;
-                inst->staticInst->checked = true;
-              }
-              else {
-                cpu->HeapPnA0++;
-                inst->staticInst->uop_pid = TheISA::PointerID(0);
-                inst->staticInst->checked = true;
-              }
-
-            }
-         }
-    }
-}
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

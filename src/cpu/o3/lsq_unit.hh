@@ -190,8 +190,6 @@ class LSQUnit {
 
     bool checkPIDMisprediction() { return loadWithWrongPID;}
 
-    void checkAccuracy(ThreadID tid, DynInstPtr &head_inst);
-
     DynInstPtr getMemWithWrongPID();
     void squashExecuteAliasTable(
                 DynInstPtr &inst, const InstSeqNum &squashed_num
