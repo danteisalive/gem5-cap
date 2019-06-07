@@ -78,6 +78,9 @@ namespace X86ISA
 
         std::string generateDisassembly(Addr pc,
             const SymbolTable *symtab) const;
+
+        public:
+          uint8_t getDataSize(){return dataSize;}
     };
 }
 

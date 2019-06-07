@@ -354,11 +354,10 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual RegIndex getIndex();
     virtual RegIndex getBase();
     virtual uint8_t getSegment();
-    virtual uint8_t getMemOpDataSize();
+    virtual uint8_t getDataSize();
     virtual uint8_t getAddressSize();
     virtual Request::FlagsType getMemFlags();
     virtual RegIndex getMemOpDataRegIndex();
-    virtual uint8_t getRegOpDataSize();
     virtual RegIndex getRegOpSrc1RegIdx();
     virtual RegIndex getRegOpSrc2RegIdx();
     virtual RegIndex getRegOpDestRegIdx();

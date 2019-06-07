@@ -111,6 +111,8 @@ DefaultIEW<Impl>::DefaultIEW(O3CPU *_cpu, DerivO3CPUParams *params)
     updateLSQNextCycle = false;
 
     skidBufferMax = (renameToIEWDelay + 1) * params->renameWidth;
+
+    prevRSPValue = 0;
 }
 
 template <class Impl>
@@ -1339,11 +1341,6 @@ DefaultIEW<Impl>::executeInsts()
                 // event adds the instruction to the queue to commit
                 fault = ldstQueue.executeLoad(inst);
 
-                // if (tc->enableCapability && inst->isBoundsCheckMicroop()){
-                //     inst->fault = NoFault;
-                //     continue;
-                // }
-
                 if (inst->isTranslationDelayed() &&
                     fault == NoFault) {
                     // A hw page table walk is currently going on; the
@@ -1399,6 +1396,7 @@ DefaultIEW<Impl>::executeInsts()
                 if (inst->isMicroopInjected()){
                    collector(tid, inst);
                 }
+
                 if (!inst->readPredicate())
                     inst->forwardOldRegs();
             }
@@ -1544,6 +1542,7 @@ DefaultIEW<Impl>::writebackInsts()
         // instruction.
         ppToCommit->notify(inst);
 
+
         // Some instructions will be sent to commit without having
         // executed because they need commit to handle them.
         // E.g. Strictly ordered loads have not actually executed when they
@@ -1551,6 +1550,20 @@ DefaultIEW<Impl>::writebackInsts()
         // when it's ready to execute the strictly ordered load.
         if (!inst->isSquashed() && inst->isExecuted() && inst->getFault() == NoFault) {
             int dependents = instQueue.wakeDependents(inst);
+
+           //update the execute alias table with any new executed store
+            ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+
+            if (tc->enableCapability){
+
+              if (inst->isStore())
+              {
+                updateAliasTable(inst->threadNumber, inst);
+              }
+
+              updateStackAliasTable(inst->threadNumber, inst);
+
+            }
 
             for (int i = 0; i < inst->numDestRegs(); i++) {
                 //mark as Ready
@@ -1767,18 +1780,6 @@ DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
 
 template <class Impl>
 void
-DefaultIEW<Impl>::updateTracker(ThreadID tid, DynInstPtr &inst)
-{
-    ThreadContext * tc = cpu->tcBase(tid);
-
-    if (tc->ExeStopTracking){
-        std::cout << inst->pcState() << " " << inst->seqNum << std::endl;
-    }
-
-}
-
-template <class Impl>
-void
 DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
 {
     ThreadContext * tc = cpu->tcBase(inst->threadNumber);
@@ -1912,6 +1913,169 @@ DefaultIEW<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
   }
 
   return _pid;
+}
+
+
+
+template <class Impl>
+void
+DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
+{
+  #define ENABLE_EXE_ALIAS_TABLE_DEBUG 1
+
+  ThreadContext * tc = cpu->tcBase(tid);
+  const StaticInstPtr si = inst->staticInst;
+
+
+  if (inst->isMicroopInjected()) return;
+  if (inst->isBoundsCheckMicroop()) return;
+  if (tc->ExeStopTracking) return;   // dont care about AP functions
+
+  //this should be replaced by isStore()
+  if ((si->getName().compare("st") == 0) ||
+      (si->getName().compare("stis") == 0)){
+
+       // datasize should be 4/8 bytes othersiwe it's not a base address
+       if (si->getDataSize() < 4) return;
+       // return if store is not pointed to a DS or SS section
+       if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
+           si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+       //  to our knowledge:
+       // (base < 16) and base == 32 could be used for addresing.
+       // igonre stores which don't use these regs
+       RegIndex baseRegInx = si->getBase();
+       if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
+            (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
+
+       if (!inst->srcRegIdx(2).isIntReg()) return; // this is the dest reg
+       RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
+
+       if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
+
+       // srcReg[2] in store microops is the register that
+       //we want to write its value to mem
+       uint64_t  dataRegContent =
+                    inst->readIntRegOperand(inst->staticInst.get(),2);
+
+       // check if this is a base address or not
+       TheISA::PointerID _pid = TheISA::PointerID(0);
+       for (auto& capElem : tc->CapRegsFile){
+            if (capElem.second.getBaseAddr() == dataRegContent){
+                _pid = capElem.first;
+                break;
+            }
+       }
+
+        // finally if it's a base adress write it in the execute alias table
+        if (_pid != TheISA::PointerID(0))
+        {
+          if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
+            {std::cout << "IEW: updateAliasTable" <<
+            inst->pcState() << " " <<
+            si->disassemble(inst->pcState().pc()) <<
+            " Base: " << si->getBase() <<
+            " Dest: " << si->getMemOpDataRegIndex() <<
+            " src2 idx: "  << inst->srcRegIdx(2).index() <<
+            " src2: " << std::hex <<
+            inst->readIntRegOperand(inst->staticInst.get(),2) << std::dec <<
+            " PID: " << _pid <<
+            std::endl;}
+            //put it into exe alias table and later in commit delete it
+            tc->ExecuteAliasTable[inst->effAddr].pid = _pid ;
+            tc->ExecuteAliasTable[inst->effAddr].seqNum = inst->seqNum;
+        }
+        // if this address holds a pid(0) then remove it!
+        else if (tc->ExecuteAliasTable.find(inst->effAddr) !=
+                                      tc->ExecuteAliasTable.end())
+        {
+          tc->ExecuteAliasTable.erase(inst->effAddr);
+        }
+
+  }
+
+}
+
+
+
+// this function will be called in writeback like updateAliasTable
+// we know that if an instruction updates the RSP/ESP reg, then defenitly
+// all the instructions dependent on this on RSP before this instrcution
+// are executed. So, we can safely update our exe_alias_table
+template <class Impl>
+void
+DefaultIEW<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &inst)
+{
+    #define ENABLE_EXE_STACK_ALIAS_TABLE_DEBUG 0
+
+    ThreadContext * tc = cpu->tcBase(tid);
+    const StaticInstPtr si = inst->staticInst;
+
+    if (inst->isMicroopInjected()) return;
+    if (inst->isBoundsCheckMicroop()) return;
+    //if (tc->ExeStopTracking) return;
+
+    // a little speeding things up
+    // is inst integer?
+    if (!inst->isInteger()) return;
+    // is dataszie >=4 ?
+    if (si->getDataSize() < 4) {
+      if (si->getDataSize() == 0){
+        if (ENABLE_EXE_STACK_ALIAS_TABLE_DEBUG)
+        {
+            std::cout << "updateStackAliasTable: " <<
+                inst->pcState() << " " <<
+                si->disassemble(inst->pcState().pc()) <<
+                std::endl;
+        }
+      }
+      return;
+    }
+
+    // for every dest reg of the insturction:
+    // if its integer and equals to RSP/ESP then update alias table
+    // we are sure that we can only have one RSP dest reg
+    int i;
+    for (i = 0; i < inst->numDestRegs(); i++) {
+        // is dest int ?
+        if (!inst->destRegIdx(i).isIntReg()) continue;
+        // is the reg RSP/ESP?
+        if (inst->destRegIdx(i).index() == X86ISA::INTREG_RSP) {
+          if (ENABLE_EXE_STACK_ALIAS_TABLE_DEBUG)
+          {std::cout << inst->pcState() << " " <<
+            si->disassemble(inst->pcState().pc()) <<
+            std::endl;}
+
+          break;
+        }
+
+    }
+
+    if (i == inst->numDestRegs()) return; // non of the dest regs are RSP/ESP
+
+    uint64_t newRSPValue = inst->readDestReg(si.get(), i);
+    if (prevRSPValue < newRSPValue){
+        auto exe_low_it =
+                  tc->ExecuteAliasTable.lower_bound(prevRSPValue);
+        if ((exe_low_it != tc->ExecuteAliasTable.end())){
+
+          auto exe_high_it =
+                    tc->ExecuteAliasTable.upper_bound(newRSPValue-1);
+
+          if ((exe_high_it != tc->ExecuteAliasTable.end())){
+             tc->ExecuteAliasTable.erase(exe_low_it,exe_high_it);
+          }
+          else {
+              tc->ExecuteAliasTable.erase(
+                                        exe_low_it,
+                                        tc->ExecuteAliasTable.end()
+                                        );
+          }
+
+        }
+    }
+
+    prevRSPValue = newRSPValue;
+
 }
 
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

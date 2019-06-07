@@ -84,7 +84,7 @@ namespace X86ISA
             return dest;
           }
 
-          uint8_t getRegOpDataSize(){
+          uint8_t getDataSize(){
             return dataSize;
           }
     };
@@ -93,7 +93,7 @@ namespace X86ISA
     {
       protected:
         const RegIndex src2;
-
+        const uint8_t dataSize;
         // Constructor
         RegOp(ExtMachInst _machInst,
                 const char *mnem, const char *_instMnem, uint64_t setFlags,
@@ -103,7 +103,7 @@ namespace X86ISA
             RegOpBase(_machInst, mnem, _instMnem, setFlags,
                     _src1, _dest, _dataSize, _ext,
                     __opClass),
-            src2(_src2.index())
+            src2(_src2.index()), dataSize(_dataSize)
         {
         }
 
@@ -115,6 +115,9 @@ namespace X86ISA
         RegIndex getRegOpSrc2RegIdx(){
           return src2;
         }
+        uint8_t getDataSize(){
+          return dataSize;
+        }
 
 
     };
@@ -123,7 +126,7 @@ namespace X86ISA
     {
       protected:
         const uint8_t imm8;
-
+        const uint8_t dataSize;
         // Constructor
         RegOpImm(ExtMachInst _machInst,
                 const char * mnem, const char *_instMnem, uint64_t setFlags,
@@ -133,12 +136,17 @@ namespace X86ISA
             RegOpBase(_machInst, mnem, _instMnem, setFlags,
                     _src1, _dest, _dataSize, _ext,
                     __opClass),
-            imm8(_imm8)
+            imm8(_imm8), dataSize(_dataSize)
         {
         }
 
         std::string generateDisassembly(Addr pc,
             const SymbolTable *symtab) const;
+
+      public:
+        uint8_t getDataSize(){
+          return dataSize;
+        }
     };
 }
 

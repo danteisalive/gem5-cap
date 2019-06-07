@@ -315,6 +315,7 @@ class DefaultCommit
     void updatePointerTracker(ThreadID tid, DynInstPtr &head_inst);
     void updateAliasTable(ThreadID tid, DynInstPtr &head_inst);
     TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
+    void updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst);
     /** Gets the thread to commit, based on the SMT policy. */
     ThreadID getCommittingThread();
 

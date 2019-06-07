@@ -231,10 +231,11 @@ class DefaultIEW
 
     /** Check misprediction  */
     void checkMisprediction(DynInstPtr &inst);
-    void updateTracker(ThreadID tid, DynInstPtr &head_inst);
+    void updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst);
     void squashExecuteAliasTable(DynInstPtr &inst);
     void collector(ThreadID tid, DynInstPtr &head_inst);
     TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
+    void updateAliasTable(ThreadID tid, DynInstPtr &inst);
   private:
     /** Sends commit proper information for a squash due to a branch
      * mispredict.
@@ -368,6 +369,8 @@ class DefaultIEW
      * IEW knows if there will be activity on the next cycle.
      */
     bool updateLSQNextCycle;
+
+    uint64_t prevRSPValue;
 
   private:
     /** Records if there is a fetch redirect on this cycle for each thread. */

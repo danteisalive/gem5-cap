@@ -27,10 +27,11 @@ bool MacroopBase::filterInst(ThreadContext * tc) {
 }
 
 void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
-  {
-      if (_isInjected) panic("tracking an injected microp!");
+{
+      if (_isInjected) panic("tracking an injected macroop!");
 
-      if (tc->stopTracking) return; //OK
+      // this is probably a a little late but still can be effective
+      if (tc->ExeStopTracking) return;
       // its like we are executing microps here
       for (size_t i = 0; i < numMicroops; i++) {
           const StaticInstPtr si = microops[i];
@@ -45,8 +46,9 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
            if (si->isLoad() && !si->checked)
            {
                 int base = si->getBase();
-                if ((base != 4) &&
-                   ((base >=0 && base <= 15) || (base == 23)))
+                if ((base != INTREG_RSP) &&
+                    ((base < X86ISA::NUM_INTREGS) ||
+                     (base == X86ISA::NUM_INTREGS + 7)))
                 {
                     if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
                     {
@@ -61,9 +63,16 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
            }
            else if (si->isStore() && !si->checked)
            {
+               // std::cout << "Fetch: " << nextPC << " " <<
+               //si->disassemble(nextPC.pc()) <<
+               // " Base: " << si->getBase() << " Dest: " <<
+               //si->getMemOpDataRegIndex() <<
+               // std::endl;
+
                int base = si->getBase();
-               if ((base != 4) &&
-                   ((base >=0 && base <= 15) || (base == 23)))
+               if ((base != INTREG_RSP) &&
+                   ((base < X86ISA::NUM_INTREGS) ||
+                    (base == X86ISA::NUM_INTREGS + 7)))
                {
                    if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
                    {
@@ -332,7 +341,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 
        }
 
-  }
+}
 
 
 bool MacroopBase::injectCheckMicroops(){

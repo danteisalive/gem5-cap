@@ -1302,59 +1302,10 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
       cpu->updatePIDHistory(head_inst);
     }
 
-    #define ENABLE_CAPABILITY_DEBUG 0
-    //ThreadContext * tc = cpu->tcBase(tid);
-
-    if (tc->enableCapability){
-
-        uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
-        if (prevRSPValue < newRSPValue){
-
-            auto commit_low_it =
-                      tc->CommitAliasTable.lower_bound(prevRSPValue);
-            if ((commit_low_it != tc->CommitAliasTable.end())){
-
-              auto commit_high_it =
-                        tc->CommitAliasTable.upper_bound(newRSPValue-1);
-
-              if ((commit_high_it != tc->CommitAliasTable.end())){
-                 tc->CommitAliasTable.erase(commit_low_it,commit_high_it);
-              }
-              else {
-                  tc->CommitAliasTable.erase(
-                                            commit_low_it,
-                                            tc->CommitAliasTable.end()
-                                            );
-              }
-
-            }
-
-            auto exe_low_it =
-                      tc->ExecuteAliasTable.lower_bound(prevRSPValue);
-            if ((exe_low_it != tc->ExecuteAliasTable.end())){
-
-              auto exe_high_it =
-                        tc->ExecuteAliasTable.upper_bound(newRSPValue-1);
-
-              if ((exe_high_it != tc->ExecuteAliasTable.end())){
-                 tc->ExecuteAliasTable.erase(exe_low_it,exe_high_it);
-              }
-              else {
-                  tc->ExecuteAliasTable.erase(
-                                            exe_low_it,
-                                            tc->ExecuteAliasTable.end()
-                                            );
-              }
-
-            }
-
-        }
-
-        prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
-    }
-
     if (tc->enableCapability){
       collector(tid, head_inst);
+      updateAliasTable(tid, head_inst);
+      updateStackAliasTable(tid,head_inst);
     }
 
 
@@ -1377,7 +1328,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     if (tc->enableCapability){
 
-        //updateAliasTable(tid, head_inst);
+
         //updatePointerTracker(tid, head_inst);
 
         if ((uint64_t)cpu->thread[tid]->numInsts.value() % 1000000 == 0 &&
@@ -1490,8 +1441,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
   ThreadContext * tc = cpu->tcBase(tid);
 
-  if (tc->enableCapability){
-
     if (inst->isMallocSizeCollectorMicroop()){
       if (ENABLE_COLLECTOR_DEBUG)
         {std::cout << std::hex << "COMMIT: MALLOC SIZE: " <<
@@ -1510,6 +1459,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         assert(tc->CapRegsFile[_pid].getSize() == _pid_size);
 
         //tc->CapRegsFile[_pid].setCSRBit(2); //Commit Size Pickup
+        tc->CommitStopTracking = true;
 
       }
 
@@ -1532,6 +1482,8 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         // now the cap is commited
         tc->CapRegsFile[_pid].setCSRBit(0); //Commit Base Pickup
+
+        tc->CommitStopTracking = false;
 
 
     }
@@ -1557,6 +1509,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
           // now remove it
           tc->CapRegsFile.erase(_pid);
       }
+      tc->CommitStopTracking = true;
 
     }
     else if (inst->isFreeRetMicroop()){
@@ -1566,14 +1519,67 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                 " " << inst->seqNum <<
                 std::endl;}
-      // do nothing
+      // do nothing just start tracking again
+      tc->CommitStopTracking = true;
     }
-
-
-  }
 
 }
 
+template <class Impl>
+void
+DefaultCommit<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &inst)
+{
+    ThreadContext * tc = cpu->tcBase(tid);
+
+    if (inst->isMicroopInjected()) return;
+    if (inst->isBoundsCheckMicroop()) return;
+
+    uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
+    if (prevRSPValue < newRSPValue){
+
+          auto commit_low_it =
+                    tc->CommitAliasTable.lower_bound(prevRSPValue);
+          if ((commit_low_it != tc->CommitAliasTable.end())){
+
+            auto commit_high_it =
+                      tc->CommitAliasTable.upper_bound(newRSPValue-1);
+
+            if ((commit_high_it != tc->CommitAliasTable.end())){
+               tc->CommitAliasTable.erase(commit_low_it,commit_high_it);
+            }
+            else {
+                tc->CommitAliasTable.erase(
+                                          commit_low_it,
+                                          tc->CommitAliasTable.end()
+                                          );
+            }
+
+          }
+
+          auto exe_low_it =
+                    tc->ExecuteAliasTable.lower_bound(prevRSPValue);
+          if ((exe_low_it != tc->ExecuteAliasTable.end())){
+
+            auto exe_high_it =
+                      tc->ExecuteAliasTable.upper_bound(newRSPValue-1);
+
+            if ((exe_high_it != tc->ExecuteAliasTable.end())){
+               tc->ExecuteAliasTable.erase(exe_low_it,exe_high_it);
+            }
+            else {
+                tc->ExecuteAliasTable.erase(
+                                          exe_low_it,
+                                          tc->ExecuteAliasTable.end()
+                                          );
+            }
+
+          }
+
+    }
+
+      prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
+
+}
 
 template <class Impl>
 TheISA::PointerID
@@ -1604,7 +1610,7 @@ DefaultCommit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
   // sanitization
   if (head_inst->isMicroopInjected()) return;
     if (head_inst->isBoundsCheckMicroop()) return;
-  if (tc->stopTracking) return;
+  if (tc->CommitStopTracking) return;
 
 
   if ((si->getName().compare("ld") == 0) ||
@@ -1645,56 +1651,94 @@ void
 DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
 {
 
+  #define ENABLE_COMMIT_ALIAS_TABLE_DEBUG 1
+
   ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = head_inst->staticInst;
 
   // sanitization
   if (head_inst->isMicroopInjected()) return;
   if (head_inst->isBoundsCheckMicroop()) return;
-  if (tc->stopTracking) return;
+  if (tc->CommitStopTracking) return;
 
 
 
   if ((si->getName().compare("st") == 0) ||
       (si->getName().compare("stis") == 0)){
 
-      if (head_inst->srcRegIdx(2).isIntReg()){
+        // datasize should be 4/8 bytes othersiwe it's not a base address
+        if (si->getDataSize() < 4) return;
+        // return if store is not pointed to a DS or SS section
+        if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
+            si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+        //  to our knowledge:
+        // (base < 16) and base == 32 could be used for addresing.
+        // igonre stores which don't use these regs
+        RegIndex baseRegInx = si->getBase();
+        if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
+             (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
 
-        X86ISA::IntRegIndex   src2 =
-                        (X86ISA::IntRegIndex)head_inst->srcRegIdx(2).index();
-        if (src2 < X86ISA::INTREG_RAX ||
-            src2 >= X86ISA::NUM_INTREGS + 15)
-            return;
+        // this is the dest reg
+        if (!head_inst->srcRegIdx(2).isIntReg()) return;
+        RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
 
-        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
+        if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
+
+        // srcReg[2] in store microops is the register that
+        //we want to write its value to mem
+        uint64_t  dataRegContent =
+                  head_inst->readIntRegOperand(head_inst->staticInst.get(),2);
+
+        // check if this is a base address or not
         TheISA::PointerID _pid = TheISA::PointerID(0);
         for (auto& capElem : tc->CapRegsFile){
-            if (capElem.second.getBaseAddr() == archRegContent){
-                _pid = capElem.first;
-                break;
-            }
+             if (capElem.second.getBaseAddr() == dataRegContent){
+                 _pid = capElem.first;
+                 break;
+             }
         }
 
 
         if (_pid != TheISA::PointerID(0))
         {
+            if (ENABLE_COMMIT_ALIAS_TABLE_DEBUG)
+              {std::cout << "Commit: updateAliasTable: " <<
+                head_inst->pcState() << " " <<
+                si->disassemble(head_inst->pcState().pc()) <<
+                " Base: " << si->getBase() <<
+                " Dest: " << si->getMemOpDataRegIndex() <<
+                " src2 idx: "  << head_inst->srcRegIdx(2).index() <<
+                " src2: " << std::hex <<
+                head_inst->readIntRegOperand(head_inst->staticInst.get(),2) <<
+                std::dec << " PID: " << _pid <<
+                std::endl;
+              }
+            //update Commit Alias Table
             tc->CommitAliasTable[head_inst->effAddr] = _pid;
+            // if there is a same update in Exe Alias Table
+            // find it and remove it as it's in the commit alias table now
             auto exe_alias_table =
                 tc->ExecuteAliasTable.find(head_inst->effAddr);
             if (exe_alias_table != tc->ExecuteAliasTable.end()){
               if (exe_alias_table->second.seqNum == head_inst->seqNum){
+                  if (ENABLE_COMMIT_ALIAS_TABLE_DEBUG){
+                    std::cout << "Commit: updateAliasTable: " <<
+                        head_inst->pcState() << " " <<
+                        "removing "<< _pid << " from ExeAliasTable!" <<
+                        std::endl;
+                  }
                   tc->ExecuteAliasTable.erase(head_inst->effAddr);
               }
             }
+
         }
+        // if this address holds a pid(0) then remove it!
         else if (tc->CommitAliasTable.find(head_inst->effAddr) !=
                                                     tc->CommitAliasTable.end())
         {
           tc->CommitAliasTable.erase(head_inst->effAddr);
         }
       }
-  }
-
 
 }
 

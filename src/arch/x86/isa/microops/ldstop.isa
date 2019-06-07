@@ -265,6 +265,11 @@ def template MicroStoreInitiateAcc {{
         }
 */
 
+        ThreadContext * tc = xc->tcBase();
+        if (tc->enableCapability && isBoundsCheckMicroop()){
+             return NoFault;
+        }
+
         if (fault == NoFault) {
             fault = writeMemTiming(xc, traceData, Mem, dataSize, EA,
                                    memFlags, NULL);

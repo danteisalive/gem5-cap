@@ -86,6 +86,7 @@ namespace X86ISA
         {
             return ext & MediaSignedOp;
         }
+
     };
 
     class MediaOpReg : public MediaOpBase

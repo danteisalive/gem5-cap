@@ -208,7 +208,6 @@ LSQUnit<Impl>::resetState()
     memDepViolator = NULL;
 
     loadWithWrongPID = NULL;
-    prevRSPValue = 0;
 
     stalled = false;
 
@@ -1034,8 +1033,6 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
     Fault store_fault = store_inst->initiateAcc();
 
 
-     ThreadContext * tc = cpu->tcBase(tid);
-
 
     if (store_inst->isTranslationDelayed() &&
         store_fault == NoFault)
@@ -1066,10 +1063,6 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
     }
 
     panic_if(!store_inst->effAddrValid(), "store effAddr is not valid!");
-
-     if (tc->enableCapability){
-    //   updateAliasTable( tid, store_inst);
-     }
 
     return checkViolations(load_idx, store_inst);
 
@@ -1379,19 +1372,6 @@ LSQUnit<Impl>::writebackStores()
     assert(stores >= 0 && storesToWB >= 0);
 }
 
-/*template <class Impl>
-void
-LSQUnit<Impl>::removeMSHR(InstSeqNum seqNum)
-{
-    list<InstSeqNum>::iterator mshr_it = find(mshrSeqNums.begin(),
-                                              mshrSeqNums.end(),
-                                              seqNum);
-
-    if (mshr_it != mshrSeqNums.end()) {
-        mshrSeqNums.erase(mshr_it);
-        DPRINTF(LSQUnit, "Removing MSHR. count = %i\n",mshrSeqNums.size());
-    }
-}*/
 
 template <class Impl>
 void
@@ -1590,6 +1570,7 @@ LSQUnit<Impl>::completeStore(int store_idx)
 
         iewStage->updateLSQNextCycle = true;
     }
+
 
     DPRINTF(LSQUnit, "Completing store [sn:%lli], idx:%i, store head "
             "idx:%i\n",
@@ -1894,81 +1875,6 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 }
 
 
-template <class Impl>
-void
-LSQUnit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
-{
-
-  ThreadContext * tc = cpu->tcBase(tid);
-  const StaticInstPtr si = inst->staticInst;
-
-  // sanitization
-  if (inst->isMicroopInjected()) return;
-  if (inst->isBoundsCheckMicroop()) return;
-  if (tc->ExeStopTracking) return;
-
-  if ((si->getName().compare("st") == 0) ||
-      (si->getName().compare("stis") == 0)){
-
-      if (inst->srcRegIdx(2).isIntReg()){
-
-        X86ISA::IntRegIndex   src2 =
-                        (X86ISA::IntRegIndex)inst->srcRegIdx(2).index();
-        if (src2 < X86ISA::INTREG_RAX ||
-            src2 >= X86ISA::NUM_INTREGS + 15)
-            return;
-
-        uint64_t  archRegContent =  cpu->readArchIntReg(src2, tid);
-        TheISA::PointerID _pid = TheISA::PointerID(0);
-        for (auto& capElem : tc->CapRegsFile){
-            if (capElem.second.getBaseAddr() == archRegContent){
-                _pid = capElem.first;
-                break;
-            }
-        }
-
-
-
-        if (_pid != TheISA::PointerID(0))
-        {
-            tc->ExecuteAliasTable[inst->effAddr].pid = _pid;
-            tc->ExecuteAliasTable[inst->effAddr].seqNum = inst->seqNum;
-        }
-        else if (tc->ExecuteAliasTable.find(inst->effAddr) !=
-                                      tc->ExecuteAliasTable.end())
-        {
-          tc->ExecuteAliasTable.erase(inst->effAddr);
-        }
-      }
-  }
-
-  // still dont know how I can safely handel this
-  // TODO: need to change place of this code
-  uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
-  if (prevRSPValue < newRSPValue){
-      auto exe_low_it =
-                tc->ExecuteAliasTable.lower_bound(prevRSPValue);
-      if ((exe_low_it != tc->ExecuteAliasTable.end())){
-
-        auto exe_high_it =
-                  tc->ExecuteAliasTable.upper_bound(newRSPValue-1);
-
-        if ((exe_high_it != tc->ExecuteAliasTable.end())){
-           tc->ExecuteAliasTable.erase(exe_low_it,exe_high_it);
-        }
-        else {
-            tc->ExecuteAliasTable.erase(
-                                      exe_low_it,
-                                      tc->ExecuteAliasTable.end()
-                                      );
-        }
-
-      }
-  }
-  prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
-
-
-}
 
 // this function is fast because Execute alias table size is small
 template <class Impl>

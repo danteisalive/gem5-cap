@@ -181,10 +181,7 @@ uint8_t
 StaticInst::getSegment(){
   panic("getSegment: This should only be called by a MemOp");
 }
-uint8_t
-StaticInst::getMemOpDataSize(){
-  panic("getMemOpDataSize: This should only be called by a MemOp");
-}
+
 uint8_t
 StaticInst::getAddressSize(){
   panic("getAddressSize: This should only be called by a MemOp");
@@ -217,8 +214,10 @@ StaticInst::getRegOpDestRegIdx(){
 }
 
 uint8_t
-StaticInst::getRegOpDataSize(){
-  panic("getRegOpDataSize: This should only be called by a MemOp");
+StaticInst::getDataSize(){
+  //panic("getRegOpDataSize: This should only be called by a MemOp");
+  //std::cout << "getDataSize called from staticInst!" << std::endl;
+  return 0;
 }
 
 RegIndex
