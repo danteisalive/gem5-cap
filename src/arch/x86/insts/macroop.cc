@@ -63,11 +63,6 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
            }
            else if (si->isStore() && !si->checked)
            {
-               // std::cout << "Fetch: " << nextPC << " " <<
-               //si->disassemble(nextPC.pc()) <<
-               // " Base: " << si->getBase() << " Dest: " <<
-               //si->getMemOpDataRegIndex() <<
-               // std::endl;
 
                int base = si->getBase();
                if ((base != INTREG_RSP) &&

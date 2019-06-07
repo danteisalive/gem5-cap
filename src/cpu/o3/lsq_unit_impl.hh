@@ -997,10 +997,10 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         int load_idx = inst->lqIdx;
         incrLdIdx(load_idx);
 
-        // check PID for this load here
-        // if (tc->enableCapability && mispredictedPID(tid, inst)){
-        //     loadWithWrongPID = inst;
-        // }
+        //check PID for this load here
+        if (tc->enableCapability && mispredictedPID(tid, inst)){
+            loadWithWrongPID = inst;
+        }
 
 
         if (checkLoads)
@@ -1737,7 +1737,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
 
-   // if (tc->ExeStopTracking) return false;
+   if (tc->ExeStopTracking) return false;
    if (inst->isMicroopInjected()) return false;
    if (inst->isBoundsCheckMicroop()) return false;
 
