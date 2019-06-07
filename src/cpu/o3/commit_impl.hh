@@ -1364,46 +1364,41 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
               }
             }
 
-            for (auto& elem: tc->CommitAliasTable){
-              if (elem.second.getPID() == 885){
-                  std::cout << elem.first << " --> " << elem.second << "\n";
-              }
-            }
-
-
             std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
             " CommitAliasTable Size: " <<
             tc->CommitAliasTable.size() <<
+            " ExecuteAliasTable Size: " <<
+            tc->ExecuteAliasTable.size() <<
             " NumOfAllocations: " << tc->CapRegsFile.size() <<
             " Highest Number of Element: " <<
             " PID(" << _pid << ")" << "[" << num << "]" <<
             std::endl;
 
-                double accuracy =
-                (double)(cpu->NumOfAliasTableAccess - cpu->FalsePredict) /
-                cpu->NumOfAliasTableAccess;
+            double accuracy =
+            (double)(cpu->NumOfAliasTableAccess - cpu->FalsePredict) /
+            cpu->NumOfAliasTableAccess;
 
-                std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
-                " Number of Execute Alias Table accesses: " <<
-                cpu->NumOfAliasTableAccess <<
-                " Prediction Accuracy(1e6 Instr.): " << accuracy <<
-                " NumOfMissPredictions: " << cpu->FalsePredict <<
-                " P0An: " << cpu->P0An <<
-                " PnA0: " << cpu->PnA0 <<
-                " PmAn: " << cpu->PmAn <<
-                " Number Of Lds: " << cpu->ldsWithPid <<
-                " Heap Access: " << cpu->heapAccesses <<
-                " True Predections: " << cpu->truePredection <<
-                " HeapPnA0: " << cpu->HeapPnA0 <<
-                " HeapPnAm: " << cpu->HeapPnAm <<
-                " Access Prediction Accuracy: " <<
+            std::cout << std::dec << cpu->thread[tid]->numInsts.value() <<
+            " Number of Execute Alias Table accesses: " <<
+            cpu->NumOfAliasTableAccess <<
+            " Prediction Accuracy(1e6 Instr.): " << accuracy <<
+            " NumOfMissPredictions: " << cpu->FalsePredict <<
+            " P0An: " << cpu->P0An <<
+            " PnA0: " << cpu->PnA0 <<
+            " PmAn: " << cpu->PmAn <<
+            " Number Of Lds: " << cpu->ldsWithPid <<
+            " Heap Access: " << cpu->heapAccesses <<
+            " True Predections: " << cpu->truePredection <<
+            " HeapPnA0: " << cpu->HeapPnA0 <<
+            " HeapPnAm: " << cpu->HeapPnAm <<
+            " Access Prediction Accuracy: " <<
                   (double)cpu->truePredection/cpu->ldsWithPid <<
-                std::endl;
+            std::endl;
 
-                cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
-                cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
-                cpu->heapAccesses = 0; cpu->truePredection = 0;
-                cpu->ldsWithPid = 0; cpu->HeapPnAm = 0; cpu->HeapPnA0 = 0;
+            cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
+            cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
+            cpu->heapAccesses = 0; cpu->truePredection = 0;
+            cpu->ldsWithPid = 0; cpu->HeapPnAm = 0; cpu->HeapPnA0 = 0;
 
         }
     }
@@ -1437,12 +1432,12 @@ template <class Impl>
 void
 DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 {
-  #define ENABLE_COLLECTOR_DEBUG 0
+  #define ENABLE_COMMIT_COLLECTOR_DEBUG 0
 
   ThreadContext * tc = cpu->tcBase(tid);
 
     if (inst->isMallocSizeCollectorMicroop()){
-      if (ENABLE_COLLECTOR_DEBUG)
+      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
         {std::cout << std::hex << "COMMIT: MALLOC SIZE: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
@@ -1454,18 +1449,18 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         uint64_t _pid_size = inst->readDestReg(inst->staticInst.get(),0);
 
         TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-        //assert(tc->CapRegsFile[_pid].getCSRBit(0)); //IEW Size Pickup
+
         assert(tc->CapRegsFile[_pid].seqNum == inst->seqNum);
         assert(tc->CapRegsFile[_pid].getSize() == _pid_size);
 
-        //tc->CapRegsFile[_pid].setCSRBit(2); //Commit Size Pickup
+
         tc->CommitStopTracking = true;
 
       }
 
     else if (inst->isMallocBaseCollectorMicroop()){
 
-      if (ENABLE_COLLECTOR_DEBUG)
+      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
         {std::cout << std::hex << "COMMIT: MALLOC BASE: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
@@ -1476,7 +1471,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
         TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
 
-        //assert(tc->CapRegsFile[_pid].getCSRBit(1));  //IEW Base Pickup
         assert(tc->CapRegsFile[_pid].seqNum == inst->seqNum);
         assert(tc->CapRegsFile[_pid].getBaseAddr() == _pid_base);
 
@@ -1490,7 +1484,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
     else if (inst->isFreeCallMicroop()){
 
-      if (ENABLE_COLLECTOR_DEBUG)
+      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
         {std::cout << std::hex << "COMMIT: FREE CALL: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
@@ -1509,11 +1503,32 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
           // now remove it
           tc->CapRegsFile.erase(_pid);
       }
+      // remove all the aliases related to this pid from commit alias table
+      // exe allias table is handled in IEW stage. so we dont need to update it
+      // this is slow but because we do it every time free is called it's fine
+      if (_pid != TheISA::PointerID(0)){
+          for (auto it = tc->CommitAliasTable.cbegin(), next_it = it;
+               it != tc->CommitAliasTable.cend(); it = next_it)
+          {
+            ++next_it;
+            if (it->second.getPID() == _pid.getPID())
+            {
+              if (ENABLE_COMMIT_COLLECTOR_DEBUG){
+                std::cout << "Commit: collector: " << "Free is called " <<
+                "and is removing " << it->second << " at address " <<
+                std::hex << it->first << std::dec <<
+                std::endl;
+              }
+              tc->CommitAliasTable.erase(it);
+            }
+          }
+      }
+
       tc->CommitStopTracking = true;
 
     }
     else if (inst->isFreeRetMicroop()){
-      if (ENABLE_COLLECTOR_DEBUG)
+      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
         {std::cout << std::hex << "COMMIT: FREE RET: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
@@ -1651,7 +1666,7 @@ void
 DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
 {
 
-  #define ENABLE_COMMIT_ALIAS_TABLE_DEBUG 1
+  #define ENABLE_COMMIT_ALIAS_TABLE_DEBUG 0
 
   ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = head_inst->staticInst;

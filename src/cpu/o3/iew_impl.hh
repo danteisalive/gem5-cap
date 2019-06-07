@@ -1810,14 +1810,14 @@ template <class Impl>
 void
 DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 {
-  #define ENABLE_COLLECTOR_DEBUG 0
+  #define ENABLE_EXE_COLLECTOR_DEBUG 0
   ThreadContext * tc = cpu->tcBase(tid);
 
   if (tc->enableCapability){
 
     if (inst->isMallocSizeCollectorMicroop()){
 
-        if (ENABLE_COLLECTOR_DEBUG)
+        if (ENABLE_EXE_COLLECTOR_DEBUG)
           {std::cout << std::hex << "IEW: MALLOC SIZE: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
@@ -1831,7 +1831,6 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                     (TheISA::PointerID(_pid_num),TheISA::Capability()));
 
           TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-          //tc->CapRegsFile[_pid].setCSRBit(0); // size collected in IEW stage
           tc->CapRegsFile[_pid].seqNum = inst->seqNum;
           tc->CapRegsFile[_pid].setSize(_pid_size);
 
@@ -1840,7 +1839,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       }
 
     else if (inst->isMallocBaseCollectorMicroop()){
-      if (ENABLE_COLLECTOR_DEBUG)
+      if (ENABLE_EXE_COLLECTOR_DEBUG)
         {std::cout << std::hex << "IEW: MALLOC BASE: " <<
                     inst->readDestReg(inst->staticInst.get(),0) <<
                     " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
@@ -1852,7 +1851,6 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
         tc->CapRegsFile[_pid].setBaseAddr(_pid_base);
-        //tc->CapRegsFile[_pid].setCSRBit(1); // base collected in IEW stage
         tc->CapRegsFile[_pid].seqNum = inst->seqNum;
 
         tc->ExeStopTracking = false;
@@ -1860,7 +1858,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
     }
 
     else if (inst->isFreeCallMicroop()){
-      if (ENABLE_COLLECTOR_DEBUG)
+      if (ENABLE_EXE_COLLECTOR_DEBUG)
       {std::cout << std::hex << "IEW: FREE CALL: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
@@ -1876,23 +1874,44 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             tc->CapRegsFile[_pid].seqNum = inst->seqNum;
         }
 
+        // delete all aliases that match this pid from exe alias table
+        // commit alias table will be updates in its own collector
+        // this removal shoidl happen when returnin from Free function
+        // but as we dont know the pid at the return and we are not tracking
+        // anything during the free fucntion we can safelydo it here!
+        if (_pid != TheISA::PointerID(0)){
+            for (auto it = tc->ExecuteAliasTable.cbegin(), next_it = it;
+                 it != tc->ExecuteAliasTable.cend(); it = next_it)
+            {
+              ++next_it;
+              if (it->second.pid.getPID() == _pid.getPID())
+              {
+                if (ENABLE_EXE_COLLECTOR_DEBUG){
+                  std::cout << "IEW: collector: " << "Free is called " <<
+                  "and is removing " << it->second.pid << " at address " <<
+                  std::hex << it->first << std::dec <<
+                  std::endl;
+                }
+                tc->ExecuteAliasTable.erase(it);
+              }
+            }
+        }
+
         tc->ExeStopTracking = true;
+
 
     }
     else if (inst->isFreeRetMicroop()){
-      if (ENABLE_COLLECTOR_DEBUG)
+      if (ENABLE_EXE_COLLECTOR_DEBUG)
         {std::cout << std::hex << "IEW: FREE RET: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
                 " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                 " " << inst->seqNum <<
                 std::endl;}
-
       // do nothing, just start tracking again.
       // in commit we will check whether freeing was succesful or not
       tc->ExeStopTracking = false;
     }
-
-
 
   }
 
@@ -1921,7 +1940,7 @@ template <class Impl>
 void
 DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 {
-  #define ENABLE_EXE_ALIAS_TABLE_DEBUG 1
+  #define ENABLE_EXE_ALIAS_TABLE_DEBUG 0
 
   ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = inst->staticInst;
@@ -1983,6 +2002,12 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
             //put it into exe alias table and later in commit delete it
             tc->ExecuteAliasTable[inst->effAddr].pid = _pid ;
             tc->ExecuteAliasTable[inst->effAddr].seqNum = inst->seqNum;
+
+            if (0)
+              {std::cout << "IEW: updateAliasTable " <<
+                 "ExeAliasTableSize: " << tc->ExecuteAliasTable.size() <<
+                 std::endl;
+              }
         }
         // if this address holds a pid(0) then remove it!
         else if (tc->ExecuteAliasTable.find(inst->effAddr) !=
@@ -2018,6 +2043,10 @@ DefaultIEW<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &inst)
     // is inst integer?
     if (!inst->isInteger()) return;
     // is dataszie >=4 ?
+    // some limited microops (e.g, limm)
+    //they dont have getDataSize implemented
+    // because they are derived diretly from BaseMicroop class
+    // for now everything seems fine but solve this problem
     if (si->getDataSize() < 4) {
       if (si->getDataSize() == 0){
         if (ENABLE_EXE_STACK_ALIAS_TABLE_DEBUG)
