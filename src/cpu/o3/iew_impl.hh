@@ -1569,7 +1569,7 @@ DefaultIEW<Impl>::writebackInsts()
                 checkAccuracy(inst->threadNumber,inst);
               }
 
-              if (tc->enableCapability && inst->isBoundsCheckMicroop()){
+              if (inst->isBoundsCheckMicroop()){
                   cpu->NumOfExecutedBoundsCheck++;
               }
             }
@@ -2121,12 +2121,11 @@ DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
 {
     //ThreadContext * tc = cpu->tcBase(tid);
     const StaticInstPtr si = inst->staticInst;
-  //let's see whether this is a heap access or not
-    //heap accesses can be made only with ld and st
+    //let's see whether this is a heap access or not
     // this is defeniltly a memory access (any kind)
 
-    if ((si->getName().compare("ld") == 0) ||
-        (si->getName().compare("st") == 0)){
+    // if ((si->getName().compare("ld") == 0) ||
+    //     (si->getName().compare("st") == 0)){
         cpu->numOfMemRefs++;
         if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
 
@@ -2164,7 +2163,7 @@ DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
          else {
            cpu->truePredection++;
          }
-    }
+  //  }
 
 }
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

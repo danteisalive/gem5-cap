@@ -37,6 +37,24 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
       for (size_t i = 0; i < numMicroops; i++) {
           const StaticInstPtr si = microops[i];
 
+          // is this an integer microop?
+          // continue because threre is no change to any int reg
+          if (!si->isInteger()) continue;
+          // is the data size 4/8?
+          // if true, then zero out all dest regs and continue
+          //as a PID is never less than 4 bytes
+          if (si->getDataSize() < 4) {
+              for (int i = 0; i < si->numDestRegs(); i++) {
+                  // is dest int ?
+                  if (!si->destRegIdx(i).isIntReg()) continue;
+                  int dest = si->destRegIdx(i).index();
+                  if (dest < X86ISA::NUM_INTREGS + 16){
+                      tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
+                  }
+
+              }
+              continue;
+          }
 
           // //let's see whether this is a heap access or not
           // This should be done before chaning pointer track table state
@@ -85,28 +103,21 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                }
            }
 
-
+           // actual pointer tracker logic
           if ((si->getName().compare("and") == 0)){
 
               if (si->destRegIdx(0).isIntReg() &&
                   si->srcRegIdx(0).isIntReg()  &&
                   si->srcRegIdx(1).isIntReg())
               {
-                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(1).index();
-                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                                si->destRegIdx(0).index();
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest > X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 > X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src2 < X86ISA::INTREG_RAX ||
-                      src2 > X86ISA::NUM_INTREGS + 15)
-                        return;
+                  int src1 = si->srcRegIdx(0).index();
+                  int src2 = si->srcRegIdx(1).index();
+                  int dest = si->destRegIdx(0).index();
+
+                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
+                      (src1 > X86ISA::NUM_INTREGS + 15) ||
+                      (src2 > X86ISA::NUM_INTREGS + 15))
+                        continue;
 
                   TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
                   TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
@@ -139,22 +150,14 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                 si->srcRegIdx(0).isIntReg()  &&
                 si->srcRegIdx(1).isIntReg())
             {
-                X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                            si->srcRegIdx(0).index();
-                X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                            si->srcRegIdx(1).index();
-                X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                            si->destRegIdx(0).index();
+                int src1 = si->srcRegIdx(0).index();
+                int src2 = si->srcRegIdx(1).index();
+                int dest = si->destRegIdx(0).index();
 
-                if (dest < X86ISA::INTREG_RAX ||
-                    dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src1 < X86ISA::INTREG_RAX ||
-                    src1 >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src2 < X86ISA::INTREG_RAX ||
-                    src2 >= X86ISA::NUM_INTREGS + 15)
-                      return;
+                if ((dest > X86ISA::NUM_INTREGS + 15) ||
+                    (src1 > X86ISA::NUM_INTREGS + 15) ||
+                    (src2 > X86ISA::NUM_INTREGS + 15))
+                      continue;
 
                 tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
             }
@@ -167,22 +170,14 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                   si->srcRegIdx(0).isIntReg()  &&
                   si->srcRegIdx(1).isIntReg())
               {
-                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(1).index();
-                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                                si->destRegIdx(0).index();
+                  int src1 = si->srcRegIdx(0).index();
+                  int src2 = si->srcRegIdx(1).index();
+                  int dest = si->destRegIdx(0).index();
 
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src2 < X86ISA::INTREG_RAX ||
-                      src2 >= X86ISA::NUM_INTREGS + 15)
-                        return;
+                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
+                      (src1 > X86ISA::NUM_INTREGS + 15) ||
+                      (src2 > X86ISA::NUM_INTREGS + 15))
+                        continue;
 
                   TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
                   TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
@@ -209,22 +204,14 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                   si->srcRegIdx(0).isIntReg()  &&
                   si->srcRegIdx(1).isIntReg())
               {
-                  X86ISA::IntRegIndex   src1 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   src2 = (X86ISA::IntRegIndex)
-                                                si->srcRegIdx(1).index();
-                  X86ISA::IntRegIndex   dest = (X86ISA::IntRegIndex)
-                                                si->destRegIdx(0).index();
+                  int src1 = si->srcRegIdx(0).index();
+                  int src2 = si->srcRegIdx(1).index();
+                  int dest = si->destRegIdx(0).index();
 
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src2 < X86ISA::INTREG_RAX ||
-                      src2 >= X86ISA::NUM_INTREGS + 15)
-                        return;
+                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
+                     (src1 > X86ISA::NUM_INTREGS + 15) ||
+                     (src2 > X86ISA::NUM_INTREGS + 15))
+                        continue;
 
                   TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
                   TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
@@ -249,17 +236,12 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
               if (si->destRegIdx(0).isIntReg() &&
                   si->srcRegIdx(0).isIntReg())
               {
-                  X86ISA::IntRegIndex   src1 =
-                          (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
-                  X86ISA::IntRegIndex   dest =
-                          (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+                  int src1 = si->srcRegIdx(0).index();
+                  int dest = si->destRegIdx(0).index();
 
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                        return;
-                  if (src1 < X86ISA::INTREG_RAX ||
-                      src1 >= X86ISA::NUM_INTREGS + 15)
-                        return;
+                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
+                     (src1 > X86ISA::NUM_INTREGS + 15))
+                        continue;
 
                   TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
                   tc->PointerTrackerTable[dest] = _pid_src1;
@@ -275,18 +257,12 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
             if (si->destRegIdx(0).isIntReg() &&
                 si->srcRegIdx(0).isIntReg())
             {
-                X86ISA::IntRegIndex   src1 =
-                        (X86ISA::IntRegIndex)si->srcRegIdx(0).index();
-                X86ISA::IntRegIndex   dest =
-                        (X86ISA::IntRegIndex)si->destRegIdx(0).index();
+                int src1 = si->srcRegIdx(0).index();
+                int dest = si->destRegIdx(0).index();
 
-                if (dest < X86ISA::INTREG_RAX ||
-                    dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src1 < X86ISA::INTREG_RAX ||
-                            src1 >= X86ISA::NUM_INTREGS + 15)
-                      return;
-
+                if ((dest > X86ISA::NUM_INTREGS + 15) ||
+                    (src1 > X86ISA::NUM_INTREGS + 15))
+                      continue;
 
                 TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
                 tc->PointerTrackerTable[dest] = _pid_src1;
@@ -298,16 +274,11 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
               if (si->destRegIdx(0).isIntReg() &&
                   si->srcRegIdx(1).isIntReg())
               {
-                X86ISA::IntRegIndex   src1 =
-                            (X86ISA::IntRegIndex)si->srcRegIdx(1).index();
-                X86ISA::IntRegIndex   dest =
-                            (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-                if (dest < X86ISA::INTREG_RAX ||
-                    dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
-                if (src1 < X86ISA::INTREG_RAX ||
-                    src1 >= X86ISA::NUM_INTREGS + 15)
-                      return;
+                int src1 = si->srcRegIdx(1).index();
+                int dest = si->destRegIdx(0).index();
+                if ((dest > X86ISA::NUM_INTREGS + 15) ||
+                   (src1 > X86ISA::NUM_INTREGS + 15))
+                      continue;
 
                 TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
                 tc->PointerTrackerTable[dest] = _pid_src1;
@@ -319,15 +290,38 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                    (si->getName().compare("ldis") == 0))
           {
               if (si->destRegIdx(0).isIntReg()){
-                  X86ISA::IntRegIndex   dest =
-                          (X86ISA::IntRegIndex)si->destRegIdx(0).index();
-                  if (dest < X86ISA::INTREG_RAX ||
-                      dest >= X86ISA::NUM_INTREGS + 15)
-                      return;
+
+                  int  dest = si->getMemOpDataRegIndex();
+                  if (dest > X86ISA::NUM_INTREGS + 15)
+                      continue;
+                  // only DS and SS can load a pointer
+                  if (!(si->getSegment() == X86ISA::SEGMENT_REG_DS ||
+                        si->getSegment() == X86ISA::SEGMENT_REG_SS))
+                      continue;
 
                 tc->PointerTrackerTable[dest] = macroop_pid;
 
               }
+          }
+          else {
+            // if non of the above instructions are encountred then we
+            // need to zero out the Destination regs of the inst
+            //because we assume other instructions never do any kind of
+            // pointer arithmatic or load
+            // by this point we know this is an integer instruction and
+            // datasize is 4/8
+            // just zero out dest regs
+            for (int i = 0; i < si->numDestRegs(); i++) {
+                // is dest int ?
+                if (!si->destRegIdx(i).isIntReg()) continue;
+                int dest = si->destRegIdx(i).index();
+                if (dest < X86ISA::NUM_INTREGS + 16){
+                    tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
+                }
+
+            }
+
+
           }
 
 
@@ -339,6 +333,8 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
           }
 
        }
+
+
 
 }
 
