@@ -108,8 +108,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     int8_t _numVecElemDestRegs;
     /** @} */
     bool _isInjected;
-  public:
 
+  public:
+    bool isSquashedAfterInjection;
     /// @name Register information.
     /// The sum of numFPDestRegs(), numIntDestRegs(), numVecDestRegs() and
     /// numVecelemDestRegs() equals numDestRegs().  The former two functions
@@ -305,7 +306,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
           _numFPDestRegs(0), _numIntDestRegs(0), _numCCDestRegs(0),
           _numVecDestRegs(0), _numVecElemDestRegs(0), machInst(_machInst),
           mnemonic(_mnemonic), cachedDisassembly(0)
-    { _isInjected = false; checked = false;}
+    { _isInjected = false; checked = false; isSquashedAfterInjection = false;}
 
   public:
     virtual ~StaticInst();
@@ -340,6 +341,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
                                 TheISA::PCState &nextPC,
                                 TheISA::CheckType _sym
                                );
+    bool hasInjection(){ return _isInjected; }
 
     virtual void undoInjecttion();
 
@@ -347,7 +349,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual bool injectCheckMicroops();
     virtual void updatePointerTracker(
                             ThreadContext * tc, TheISA::PCState &nextPC);
-    virtual bool filterInst(ThreadContext * tc);
+    virtual bool filterInst(ThreadContext * tc, TheISA::PCState &nextPC);
 
     virtual uint64_t getDisp();
     virtual uint8_t getScale();

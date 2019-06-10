@@ -512,6 +512,10 @@ DefaultIEW<Impl>::squashDueToBranch(DynInstPtr &inst, ThreadID tid)
         wroteToTimeBuffer = true;
 
         squashExecuteAliasTable(inst);
+
+        // if (inst->macroop->hasInjection()){
+        //     inst->macroop->isSquashedAfterInjection = true;
+        // }
     }
 
 }
@@ -545,6 +549,10 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
         wroteToTimeBuffer = true;
 
         squashExecuteAliasTable(inst);
+
+        // if (inst->macroop->hasInjection()){
+        //     inst->macroop->isSquashedAfterInjection = true;
+        // }
     }
 }
 
@@ -558,11 +566,20 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
 
     if (!toCommit->squash[tid] ||
             inst->seqNum < toCommit->squashedSeqNum[tid]) {
+
         toCommit->squash[tid] = true;
 
         toCommit->squashedSeqNum[tid] = inst->seqNum;
 
         TheISA::PCState pc = inst->pcState();
+
+        // we never squash on macroops which have injected microops!
+        // if (inst->macroop->hasInjection()){
+        //     inst->macroop->isSquashedAfterInjection = true;
+        // }
+        // panic_if(inst->macroop->hasInjection(),
+        //          "Squashing on a macroop with injected microops!");
+
         //TheISA::advancePC(pc, inst->staticInst);
         // std::cout << std::dec <<"Before Wrong PID predicted: " <<
         // pc << " " << inst->seqNum <<  std::endl;
@@ -2119,13 +2136,11 @@ template <class Impl>
 void
 DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
 {
-    //ThreadContext * tc = cpu->tcBase(tid);
+
     const StaticInstPtr si = inst->staticInst;
     //let's see whether this is a heap access or not
     // this is defeniltly a memory access (any kind)
 
-    // if ((si->getName().compare("ld") == 0) ||
-    //     (si->getName().compare("st") == 0)){
         cpu->numOfMemRefs++;
         if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
 
@@ -2163,7 +2178,6 @@ DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
          else {
            cpu->truePredection++;
          }
-  //  }
 
 }
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

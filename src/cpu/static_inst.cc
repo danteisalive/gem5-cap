@@ -124,7 +124,7 @@ StaticInst::injectMicroops(ThreadContext * _tc,
 }
 
 bool
-StaticInst::filterInst(ThreadContext * tc){
+StaticInst::filterInst(ThreadContext * tc, TheISA::PCState &nextPC){
     panic("filterInst: This should only be called by a macroop");
 }
 

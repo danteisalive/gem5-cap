@@ -702,9 +702,9 @@ Decoder::decode(PCState &nextPC)
     updateNPC(nextPC);
     StaticInstPtr &si = instBytes->si;
     if (si){
-        if (si->isMacroop()){
-            si->undoInjecttion();
-        }
+        // if (si->isMacroop()){
+        //     si->undoInjecttion();
+        // }
 
         return si;
     }

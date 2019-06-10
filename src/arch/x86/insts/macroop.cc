@@ -21,15 +21,20 @@
 namespace X86ISA
 {
 
-bool MacroopBase::filterInst(ThreadContext * tc) {
+bool MacroopBase::filterInst(ThreadContext * tc,TheISA::PCState &nextPC) {
 
-    return false;
+      for (size_t i = 0; i < numMicroops; i++) {
+        std::cout << nextPC << " " <<
+        microops[i]->disassemble(nextPC.pc()) <<
+        std::endl;
+      }
+      return false;
 }
 
 void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 {
       #define ENABLE_POINTER_TRACKER_DEBUG 0
-      if (_isInjected) panic("tracking an injected macroop!");
+    //  if (_isInjected) panic("tracking an injected macroop!");
 
       // this is probably a a little late but still can be effective
       if (tc->ExeStopTracking) return;
@@ -40,6 +45,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
           // is this an integer microop?
           // continue because threre is no change to any int reg
           if (!si->isInteger()) continue;
+          if (si->isMicroopInjected()) continue;
           // is the data size 4/8?
           // if true, then zero out all dest regs and continue
           //as a PID is never less than 4 bytes
@@ -62,6 +68,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
           // (base >=0 && base < 16) and base == 32 could be used for
           //  addresing.
           // if the base reg is RSP then it's not a heap access
+
            if (si->isLoad() && !si->checked)
            {
                 int base = si->getBase();
@@ -102,6 +109,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 
                }
            }
+
 
            // actual pointer tracker logic
           if ((si->getName().compare("and") == 0)){
@@ -324,7 +332,6 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 
           }
 
-
           if (si->isLastMicroop()){
               for (int i = 16;i < TheISA::NumIntRegsToTrack; ++i)
               {
@@ -425,6 +432,9 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
             if ((microops[idx]->getName().compare("st") == 0) &&
                 microops[idx]->uop_pid != TheISA::PointerID(0))
             {
+              // if this macroop is loading a PID then we never inject!
+              // panic_if(macroop_pid != TheISA::PointerID(0),
+              //          "St injection while the macroop pid is not PID(0)!");
               //microops[idx]->addSrcReg(InstRegIndex(NUM_INTREGS+18));
 
               microops[0]->clearFirstMicroop();
@@ -481,6 +491,9 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
             else if ((microops[idx]->getName().compare("ld") == 0) &&
                 microops[idx]->uop_pid != TheISA::PointerID(0))
             {
+                // if this macroop is loading a PID then we never inject!
+                // panic_if(macroop_pid != TheISA::PointerID(0),
+                //        "ld injection while the macroop pid is not PID(0)!");
                 //microops[idx]->addSrcReg(InstRegIndex(NUM_INTREGS+18));
 
                 microops[0]->clearFirstMicroop();

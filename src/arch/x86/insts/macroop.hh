@@ -62,7 +62,6 @@ public:
      uint32_t numMicroops;
      uint32_t numOfOriginalMicroops;
      X86ISA::EmulEnv env;
-
     //Constructor.
     MacroopBase(const char *mnem, ExtMachInst _machInst,
             uint32_t _numMicroops, X86ISA::EmulEnv _env) :
@@ -141,7 +140,7 @@ public:
 
     }
 
-    bool filterInst(ThreadContext * tc);
+    bool filterInst(ThreadContext * tc,PCState &nextPC);
     bool injectCheckMicroops();
 
     void updatePointerTracker(ThreadContext * tc, PCState &nextPC);

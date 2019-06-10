@@ -769,7 +769,8 @@ DefaultFetch<Impl>::finishTranslation(const Fault &fault,
 template <class Impl>
 inline void
 DefaultFetch<Impl>::doSquash(const TheISA::PCState &newPC,
-                             const DynInstPtr squashInst, ThreadID tid)
+                             const DynInstPtr squashInst, ThreadID tid,
+                             bool squashDueToMispredictedPID)
 {
     DPRINTF(Fetch, "[tid:%i]: Squashing, setting PC to: %s.\n",
             tid, newPC);
@@ -777,9 +778,26 @@ DefaultFetch<Impl>::doSquash(const TheISA::PCState &newPC,
     pc[tid] = newPC;
     fetchOffset[tid] = 0;
     if (squashInst && squashInst->pcState().instAddr() == newPC.instAddr())
+      {
         macroop[tid] = squashInst->macroop;
+        // if (squashDueToMispredictedPID) {
+        //     std::cout << "old macroop!" << std::endl;
+        //     squashInst->macroop->filterInst(cpu->tcBase(tid),pc[tid]);
+        // }
+
+      }
     else
-        macroop[tid] = NULL;
+        {
+          macroop[tid] = NULL;
+          // if (squashDueToMispredictedPID) {
+          //     std::cout << "new macroop!" << std::endl;
+          //     if (squashInst)
+          //       squashInst->macroop->filterInst(cpu->tcBase(tid),pc[tid]);
+          //     else
+          //     std::cout << "squashInst is NULL!" << std::endl;
+          // }
+
+        }
 
     decoder[tid]->reset();
 
@@ -827,8 +845,8 @@ DefaultFetch<Impl>::squashFromDecode(const TheISA::PCState &newPC,
 {
     DPRINTF(Fetch, "[tid:%i]: Squashing from decode.\n", tid);
 
-    doSquash(newPC, squashInst, tid);
-
+    doSquash(newPC, squashInst, tid, false);
+    //panic_if(1, "squashFromDecode");
     // Tell the CPU to remove any instructions that are in flight between
     // fetch and decode.
     cpu->removeInstsUntil(seq_num, tid);
@@ -893,11 +911,12 @@ template <class Impl>
 void
 DefaultFetch<Impl>::squash(const TheISA::PCState &newPC,
                            const InstSeqNum seq_num, DynInstPtr squashInst,
-                           ThreadID tid)
+                           ThreadID tid,
+                           bool squashDueToMispredictedPID)
 {
     DPRINTF(Fetch, "[tid:%u]: Squash from commit.\n", tid);
 
-    doSquash(newPC, squashInst, tid);
+    doSquash(newPC, squashInst, tid, squashDueToMispredictedPID);
 
     // Tell the CPU to remove any instructions that are not in the ROB.
     cpu->removeInstsNotInROB(tid);
@@ -1057,7 +1076,8 @@ DefaultFetch<Impl>::checkSignalsAndUpdate(ThreadID tid)
         // In any case, squash.
         squash(fromCommit->commitInfo[tid].pc,
                fromCommit->commitInfo[tid].doneSeqNum,
-               fromCommit->commitInfo[tid].squashInst, tid);
+               fromCommit->commitInfo[tid].squashInst, tid,
+               fromCommit->commitInfo[tid].squashDueToMispredictedPID);
 
         // If it was a branch mispredict on a control instruction, update the
         // branch predictor with that instruction, otherwise just kill the
@@ -1198,21 +1218,29 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
 
 template<class Impl>
 void
-DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, StaticInstPtr& si) {
+DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
+                                    ThreadID tid, StaticInstPtr& si) {
 
+        //if (si->isSquashedAfterInjection) return;
 
         ThreadContext * tc = cpu->tcBase(tid);
-        ThreadContext::SymbolCacheIter syms_it = (tc->syms_cache).find(thisPC.instAddr());
+        ThreadContext::SymbolCacheIter syms_it =
+                                  (tc->syms_cache).find(thisPC.instAddr());
         if (syms_it != (tc->syms_cache).end()){
             si->injectMicroops(tc, thisPC, syms_it->second);
         }
         else {
               si->updatePointerTracker(tc,thisPC);
+              // if this macroop is predicted to load a pointer
+              //then we should not  this is a workaround for
+              // a bug in squash method we check the bounds and permissions
+              //but in a different way
               if (si->injectCheckMicroops())
-                si->injectMicroops(tc,
-                                   thisPC,
-                                   TheISA::CheckType::AP_BOUNDS_INJECT
-                                  );
+                  {
+                    si->injectMicroops(tc, thisPC,
+                                       TheISA::CheckType::AP_BOUNDS_INJECT);
+                  }
+
 
         }
 
