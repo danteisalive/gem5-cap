@@ -436,6 +436,7 @@ InstructionQueue<Impl>::resetState()
     nonSpecInsts.clear();
     listOrder.clear();
     deferredMemInsts.clear();
+    deferredCapInsts.clear();
     blockedMemInsts.clear();
     retryMemInsts.clear();
     wbOutstanding = 0;
@@ -798,6 +799,10 @@ InstructionQueue<Impl>::scheduleReadyInsts()
         addReadyMemInst(mem_inst);
     }
 
+    while (mem_inst = getBlockedCapInstToExecute()) {
+        addReadyMemInst(mem_inst);
+    }
+
     // Have iterator to head of the list
     // While I haven't exceeded bandwidth or reached the end of the list,
     // Try to get a FU that can do what this op needs.
@@ -914,7 +919,7 @@ InstructionQueue<Impl>::scheduleReadyInsts()
             issuing_inst->issueTick = curTick() - issuing_inst->fetchTick;
 #endif
             issuing_inst->issueTick = curTick() - issuing_inst->fetchTick;
-            
+
             if (!issuing_inst->isMemRef()) {
                 // Memory instructions can not be freed from the IQ until they
                 // complete.
@@ -941,7 +946,8 @@ InstructionQueue<Impl>::scheduleReadyInsts()
     // @todo If the way deferred memory instructions are handeled due to
     // translation changes then the deferredMemInsts condition should be removed
     // from the code below.
-    if (total_issued || !retryMemInsts.empty() || !deferredMemInsts.empty()) {
+    if (total_issued || !retryMemInsts.empty() || !deferredMemInsts.empty() ||
+        !deferredCapInsts.empty()) {
         cpu->activityThisCycle();
     } else {
         DPRINTF(IQ, "Not able to schedule any instructions.\n");
@@ -1146,6 +1152,15 @@ InstructionQueue<Impl>::deferMemInst(DynInstPtr &deferred_inst)
     deferredMemInsts.push_back(deferred_inst);
 }
 
+
+template <class Impl>
+void
+InstructionQueue<Impl>::deferCapInst(DynInstPtr &deferred_inst)
+{
+    deferredCapInsts.push_back(deferred_inst);
+}
+
+
 template <class Impl>
 void
 InstructionQueue<Impl>::blockMemInst(DynInstPtr &blocked_inst)
@@ -1176,6 +1191,22 @@ InstructionQueue<Impl>::getDeferredMemInstToExecute()
         if ((*it)->translationCompleted() || (*it)->isSquashed()) {
             DynInstPtr mem_inst = *it;
             deferredMemInsts.erase(it);
+            return mem_inst;
+        }
+    }
+    return nullptr;
+}
+
+
+template <class Impl>
+typename Impl::DynInstPtr
+InstructionQueue<Impl>::getBlockedCapInstToExecute()
+{
+    for (ListIt it = deferredCapInsts.begin(); it != deferredCapInsts.end();
+         ++it) {
+        if ((*it)->capabilityCheckCompleted() || (*it)->isSquashed()) {
+            DynInstPtr mem_inst = *it;
+            deferredCapInsts.erase(it);
             return mem_inst;
         }
     }

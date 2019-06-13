@@ -965,8 +965,50 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
     load_fault = inst->initiateAcc();
 
      ThreadContext * tc = cpu->tcBase(tid);
-    if (tc->enableCapability && inst->isBoundsCheckMicroop()){
-        inst->setRegMade(false);
+
+     // only check for mememory refrence instuctions
+     if (inst->isMemRef()){
+       checkAccuracy(inst->threadNumber,inst);
+     }
+     // now the address is resolved and check the PID cache
+     if (tc->enableCapability &&
+        inst->isBoundsCheckMicroop()){
+        // first find the correct PID
+        setBoundsCheckPID(inst->threadNumber,inst);
+        // if the it's not PID(0) then go to the PID cache
+        if (inst->staticInst->uop_pid != TheISA::PointerID(0))
+        {
+          bool hit =
+          tc->LRUPidCache.LRUPIDCache_Access(
+                                          inst->staticInst->uop_pid.getPID());
+
+          inst->capabilityCacheAccessCycle = cpu->curCycle();
+
+          // std::cout << std::dec << "Cap$ Access Time: " <<
+          //           inst->capabilityCacheAccessCycle << " PID: " <<
+          //           inst->staticInst->uop_pid <<
+          //           " Result: " << hit <<
+          //           std::endl;
+
+          if (hit) inst->staticInst->setCapFetched();
+          else     inst->staticInst->clearCapFetched();
+        }
+
+     }
+
+    if (tc->enableCapability &&
+       inst->isBoundsCheckMicroop() &&
+       load_fault == NoFault){
+
+          if (inst->capabilityCheckCompleted())
+          {
+              inst->setRegMade(false);
+          }
+          else {
+            // there is a miss for this cap
+            // we need to defer it for now
+            return load_fault;
+          }
     }
 
     if (inst->isTranslationDelayed() &&
@@ -1032,7 +1074,10 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
     Fault store_fault = store_inst->initiateAcc();
 
-
+    // only check for mememory refrence instuctions
+    if (store_inst->isMemRef()){
+      checkAccuracy(store_inst->threadNumber,store_inst);
+    }
 
     if (store_inst->isTranslationDelayed() &&
         store_fault == NoFault)
@@ -1958,6 +2003,79 @@ LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &inst)
     }
 
   }
+
+}
+
+
+template <class Impl>
+void
+LSQUnit<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
+{
+    //for bounds check microops we have a different function
+    if (inst->isBoundsCheckMicroop()) return;
+
+    const StaticInstPtr si = inst->staticInst;
+    //let's see whether this is a heap access or not
+    // this is defeniltly a memory access (any kind)
+
+        cpu->numOfMemRefs++;
+        if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
+
+          // src reg is not rsp which is always for stack
+            TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
+            if (_pid != TheISA::PointerID(0)){ // heap access?
+              cpu->heapAccesses++;
+              if (inst->staticInst->uop_pid == _pid){
+                // correct guess
+                cpu->truePredection++;
+                inst->staticInst->checked = true;
+              }
+              else {
+                // this is heap access and we have miss prediction
+                 cpu->HeapPnAm++;
+                 inst->staticInst->uop_pid = _pid;
+                 inst->staticInst->checked = true;
+              }
+            }
+            else {
+              // this is not a heap but we need to make sure that
+              // we did not accidentaly assign a PID to it
+              if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
+                cpu->truePredection++;
+                inst->staticInst->checked = true;
+              }
+              else {
+                cpu->HeapPnA0++;
+                inst->staticInst->uop_pid = TheISA::PointerID(0);
+                inst->staticInst->checked = true;
+              }
+
+            }
+         }
+         else {
+           cpu->truePredection++;
+         }
+
+}
+
+
+template <class Impl>
+void
+LSQUnit<Impl>::setBoundsCheckPID(ThreadID tid, DynInstPtr &inst)
+{
+
+    //we do not update the pid of the bounds check microops in fetch stage
+    // instead the pid number is attached to the original ld/st microops
+    // these injected microops are used to find the right PID in IEW stage
+    // as we always access the PID cache by the correct PID, the pid number in
+    // injected microops should be always true;
+    // we never update the bounds check pid in fetch stage! threrefore
+    // we dont need to set the microop "check" signal
+    const StaticInstPtr si = inst->staticInst;
+    TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
+    //std::cout <<inst->effAddr << " " << _pid << std::endl;
+    si->uop_pid = _pid;
+
 
 }
 

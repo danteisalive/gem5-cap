@@ -110,7 +110,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool _isInjected;
 
   public:
-    bool isSquashedAfterInjection;
+    //bool isSquashedAfterInjection;
     /// @name Register information.
     /// The sum of numFPDestRegs(), numIntDestRegs(), numVecDestRegs() and
     /// numVecelemDestRegs() equals numDestRegs().  The former two functions
@@ -233,7 +233,10 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isMicroBranch() const { return flags[IsMicroBranch]; }
     //@}
     bool isCapabilityChecked() const {return flags[IsCapabilityChecked]; }
+
     bool isCapFetched() const {return flags[IsCapFetched];}
+    void setCapFetched() {flags[IsCapFetched] = true;}
+    void clearCapFetched() {flags[IsCapFetched] = false;}
 
     void setFirstMicroop() { flags[IsFirstMicroop] = true; }
     void clearFirstMicroop(){flags[IsFirstMicroop] = false;}
@@ -266,6 +269,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     TheISA::PointerID uop_pid{0};
     bool checked;
+    //bool capabilityCacheMiss;
 
   protected:
 
@@ -306,7 +310,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
           _numFPDestRegs(0), _numIntDestRegs(0), _numCCDestRegs(0),
           _numVecDestRegs(0), _numVecElemDestRegs(0), machInst(_machInst),
           mnemonic(_mnemonic), cachedDisassembly(0)
-    { _isInjected = false; checked = false; isSquashedAfterInjection = false;}
+    { _isInjected = false; checked = false;}
 
   public:
     virtual ~StaticInst();

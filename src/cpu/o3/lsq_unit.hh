@@ -197,6 +197,10 @@ class LSQUnit {
 
     TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
     void updatePointerTracker(ThreadID tid, DynInstPtr &head_inst);
+
+    void checkAccuracy(ThreadID tid, DynInstPtr &inst);
+    void setBoundsCheckPID(ThreadID tid, DynInstPtr &inst);
+
     /** Returns the number of free LQ entries. */
     unsigned numFreeLoadEntries();
 

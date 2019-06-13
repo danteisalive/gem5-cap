@@ -380,7 +380,7 @@ namespace X86ISA
           delete [] TheCache;
         }
 
-        void LRUPIDCache_Access(uint64_t _pid_num) {
+        bool LRUPIDCache_Access(uint64_t _pid_num) {
             //TODO: stats
             total_accesses = total_accesses + 1;
 
@@ -434,6 +434,9 @@ namespace X86ISA
                 TheCache[highestSpot].t_num_replaced++;
 
             }
+
+            if (hit == 1) return true;
+            else return false;
 
       }
 

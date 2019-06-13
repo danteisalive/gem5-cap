@@ -130,40 +130,14 @@ def template MicroLoadInitiateAcc {{
 
 
 /*
-        ThreadContext * tc = xc->tcBase();
-        if (tc->enableCapability && isBoundsCheckMicroop()){
-
-            TheISA::PointerID   ul_cap_index = TheISA::PointerID(0);
-            int64_t s_addr_diff_prev = std::numeric_limits<int64_t>::max();
-
-            std::for_each(tc->CapRegsFile.begin(), tc->CapRegsFile.end(), [&](std::pair<TheISA::PointerID, TheISA::Capability> cap_pair)
-            {
-
-                int64_t s_addr_diff = EA - cap_pair.second.getBaseAddr();
-
-                if (s_addr_diff >= 0 && (s_addr_diff < s_addr_diff_prev)){
-                    s_addr_diff_prev = s_addr_diff;
-                    ul_cap_index = cap_pair.first;
-                }
-
-            });
-
-            if (ul_cap_index.getPID() == 0){ DPRINTF(Capability, "ERROR!\n"); }
-            else { DPRINTF(Capability, "Capability check for address: %llx  => %d\n", EA, tc->CapRegsFile[ul_cap_index].contains(EA));}
-
-            DPRINTF(Capability, "Executed and completed an injected microop! Effective Address: %llx\n", EA);
-
-            tc->LRUCapCache.LRUCache_Access(tc->CapRegsFile[ul_cap_index].getBaseAddr());
-            return NoFault;
-        }
-
- */
-
-
        ThreadContext * tc = xc->tcBase();
        if (tc->enableCapability && isBoundsCheckMicroop()){
+            std::cout << std::hex << EA << std::dec << std::endl;
             return NoFault;
        }
+*/
+        // for bounds check microops we dont initiateMemRead
+        // look at the initiateMemRead fucntion to see how we handle it
         fault = initiateMemRead(xc, traceData, EA,
                                 %(memDataSize)s, memFlags);
 

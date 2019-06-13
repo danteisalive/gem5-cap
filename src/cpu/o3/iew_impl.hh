@@ -1140,9 +1140,6 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
             }
 
             ldstQueue.insertLoad(inst);
-            // if (inst->isBoundsCheckMicroop()){
-            //     std::cout << inst->seqNum << std::endl;
-            // }
 
             ++iewDispLoadInsts;
 
@@ -1358,10 +1355,25 @@ DefaultIEW<Impl>::executeInsts()
                 // event adds the instruction to the queue to commit
                 fault = ldstQueue.executeLoad(inst);
 
+                ThreadContext * tc = cpu->tcBase(tid);
+                if (tc->enableCapability &&
+                  inst->isBoundsCheckMicroop() &&
+                  fault == NoFault){
+
+                    if (!inst->capabilityCheckCompleted())
+                    {
+                        DPRINTF(IEW, "Execute: Delayed capability check, "
+                              "deferring inst due to capability$ miss.\n");
+                        instQueue.deferCapInst(inst);
+                        continue;
+                    }
+                 }
+
                 if (inst->isTranslationDelayed() &&
                     fault == NoFault) {
                     // A hw page table walk is currently going on; the
                     // instruction must be deferred.
+
                     DPRINTF(IEW, "Execute: Delayed translation, deferring "
                             "load.\n");
                     instQueue.deferMemInst(inst);
@@ -1432,9 +1444,6 @@ DefaultIEW<Impl>::executeInsts()
         // This probably needs to prioritize the redirects if a different
         // scheduler is used.  Currently the scheduler schedules the oldest
         // instruction first, so the branch resolution order will be correct.
-
-
-        //updateTracker(tid, inst);
 
 
         if (!fetchRedirect[tid] ||
@@ -1582,9 +1591,9 @@ DefaultIEW<Impl>::writebackInsts()
               updateStackAliasTable(inst->threadNumber, inst);
 
               // only check for mememory refrence instuctions
-              if (inst->isMemRef()){
-                checkAccuracy(inst->threadNumber,inst);
-              }
+              // if (inst->isMemRef()){
+              //   checkAccuracy(inst->threadNumber,inst);
+              // }
 
               if (inst->isBoundsCheckMicroop()){
                   cpu->NumOfExecutedBoundsCheck++;
@@ -1619,7 +1628,7 @@ DefaultIEW<Impl>::tick()
     updatedQueues = false;
 
     sortInsts();
-
+    std::cout << cpu->curCycle();
     // Free function units marked as being freed this cycle.
     fuPool->processFreeUnits();
 

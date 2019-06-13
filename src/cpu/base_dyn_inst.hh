@@ -328,6 +328,8 @@ class BaseDynInst : public ExecContext, public RefCounted
                               return instFlags[TranslationCompleted]; }
     void translationCompleted(bool f) { instFlags[TranslationCompleted] = f; }
 
+    bool capabilityCheckCompleted() {return true;}
+
     /** True if this address was found to match a previous load and they issued
      * out of order. If that happend, then it's only a problem if an incoming
      * snoop invalidate modifies the line, in which case we need to squash.
@@ -943,7 +945,15 @@ Fault
 BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
                                    Request::Flags flags)
 {
-    //printf("CALLED!\n");
+    ThreadContext * tc =  cpu->tcBase(threadNumber);
+    if (tc->enableCapability && isBoundsCheckMicroop()){
+      effAddr = addr;
+      effSize = size;
+      instFlags[EffAddrValid] = true;
+      instFlags[ReqMade] = false;
+      return NoFault;
+    }
+
     instFlags[ReqMade] = true;
     RequestPtr req = NULL;
     RequestPtr sreqLow = NULL;
@@ -972,7 +982,7 @@ BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
             effAddr = req->getVaddr();
             effSize = size;
             instFlags[EffAddrValid] = true;
-
+            if (req->getVaddr() != addr) panic("addr not equal!");
             if (cpu->checker) {
                 reqToVerify = std::make_shared<Request>(*req);
             }

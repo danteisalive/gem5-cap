@@ -196,6 +196,7 @@ class InstructionQueue
      */
     DynInstPtr getDeferredMemInstToExecute();
 
+    DynInstPtr getBlockedCapInstToExecute();
     /** Gets a memory instruction that was blocked on the cache. NULL if none
      *  available.
      */
@@ -249,6 +250,8 @@ class InstructionQueue
      * page table walk.
      */
     void deferMemInst(DynInstPtr &deferred_inst);
+
+    void deferCapInst(DynInstPtr &deferred_inst);
 
     /**  Defers a memory instruction when it is cache blocked. */
     void blockMemInst(DynInstPtr &blocked_inst);
@@ -321,6 +324,8 @@ class InstructionQueue
      *  complete (hw page table walk in progress).
      */
     std::list<DynInstPtr> deferredMemInsts;
+
+    std::list<DynInstPtr> deferredCapInsts;
 
     /** List of instructions that have been cache blocked. */
     std::list<DynInstPtr> blockedMemInsts;
