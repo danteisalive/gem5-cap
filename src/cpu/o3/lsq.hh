@@ -106,7 +106,7 @@ class LSQ {
     { thread[tid].tick(); }
 
     /** walks through the LSQ of the specified thread to check capability for each entry */
-    bool lsqWalker(ThreadID tid);
+  //  bool lsqWalker(ThreadID tid);
     bool mispredictedPID(DynInstPtr &inst);
     /** Inserts a load into the LSQ. */
     void insertLoad(DynInstPtr &load_inst);

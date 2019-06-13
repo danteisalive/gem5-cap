@@ -129,13 +129,6 @@ def template MicroLoadInitiateAcc {{
         DPRINTF(X86, "%s : %s: The address is %#x\n", instMnem, mnemonic, EA);
 
 
-/*
-       ThreadContext * tc = xc->tcBase();
-       if (tc->enableCapability && isBoundsCheckMicroop()){
-            std::cout << std::hex << EA << std::dec << std::endl;
-            return NoFault;
-       }
-*/
         // for bounds check microops we dont initiateMemRead
         // look at the initiateMemRead fucntion to see how we handle it
         fault = initiateMemRead(xc, traceData, EA,

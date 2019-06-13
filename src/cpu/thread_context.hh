@@ -146,7 +146,7 @@ class ThreadContext
     CapabilityRegistersFile                     CapRegsFile;
     TheISA::LRUCache                            LRUCapCache{128, 16, 2048};
     TheISA::LRUAliasCache                       ExeAliasCache{1, 1, 2048};
-    TheISA::LRUPIDCache                         LRUPidCache{128};
+    TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
 
     enum Status

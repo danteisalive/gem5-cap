@@ -262,7 +262,6 @@ class DefaultIEW
 
     /** Dispatches instructions to IQ and LSQ. */
     void dispatchInsts(ThreadID tid);
-    void LSQWalker(ThreadID tid);
     /** Executes instructions. In the case of memory operations, it informs the
      * LSQ to execute the instructions. Also handles any redirects that occur
      * due to the executed instructions.

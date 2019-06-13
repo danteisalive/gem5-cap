@@ -733,6 +733,7 @@ class FullO3CPU : public BaseO3CPU
     uint64_t heapAccesses;
     uint64_t truePredection;
     uint64_t numOfMemRefs;
+    uint64_t numOfCommitedMemRefs;
     uint64_t HeapPnA0;
     uint64_t HeapPnAm;
     uint64_t NumOfCommitedBoundsCheck;

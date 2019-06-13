@@ -436,7 +436,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          FalsePredict = 0; PnA0 = 0; P0An=0; PmAn = 0; heapAccesses = 0;
          truePredection = 0; numOfMemRefs = 0; HeapPnA0 = 0; HeapPnAm = 0;
          NumOfCommitedBoundsCheck = 0; NumOfInjectedBoundsCheck = 0;
-         NumOfExecutedBoundsCheck = 0;
+         NumOfExecutedBoundsCheck = 0; numOfCommitedMemRefs = 0;
 
         // Setup quiesce event.
         this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);

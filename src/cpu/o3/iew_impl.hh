@@ -1017,14 +1017,7 @@ DefaultIEW<Impl>::dispatch(ThreadID tid)
     }
 }
 
-template <class Impl>
-void
-DefaultIEW<Impl>::LSQWalker(ThreadID tid)
-{
 
-    ldstQueue.lsqWalker(tid);
-
-}
 
 template <class Impl>
 void
@@ -1132,13 +1125,6 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
             DPRINTF(IEW, "[tid:%i]: Issue: Memory instruction "
                     "encountered, adding to LSQ.\n", tid);
 
-            // Reserve a spot in the load store queue for this
-            // memory access.
-            if (0){
-                inst->resetFlag(StaticInstFlags::IsCapabilityChecked);
-                inst->resetFlag(StaticInstFlags::IsCapFetched);
-            }
-
             ldstQueue.insertLoad(inst);
 
             ++iewDispLoadInsts;
@@ -1151,11 +1137,6 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
         } else if (inst->isStore()) {
             DPRINTF(IEW, "[tid:%i]: Issue: Memory instruction "
                     "encountered, adding to LSQ.\n", tid);
-
-            if (0){
-                inst->resetFlag(StaticInstFlags::IsCapabilityChecked);
-                inst->resetFlag(StaticInstFlags::IsCapFetched);
-            }
 
             ldstQueue.insertStore(inst);
 
@@ -1236,13 +1217,6 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
         ppDispatch->notify(inst);
     }
 
-    // Here we are out of dispatching and we call
-    //lsqWalker once before we go into block state
-    //call SQL walker and try to check caps for a
-    //load or store/ make sure that you consider store forwading cases
-    if (0){
-        LSQWalker(tid);
-    }
 
     if (!insts_to_dispatch.empty()) {
         DPRINTF(IEW,"[tid:%i]: Issue: Bandwidth Full. Blocking.\n", tid);
@@ -1360,7 +1334,7 @@ DefaultIEW<Impl>::executeInsts()
                   inst->isBoundsCheckMicroop() &&
                   fault == NoFault){
 
-                    if (!inst->capabilityCheckCompleted())
+                    if (!inst->isCapabilityCheckCompleted())
                     {
                         DPRINTF(IEW, "Execute: Delayed capability check, "
                               "deferring inst due to capability$ miss.\n");
@@ -1590,10 +1564,6 @@ DefaultIEW<Impl>::writebackInsts()
               //for all instructions
               updateStackAliasTable(inst->threadNumber, inst);
 
-              // only check for mememory refrence instuctions
-              // if (inst->isMemRef()){
-              //   checkAccuracy(inst->threadNumber,inst);
-              // }
 
               if (inst->isBoundsCheckMicroop()){
                   cpu->NumOfExecutedBoundsCheck++;
@@ -1628,7 +1598,6 @@ DefaultIEW<Impl>::tick()
     updatedQueues = false;
 
     sortInsts();
-    std::cout << cpu->curCycle();
     // Free function units marked as being freed this cycle.
     fuPool->processFreeUnits();
 

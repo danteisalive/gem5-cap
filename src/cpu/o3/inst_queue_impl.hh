@@ -1204,7 +1204,7 @@ InstructionQueue<Impl>::getBlockedCapInstToExecute()
 {
     for (ListIt it = deferredCapInsts.begin(); it != deferredCapInsts.end();
          ++it) {
-        if ((*it)->capabilityCheckCompleted() || (*it)->isSquashed()) {
+        if ((*it)->isCapabilityCheckCompleted() || (*it)->isSquashed()) {
             DynInstPtr mem_inst = *it;
             deferredCapInsts.erase(it);
             return mem_inst;

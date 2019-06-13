@@ -119,8 +119,8 @@ class LSQUnit {
     /** Inserts an instruction. */
     void insert(DynInstPtr &inst);
 
-    bool lsqWalker();
-    uint64_t lsqGetCachePort(DynInstPtr& inst);
+    //bool lsqWalker();
+    //uint64_t lsqGetCachePort(DynInstPtr& inst);
     bool mispredictedPID(ThreadID tid, DynInstPtr &inst);
     //void updateAliasTable(ThreadID tid, DynInstPtr &inst);
 
@@ -724,7 +724,6 @@ LSQUnit<Impl>::read(const RequestPtr &req,
                 memcpy(load_inst->memData,
                     storeQueue[store_idx].data + shift_amt, req->getSize());
 
-            load_inst->setFlag(StaticInstFlags::IsCapabilityChecked);
 
             DPRINTF(LSQUnit, "Forwarding from store idx %i to load to "
                     "addr %#x\n", store_idx, req->getVaddr());

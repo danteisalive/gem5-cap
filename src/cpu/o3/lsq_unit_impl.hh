@@ -402,290 +402,6 @@ LSQUnit<Impl>::insert(DynInstPtr &inst)
     inst->setInLSQ();
 }
 
-template <class Impl>
-uint64_t
-LSQUnit<Impl>::lsqGetCachePort(DynInstPtr& inst)
-{
-
-    #define FU_LAT          1
-    #define CACHE_HIT_LAT   2
-    #define CACHE_MISS_LAT  8
-    #define CACHE_HIT_RATE 95
-    std::uniform_int_distribution<std::mt19937::result_type> dist100(0,100);
-    int rand  = dist100(rng);
-    bool miss;
-
-    // how many cache ports are available => 2 port
-    uint64_t *freePort = NULL;
-    uint64_t *freeFuncUnit = NULL;
-
-    miss = (rand > CACHE_HIT_RATE);
-
-    DPRINTF(Capability, "miss : %d\n", miss);
-
-    if (cpu->curCycle() > CapabilityFuncUints[0])
-        freeFuncUnit = &CapabilityFuncUints[0];
-    else if (cpu->curCycle() > CapabilityFuncUints[1])
-        freeFuncUnit = &CapabilityFuncUints[1];
-
-    if (cpu->curCycle() > CapabilityLoadPorts[0])
-        freePort = &CapabilityLoadPorts[0];
-    else if (cpu->curCycle() > CapabilityLoadPorts[1])
-        freePort = &CapabilityLoadPorts[1];
-
-
-    // we just need to assign a Func unit
-    if (inst->isCapFetched()){
-        if (freeFuncUnit){   // successfuly checked the cap
-            inst->capFiniCycle = cpu->curCycle() + FU_LAT;
-            *freeFuncUnit = cpu->curCycle() + FU_LAT;
-            DPRINTF(Capability, "Capability checking will be finished at %llu for %s\n", cpu->curCycle() + FU_LAT, inst->pcState());
-            return cpu->curCycle() + FU_LAT;
-        }
-        else{
-
-            DPRINTF(Capability, "Capability check stalled due to unavailabe FU at %llu for %s\n", cpu->curCycle(), inst->pcState());
-            return 0; // it means we cant say this cap is cheched
-        }
-    }
-    // cap is not fetched but still maybe we will have a hit
-    else{
-
-        if (!miss && freePort){  //hit,
-            inst->setFlag(StaticInstFlags::IsCapFetched);
-            inst->capFetchCycle = cpu->curCycle() + CACHE_HIT_LAT;
-            *freePort = cpu->curCycle() + CACHE_HIT_LAT;
-            DPRINTF(Capability, "Capability hit fetch at %llu will be finished at %llu for %s\n",  cpu->curCycle(), cpu->curCycle() + CACHE_HIT_LAT, inst->pcState());
-        }
-        else if (miss && freePort){
-            ++lsqCapabilityCacheMiss;
-            inst->setFlag(StaticInstFlags::IsCapFetched);
-            inst->capFetchCycle = cpu->curCycle() + CACHE_MISS_LAT;
-            *freePort = cpu->curCycle() + CACHE_MISS_LAT;
-            DPRINTF(Capability, "Capability miss fetch at %llu will be finished at %llu for %s\n", cpu->curCycle(), cpu->curCycle() + CACHE_MISS_LAT , inst->pcState());
-        }
-
-        return 0;
-    }
-
-
-}
-
-
-
-
-template <class Impl>
-bool
-LSQUnit<Impl>::lsqWalker()
-{
-
-    DPRINTF(Capability, "Cache Port #0: %llu Cache Port #1: %llu\n", CapabilityLoadPorts[0], CapabilityLoadPorts[1]);
-    DPRINTF(Capability, "Func  Port #0: %llu Func  Port #1: %llu\n", CapabilityFuncUints[0], CapabilityFuncUints[1]);
-    for (int ldq_id = loadHead; ldq_id < loadTail; ldq_id++){
-        DPRINTF(Capability, "Before LQWalker: Cycle: %llu %s Issued: \
-        %d Executed: %d Completed: %d CommitReady: %d Checked: %d\n",
-                cpu->curCycle(),
-                loadQueue[ldq_id]->pcState(),
-                loadQueue[ldq_id]->isIssued(),
-                loadQueue[ldq_id]->isExecuted(),
-                loadQueue[ldq_id]->isCompleted(),
-                loadQueue[ldq_id]->readyToCommit(),
-                loadQueue[ldq_id]->isCapabilityChecked()
-                );
-    }
-    for (int stq_id = storeHead; stq_id < storeTail; stq_id++){
-        DPRINTF(Capability, "Before SQWalker: Cycle: %llu %s Issued:\
-         %d Executed: %d Completed: %d CommitReady: %d Checked: %d\n",
-                cpu->curCycle(),
-                storeQueue[stq_id].inst->pcState(),
-                storeQueue[stq_id].inst->isIssued(),
-                storeQueue[stq_id].inst->isExecuted(),
-                storeQueue[stq_id].inst->isCompleted(),
-                storeQueue[stq_id].inst->readyToCommit(),
-                storeQueue[stq_id].inst->isCapabilityChecked()
-                );
-    }
-
-
-
-    //check the load Queue first, because loads are more important or maybe in order?
-    // if both ques are't empty firs get seq number of both queues
-    int lqIdx, sqIdx;
-    uint64_t sqSeq, lqSeq;
-    if (!lqEmpty() && !sqEmpty()){
-
-        sqIdx = storeHead;
-        lqIdx = loadHead;
-
-        for (; (sqIdx < storeTail) && (lqIdx < loadTail) ;){
-
-            sqSeq = storeQueue[sqIdx].inst->seqNum ;
-            lqSeq = loadQueue[lqIdx]->seqNum;
-
-            panic_if(sqSeq == lqSeq, "two equal sequence number!");
-
-            if (sqSeq < lqSeq)
-            {
-                if (storeQueue[sqIdx].inst->isCapFetched()  && (storeQueue[sqIdx].inst->capFetchCycle >= cpu->curCycle()) ){
-                    sqIdx++;
-                    continue;
-                }
-
-                if ( storeQueue[sqIdx].inst->isIssued() && !storeQueue[sqIdx].inst->isCapabilityChecked() )
-                {
-
-                    uint64_t t_finishCycle = lsqGetCachePort(storeQueue[sqIdx].inst);
-
-                    if (t_finishCycle){
-                        DPRINTF(Capability, "SQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", cpu->curCycle(),storeQueue[sqIdx].inst->pcState(), storeQueue[sqIdx].inst->isIssued(), storeQueue[sqIdx].inst->isExecuted(),storeQueue[sqIdx].inst->isCapabilityChecked());
-                        storeQueue[sqIdx].inst->setFlag(StaticInstFlags::IsCapabilityChecked);
-                        ++numOfCapabilityCehckedStores;
-                        return true;
-                    }
-                    return false;
-                }
-                sqIdx++;
-            }
-            else
-            {
-                if (loadQueue[lqIdx]->isCapFetched()  && (loadQueue[lqIdx]->capFetchCycle >= cpu->curCycle()) ){
-                    lqIdx++;
-                    continue;
-                }
-
-                if (loadQueue[lqIdx]->isIssued() && !loadQueue[lqIdx]->isCapabilityChecked())
-                {
-                    uint64_t t_finishCycle = lsqGetCachePort(loadQueue[lqIdx]);
-                    if (t_finishCycle){
-                        DPRINTF(Capability, "LQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", cpu->curCycle(),loadQueue[lqIdx]->pcState(), loadQueue[lqIdx]->isIssued(), loadQueue[lqIdx]->isExecuted(),loadQueue[lqIdx]->isCapabilityChecked());
-                        loadQueue[lqIdx]->setFlag(
-                            StaticInstFlags::IsCapabilityChecked);
-                        ++numOfCapabilityCehckedLoads;
-                        return true;
-                    }
-                    return false;
-                }
-                lqIdx++;
-            }
-
-        }
-
-        for (; lqIdx < loadTail; lqIdx++){
-
-            if (loadQueue[lqIdx]->isCapFetched()  && (loadQueue[lqIdx]->capFetchCycle >= cpu->curCycle()) ){
-                continue;
-            }
-
-            if (loadQueue[lqIdx]->isIssued() && !loadQueue[lqIdx]->isCapabilityChecked())
-            {
-
-                uint64_t t_finishCycle = lsqGetCachePort(loadQueue[lqIdx]);
-                if (t_finishCycle){
-                    DPRINTF(Capability, "LQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", cpu->curCycle(),loadQueue[lqIdx]->pcState(), loadQueue[lqIdx]->isIssued(), loadQueue[lqIdx]->isExecuted(),loadQueue[lqIdx]->isCapabilityChecked());
-                    loadQueue[lqIdx]->setFlag(
-                      StaticInstFlags::IsCapabilityChecked);
-                    ++numOfCapabilityCehckedLoads;
-                    return true;
-                }
-                return false;
-            }
-
-        }
-
-        for (; sqIdx < storeTail; sqIdx++){
-
-            if (storeQueue[sqIdx].inst->isCapFetched()  && (storeQueue[sqIdx].inst->capFetchCycle >= cpu->curCycle()) ){
-                continue;
-            }
-
-            if ( storeQueue[sqIdx].inst->isIssued() &&
-                !storeQueue[sqIdx].inst->isCapabilityChecked() )
-            {
-                uint64_t t_finishCycle =
-                      lsqGetCachePort(storeQueue[sqIdx].inst);
-                if (t_finishCycle){
-                    DPRINTF(Capability, "SQWalker: Cycle: %llu %s Issued: %d Executed: %d Checked: %d\n\n", cpu->curCycle(),storeQueue[sqIdx].inst->pcState(), storeQueue[sqIdx].inst->isIssued(), storeQueue[sqIdx].inst->isExecuted(),storeQueue[sqIdx].inst->isCapabilityChecked());
-                    storeQueue[sqIdx].inst->setFlag(StaticInstFlags::IsCapabilityChecked);
-                    ++numOfCapabilityCehckedStores;
-                    return true;
-                }
-                return false;
-            }
-
-        }
-
-    }
-
-    else if (!lqEmpty() && sqEmpty())
-    {
-        for (int ldq_id = loadHead; ldq_id < loadTail; ldq_id++){
-
-            if (loadQueue[ldq_id]->isCapFetched() && (loadQueue[ldq_id]->capFetchCycle >= cpu->curCycle())){
-                continue;
-            }
-
-            if (loadQueue[ldq_id]->isIssued() &&
-            !loadQueue[ldq_id]->isCapabilityChecked())
-            {
-                uint64_t t_finishCycle =
-                      lsqGetCachePort(loadQueue[ldq_id]);
-                if (t_finishCycle) {
-                    DPRINTF(Capability, "LQWalker: Cycle: %llu %s Issued:\
-                     %d Executed: %d Checked: %d\n\n",
-                        cpu->curCycle(),
-                        loadQueue[ldq_id]->pcState(),
-                        loadQueue[ldq_id]->isIssued(),
-                        loadQueue[ldq_id]->isExecuted(),
-                        loadQueue[ldq_id]->isCapabilityChecked()
-                    );
-                    loadQueue[ldq_id]->setFlag(StaticInstFlags::IsCapabilityChecked);
-                    ++numOfCapabilityCehckedLoads;
-                    return true;
-                }
-                return false;
-            }
-        }
-
-    }
-    else if (!sqEmpty() && lqEmpty()){
-
-        for (int stq_id = storeHead; stq_id < storeTail; stq_id++){
-
-            if (storeQueue[stq_id].inst->isCapFetched() && (storeQueue[stq_id].inst->capFetchCycle >= cpu->curCycle())){
-                continue;
-            }
-
-            if ( storeQueue[stq_id].inst->isIssued() && !storeQueue[stq_id].inst->isCapabilityChecked() )
-            {
-
-                uint64_t t_finishCycle =
-                  lsqGetCachePort(storeQueue[stq_id].inst);
-                if (t_finishCycle) {
-                    DPRINTF(Capability, "SQWalker: Cycle: %llu %s\
-                     Issued: %d Executed: %d Checked: %d\n\n",
-                        cpu->curCycle(),
-                        storeQueue[stq_id].inst->pcState(),
-                        storeQueue[stq_id].inst->isIssued(),
-                        storeQueue[stq_id].inst->isExecuted(),
-                        storeQueue[stq_id].inst->isCapabilityChecked()
-                    );
-                    storeQueue[stq_id].inst->setFlag(StaticInstFlags::IsCapabilityChecked);
-                    ++numOfCapabilityCehckedStores;
-                    return true;
-                }
-                return false;
-            }
-
-        }
-
-    }
-
-
-    DPRINTF(Capability, "\n");
-    return false;
-}
-
-
 
 template <class Impl>
 void
@@ -972,35 +688,38 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
      }
      // now the address is resolved and check the PID cache
      if (tc->enableCapability &&
-        inst->isBoundsCheckMicroop()){
+        inst->isBoundsCheckMicroop() &&
+        !inst->isCapabilityChecked()){
         // first find the correct PID
         setBoundsCheckPID(inst->threadNumber,inst);
         // if the it's not PID(0) then go to the PID cache
         if (inst->staticInst->uop_pid != TheISA::PointerID(0))
         {
-          bool hit =
-          tc->LRUPidCache.LRUPIDCache_Access(
+          bool hit = tc->LRUPidCache.LRUPIDCache_Access(
                                           inst->staticInst->uop_pid.getPID());
 
-          inst->capabilityCacheAccessCycle = cpu->curCycle();
-
+          inst->capFetchCycle = cpu->curCycle();
           // std::cout << std::dec << "Cap$ Access Time: " <<
-          //           inst->capabilityCacheAccessCycle << " PID: " <<
+          //           inst->capFetchCycle << " PID: " <<
           //           inst->staticInst->uop_pid <<
           //           " Result: " << hit <<
           //           std::endl;
 
-          if (hit) inst->staticInst->setCapFetched();
-          else     inst->staticInst->clearCapFetched();
+          if (hit) inst->setCapFetched();
+          else     inst->clearCapFetched();
         }
-
+        else {
+          // this bounds check microop is cheked
+          inst->setFlag(StaticInstFlags::IsCapabilityChecked);
+          inst->setCapFetched();
+        }
      }
 
     if (tc->enableCapability &&
        inst->isBoundsCheckMicroop() &&
        load_fault == NoFault){
 
-          if (inst->capabilityCheckCompleted())
+          if (inst->isCapabilityCheckCompleted())
           {
               inst->setRegMade(false);
           }
@@ -1122,21 +841,6 @@ LSQUnit<Impl>::commitLoad()
     DPRINTF(LSQUnit, "Committing head load instruction, PC %s\n",
             loadQueue[loadHead]->pcState());
 
-    if (0){
-        if (!loadQueue[loadHead]->isCapabilityChecked()){
-                    ++lsqLoadCapabilityMissed;
-                    lsqLoadCapabilityCyclesStalled += CACHE_HIT_LAT + FU_LAT;
-                    DPRINTF(Capability, "Commiting load without capability check!\n");
-        }
-        else if (loadQueue[loadHead]->isCapFetched() && loadQueue[loadHead]->capFetchCycle > cpu->curCycle()) {
-                    ++lsqLoadCapabilityMissed;
-                    lsqLoadCapabilityCyclesStalled += (loadQueue[loadHead]->capFetchCycle - cpu->curCycle()) + FU_LAT;
-                    //std::cout << "Commiting store without capability check!\n";
-                    DPRINTF(Capability, "Commiting load without capability check!\n");
-        }
-        loadQueue[loadHead]->setFlag(StaticInstFlags::IsCapabilityChecked);
-    }
-
     ++lsqCommitedLoads;
 
     loadQueue[loadHead] = NULL;
@@ -1181,20 +885,6 @@ LSQUnit<Impl>::commitStores(InstSeqNum &youngest_inst)
                     storeQueue[store_idx].inst->pcState(),
                     storeQueue[store_idx].inst->seqNum);
 
-        if (0){
-            if (!storeQueue[store_idx].inst->isCapabilityChecked()){
-                ++lsqStoreCapabilityMissed;
-                lsqStoreCapabilityCyclesStalled += CACHE_HIT_LAT + FU_LAT;
-                DPRINTF(Capability, "Commiting store without capability check!\n");
-            }
-            else if (storeQueue[store_idx].inst->isCapFetched() && storeQueue[store_idx].inst->capFetchCycle > cpu->curCycle()) {
-                ++lsqStoreCapabilityMissed;
-                lsqStoreCapabilityCyclesStalled += (storeQueue[store_idx].inst->capFetchCycle - cpu->curCycle()) + FU_LAT;
-                //std::cout << "Commiting store without capability check!\n";
-                DPRINTF(Capability, "Commiting store without capability check!\n");
-            }
-            storeQueue[store_idx].inst->setFlag(StaticInstFlags::IsCapabilityChecked);
-        }
             ++lsqCommitedStores;
 
             storeQueue[store_idx].canWB = true;
@@ -1443,9 +1133,6 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
         // Clear the smart pointer to make sure it is decremented.
         loadQueue[load_idx]->setSquashed();
         squashExecuteAliasTable(loadQueue[load_idx], squashed_num);
-        /** set not capability checked */
-        loadQueue[load_idx]->resetFlag(StaticInstFlags::IsCapabilityChecked);
-        loadQueue[load_idx]->resetFlag(StaticInstFlags::IsCapFetched);
         loadQueue[load_idx] = NULL;
         --loads;
 
@@ -1491,11 +1178,6 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
         // Clear the smart pointer to make sure it is decremented.
         storeQueue[store_idx].inst->setSquashed();
         squashExecuteAliasTable(storeQueue[store_idx].inst, squashed_num);
-        /** set not capability checked */
-        storeQueue[store_idx].inst->resetFlag(
-                              StaticInstFlags::IsCapabilityChecked);
-        storeQueue[store_idx].inst->resetFlag(
-                              StaticInstFlags::IsCapFetched);
         storeQueue[store_idx].inst = NULL;
         storeQueue[store_idx].canWB = 0;
 

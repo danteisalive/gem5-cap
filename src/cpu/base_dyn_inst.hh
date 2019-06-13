@@ -233,6 +233,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     //bool capFetched;
     uint64_t capFetchCycle;
     uint64_t capFiniCycle;
+
     /////////////////////// TLB Miss //////////////////////
     /**
      * Saved memory requests (needed when the DTB address translation is
@@ -328,7 +329,22 @@ class BaseDynInst : public ExecContext, public RefCounted
                               return instFlags[TranslationCompleted]; }
     void translationCompleted(bool f) { instFlags[TranslationCompleted] = f; }
 
-    bool capabilityCheckCompleted() {return true;}
+    bool isCapabilityCheckCompleted() {
+      //return true;
+      if (isCapFetched()){
+          return true;
+      }
+      else {
+          assert(cpu->curCycle() >= capFetchCycle);
+          if ((cpu->curCycle() - capFetchCycle) > 10){
+            setCapFetched();
+            return true;
+          }
+          else {
+            return false;
+          }
+      }
+    }
 
     /** True if this address was found to match a previous load and they issued
      * out of order. If that happend, then it's only a problem if an incoming
@@ -583,6 +599,8 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool isCapabilityChecked() const
     {return staticInst->isCapabilityChecked() ;}
     bool isCapFetched() const {return  staticInst->isCapFetched(); }
+    void setCapFetched(){ staticInst->setCapFetched(); }
+    void clearCapFetched(){ staticInst->clearCapFetched(); }
     void setFlag(StaticInstFlags::Flags f) { staticInst->setFlag(f); }
     void resetFlag(StaticInstFlags::Flags f) { staticInst->resetFlag(f); }
     void setFlag(Flags f) {instFlags[f] = true;}

@@ -1401,8 +1401,11 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " NumOfExecutedBoundsCheck: " <<
             cpu->NumOfExecutedBoundsCheck <<std::endl <<
             " NumOfCommitedBoundsCheck: " <<
-            cpu->NumOfCommitedBoundsCheck <<std::endl <<
+            cpu->NumOfCommitedBoundsCheck <<
+            " numOfCommitedMemRefs: " <<
+            cpu->numOfCommitedMemRefs <<
             std::endl;
+            tc->LRUPidCache.LRUPIDCachePrintStats();
 
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
@@ -1411,13 +1414,17 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             cpu->NumOfCommitedBoundsCheck = 0;
             cpu->NumOfInjectedBoundsCheck = 0;
             cpu->NumOfExecutedBoundsCheck = 0;
+            cpu->numOfCommitedMemRefs = 0;
 
         }
     }
 
     if (tc->enableCapability && head_inst->isBoundsCheckMicroop()){
+      if (head_inst->staticInst->uop_pid != TheISA::PointerID(0))
         cpu->NumOfCommitedBoundsCheck++;
     }
+    if (head_inst->isMemRef() && !head_inst->isBoundsCheckMicroop())
+        cpu->numOfCommitedMemRefs++;
     // Update the commit rename map
     for (int i = 0; i < head_inst->numDestRegs(); i++) {
         renameMap[tid]->setEntry(head_inst->flattenedDestRegIdx(i),

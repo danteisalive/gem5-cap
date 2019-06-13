@@ -561,7 +561,13 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
                                         ThreadID tid,
                                         StaticInstPtr &inst)
 {
-    inst->setMacroopPid(LVPT->lookup(thisPC.instAddr(), tid));
+    ThreadContext * tc = cpu->tcBase(tid);
+    TheISA::PointerID _pid = LVPT->lookup(thisPC.instAddr(), tid);
+    if (_pid != TheISA::PointerID(0)){
+        tc->LRUPidCache.LRUPIDCache_Access(_pid.getPID());
+    }
+
+    inst->setMacroopPid(_pid);
 }
 
 

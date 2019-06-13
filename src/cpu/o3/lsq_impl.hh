@@ -256,12 +256,6 @@ LSQ<Impl>::tick()
 }
 
 
-template<class Impl>
-bool
-LSQ<Impl>::lsqWalker(ThreadID tid)
-{
-    return thread[tid].lsqWalker();
-}
 
 template<class Impl>
 bool
