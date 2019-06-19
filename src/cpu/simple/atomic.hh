@@ -43,6 +43,8 @@
 #ifndef __CPU_SIMPLE_ATOMIC_HH__
 #define __CPU_SIMPLE_ATOMIC_HH__
 
+#include <fstream>
+
 #include "cpu/simple/base.hh"
 #include "cpu/simple/exec_context.hh"
 #include "mem/request.hh"
@@ -70,6 +72,9 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     // main simulation loop (one cycle)
     void tick();
 
+    void collector(ThreadContext * _tc,
+                TheISA::PCState &pcState,
+                TheISA::CheckType _sym);
     /**
      * Check if a system is in a drained state.
      *

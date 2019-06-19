@@ -1011,7 +1011,7 @@ DefaultCommit<Impl>::commitInsts()
         // (be removed from the ROB) at any time.
         if (head_inst->isSquashed()) {
 
-            squashExecuteAliasTable(head_inst, true);
+            squashExecuteAliasTable(head_inst);
 
             DPRINTF(Commit, "Retiring squashed instruction from "
                     "ROB.\n");
@@ -1040,7 +1040,6 @@ DefaultCommit<Impl>::commitInsts()
 
 
             if (commit_success) {
-                squashExecuteAliasTable(head_inst, false);
                 ++num_committed;
                 statCommittedInstType[tid][head_inst->opClass()]++;
                 ppCommit->notify(head_inst);
@@ -1304,8 +1303,9 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     if (tc->enableCapability){
       collector(tid, head_inst);
+      updateStackAliasTable(tid, head_inst);
       updateAliasTable(tid, head_inst);
-      updateStackAliasTable(tid,head_inst);
+
     }
 
 
@@ -1329,52 +1329,23 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     if (tc->enableCapability){
 
 
-        //updatePointerTracker(tid, head_inst);
-
         if ((uint64_t)cpu->thread[tid]->numInsts.value() % 1000000 == 0 &&
             !head_inst->isNop() &&
             !head_inst->isInstPrefetch() &&
             head_inst->isLastMicroop()
            )
         {
-
-            // uint64_t _pid = 0;
-            // uint64_t num = 0;
-            // for (size_t i = 1; i < tc->PID.getPID(); i++) {
-            //   uint64_t _num = 0;
-            //   for (auto& elem: tc->CommitAliasTable){
-            //       if (elem.second.getPID() == i){
-            //           _num++;
-            //       }
-            //   }
-            //   if (_num >= num){
-            //     num = _num;
-            //     _pid = i;
-            //   }
-            // }
-
-            // uint64_t _allocs = 0;
-            // for (size_t i = 1; i < tc->PID.getPID(); i++) {
-            //
-            //   for (auto& elem: tc->CommitAliasTable){
-            //       if (elem.second.getPID() == i){
-            //           _allocs++;
-            //           break;
-            //       }
-            //   }
-            // }
-
             std::cout <<
             "--------------------START OF EPOCH----------------------------" <<
             std::endl << std::dec << cpu->thread[tid]->numInsts.value() <<
             std::endl <<
             " CommitAliasTable Size: " <<
             tc->CommitAliasTable.size() << std::endl <<
-            // " ExecuteAliasTable Size: " <<
-            // tc->ExecuteAliasTable.size() <<
+            " ExecuteAliasTable Size: " <<
+            tc->ExecuteAliasTable.size() << std::endl <<
+            " ExeAliasTableBuffer Size: " <<
+            tc->ExeAliasTableBuffer.size() << std::endl <<
             " NumOfAllocations: " << tc->CapRegsFile.size() <<
-            // " Highest Number of Element: " <<
-            // " PID(" << _pid << ")" << "[" << num << "]" <<
             std::endl;
 
             double accuracy =
@@ -1406,6 +1377,17 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             cpu->numOfCommitedMemRefs <<
             std::endl;
             tc->LRUPidCache.LRUPIDCachePrintStats();
+            tc->ExeAliasCache.print_stats();
+
+            std::cout << std::dec << head_inst->seqNum << " " <<
+                  std::hex << cpu->readArchIntReg(X86ISA::INTREG_RSP, tid) <<
+                  std::endl;
+
+            for (auto& entry : tc->ExeAliasTableBuffer) {
+                std::cout << std::dec << entry.first.first << " " <<
+                          std::hex << entry.first.second << " " << std::dec <<
+                             entry.second << std::endl;
+            }
 
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
@@ -1478,7 +1460,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         tc->CommitStopTracking = true;
 
-      }
+    }
 
     else if (inst->isMallocBaseCollectorMicroop()){
 
@@ -1549,6 +1531,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       tc->CommitStopTracking = true;
 
     }
+
     else if (inst->isFreeRetMicroop()){
       if (ENABLE_COMMIT_COLLECTOR_DEBUG)
         {std::cout << std::hex << "COMMIT: FREE RET: " <<
@@ -1562,59 +1545,55 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
 }
 
+
+// delete all aliases which are in the range of newly freed frame
+// in updateAliasTable function we don not write stack aliases to
+// shadow memory as it will become so hard and very slow to handle them
+// for now we keep them in ExeAliasBuffer, eventually they will be
+// erased by the updateStackAliasTable as we can precisley track them
+// by updateStackAliasTable
 template <class Impl>
 void
-DefaultCommit<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &inst)
+DefaultCommit<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst)
 {
     ThreadContext * tc = cpu->tcBase(tid);
 
-    if (inst->isMicroopInjected()) return;
-    if (inst->isBoundsCheckMicroop()) return;
+    if (head_inst->isMicroopInjected()) return;
+    if (head_inst->isBoundsCheckMicroop()) return;
 
-    uint64_t newRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
-    if (prevRSPValue < newRSPValue){
+    // delete all entrys with effAddr smaller than RSPValue
+    // make sure to check the seqNum and only delete those entrys
+    // with seqNum smaller than youngestSeqNum
+    // if we do everything right here, then we should not find any entry here!
 
-          auto commit_low_it =
-                    tc->CommitAliasTable.lower_bound(prevRSPValue);
-          if ((commit_low_it != tc->CommitAliasTable.end())){
+    uint64_t RSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
+    // new code
+    Addr stack_base = 0x7FFFFFFFF000ULL;
+    Addr max_stack_size = 8 * 1024 * 1024;
+    Addr next_thread_stack_base = stack_base - max_stack_size;
+    //check to make sure that this address is in stack valid address range
+    if (!(RSPValue >= next_thread_stack_base &&
+          RSPValue <= stack_base))  return;
 
-            auto commit_high_it =
-                      tc->CommitAliasTable.upper_bound(newRSPValue-1);
-
-            if ((commit_high_it != tc->CommitAliasTable.end())){
-               tc->CommitAliasTable.erase(commit_low_it,commit_high_it);
-            }
-            else {
-                tc->CommitAliasTable.erase(
-                                          commit_low_it,
-                                          tc->CommitAliasTable.end()
-                                          );
-            }
-
+    for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
+                  it != tc->ExeAliasTableBuffer.cend();
+                  it = next_it)
+    {
+          ++next_it;
+          if (it->first.first <= head_inst->seqNum)
+          {
+              if (it->first.second <= RSPValue &&
+                  it->first.second >= next_thread_stack_base)
+              {
+                  tc->ExeAliasTableBuffer.erase(it);
+              }
           }
-
-          auto exe_low_it =
-                    tc->ExecuteAliasTable.lower_bound(prevRSPValue);
-          if ((exe_low_it != tc->ExecuteAliasTable.end())){
-
-            auto exe_high_it =
-                      tc->ExecuteAliasTable.upper_bound(newRSPValue-1);
-
-            if ((exe_high_it != tc->ExecuteAliasTable.end())){
-               tc->ExecuteAliasTable.erase(exe_low_it,exe_high_it);
-            }
-            else {
-                tc->ExecuteAliasTable.erase(
-                                          exe_low_it,
-                                          tc->ExecuteAliasTable.end()
-                                          );
-            }
-
+          else {
+            // all other lookups will defenitly result here!
+            break;
           }
-
     }
 
-      prevRSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
 
 }
 
@@ -1636,53 +1615,7 @@ DefaultCommit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
 }
 
 
-template <class Impl>
-void
-DefaultCommit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &head_inst)
-{
-
-  ThreadContext * tc = cpu->tcBase(tid);
-  const StaticInstPtr si = head_inst->staticInst;
-
-  // sanitization
-  if (head_inst->isMicroopInjected()) return;
-    if (head_inst->isBoundsCheckMicroop()) return;
-  if (tc->CommitStopTracking) return;
-
-
-  if ((si->getName().compare("ld") == 0) ||
-      (si->getName().compare("ldis") == 0))
-  {
-
-    if (head_inst->destRegIdx(0).isIntReg()){
-        X86ISA::IntRegIndex   dest =
-                        (X86ISA::IntRegIndex)head_inst->destRegIdx(0).index();
-        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
-            return;
-
-      auto mtt_it = tc->CommitAliasTable.find(head_inst->effAddr);
-      if (mtt_it != tc->CommitAliasTable.end()){
-        //  tc->CommitPointerTracker[dest] = mtt_it->second;
-          return;
-      }
-
-
-      X86ISA::IntRegIndex   src_reg =
-                 (X86ISA::IntRegIndex)head_inst->srcRegIdx(1).index();
-
-      if (src_reg != X86ISA::INTREG_RSP){
-          if (head_inst->staticInst->checked){
-        //tc->CommitPointerTracker[src_reg] = head_inst->staticInst->uop_pid;
-          }
-       }
-
-    }
-
-  }
-
-}
-
-
+// In this fucntion if
 template <class Impl>
 void
 DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
@@ -1693,90 +1626,82 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = head_inst->staticInst;
 
+  Addr stack_base = 0x7FFFFFFFF000ULL;
+  Addr max_stack_size = 8 * 1024 * 1024;
+  Addr next_thread_stack_base = stack_base - max_stack_size;
+  uint64_t RSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
   // sanitization
   if (head_inst->isMicroopInjected()) return;
   if (head_inst->isBoundsCheckMicroop()) return;
-  if (tc->CommitStopTracking) return;
+  //if (tc->CommitStopTracking) return;
 
-
-
-  if ((si->getName().compare("st") == 0) ||
-      (si->getName().compare("stis") == 0)){
-
-        // datasize should be 4/8 bytes othersiwe it's not a base address
-        if (si->getDataSize() < 4) return;
-        // return if store is not pointed to a DS or SS section
-        if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
-            si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
-        //  to our knowledge:
-        // (base < 16) and base == 32 could be used for addresing.
-        // igonre stores which don't use these regs
-        RegIndex baseRegInx = si->getBase();
-        if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
-             (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
-
-        // this is the dest reg
-        if (!head_inst->srcRegIdx(2).isIntReg()) return;
-        RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
-
-        if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
-
-        // srcReg[2] in store microops is the register that
-        //we want to write its value to mem
-        uint64_t  dataRegContent =
-                  head_inst->readIntRegOperand(head_inst->staticInst.get(),2);
-
-        // check if this is a base address or not
-        TheISA::PointerID _pid = TheISA::PointerID(0);
-        for (auto& capElem : tc->CapRegsFile){
-             if (capElem.second.getBaseAddr() == dataRegContent){
-                 _pid = capElem.first;
-                 break;
-             }
-        }
-
-
-        if (_pid != TheISA::PointerID(0))
+  // here commit the youngest entry of the ExeAliasBuffer to shadow memory
+  // which is actually the CommitAliasTable
+  for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
+                it != tc->ExeAliasTableBuffer.cend();
+                it = next_it)
+  {
+        ++next_it;
+        if (it->first.first <= head_inst->seqNum)
         {
-            if (ENABLE_COMMIT_ALIAS_TABLE_DEBUG)
-              {std::cout << "Commit: updateAliasTable: " <<
-                head_inst->pcState() << " " <<
-                si->disassemble(head_inst->pcState().pc()) <<
-                " Base: " << si->getBase() <<
-                " Dest: " << si->getMemOpDataRegIndex() <<
-                " src2 idx: "  << head_inst->srcRegIdx(2).index() <<
-                " src2: " << std::hex <<
-                head_inst->readIntRegOperand(head_inst->staticInst.get(),2) <<
-                std::dec << " PID: " << _pid <<
-                std::endl;
-              }
-            //update Commit Alias Table
-            tc->CommitAliasTable[head_inst->effAddr] = _pid;
-            // if there is a same update in Exe Alias Table
-            // find it and remove it as it's in the commit alias table now
-            auto exe_alias_table =
-                tc->ExecuteAliasTable.find(head_inst->effAddr);
-            if (exe_alias_table != tc->ExecuteAliasTable.end()){
-              if (exe_alias_table->second.seqNum == head_inst->seqNum){
-                  if (ENABLE_COMMIT_ALIAS_TABLE_DEBUG){
-                    std::cout << "Commit: updateAliasTable: " <<
-                        head_inst->pcState() << " " <<
-                        "removing "<< _pid << " from ExeAliasTable!" <<
-                        std::endl;
-                  }
-                  tc->ExecuteAliasTable.erase(head_inst->effAddr);
-              }
+
+            // first check whether this is a valid stack alias or not
+            if (it->first.second <= stack_base &&
+                it->first.second > RSPValue)
+            {
+                // updateStackAliasTable will handle this
+                //  break;
+            }
+            else if (it->first.second <= RSPValue &&
+                it->first.second >= next_thread_stack_base)
+            {
+              // we should not be here!
+              // just erase, dont commit it
+                tc->ExeAliasTableBuffer.erase(it);
+              //  break;
+            }
+            else {
+              // this is not a stack alias therfore commit it to shadow memory
+              // and then erase it
+                tc->CommitAliasTable[it->first.second] = it->second;
+                tc->ExeAliasTableBuffer.erase(it);
+              //  break;
             }
 
         }
-        // if this address holds a pid(0) then remove it!
-        else if (tc->CommitAliasTable.find(head_inst->effAddr) !=
-                                                    tc->CommitAliasTable.end())
-        {
-          tc->CommitAliasTable.erase(head_inst->effAddr);
+        else {
+          // there is no more to commit
+          break;
         }
-      }
+  }
 
+
+}
+
+// here dont commit stack aliases!
+// this is a function just for squashing a single instruction!
+// if equal is true then we need to delete the entry because it's squashed
+template<class Impl>
+void
+DefaultCommit<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
+{
+
+    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+    if (tc->enableCapability ){
+       for (auto exe_alias_table =
+            tc->ExeAliasTableBuffer.cbegin(), next_it = exe_alias_table;
+           exe_alias_table != tc->ExeAliasTableBuffer.cend();
+           exe_alias_table = next_it)
+       {
+          ++next_it;
+          if (exe_alias_table->first.first == inst->seqNum)
+          {
+            //remove and break we cant have two equal seqNum
+            tc->ExeAliasTableBuffer.erase(exe_alias_table);
+            break;
+          }
+       }
+    }
 }
 
 template <class Impl>
@@ -1808,7 +1733,7 @@ DefaultCommit<Impl>::getInsts()
 
             youngestSeqNum[tid] = inst->seqNum;
         } else {
-            squashExecuteAliasTable(inst, true);
+            squashExecuteAliasTable(inst);
             DPRINTF(Commit, "Instruction PC %s [sn:%i] [tid:%i] was "
                     "squashed, skipping.\n",
                     inst->pcState(), inst->seqNum, tid);
@@ -2004,31 +1929,6 @@ DefaultCommit<Impl>::oldestReady()
 }
 
 
-template<class Impl>
-void
-DefaultCommit<Impl>::squashExecuteAliasTable(DynInstPtr &inst, bool equal)
-{
-    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
-    if (tc->enableCapability ){
-       for (auto exe_alias_table =
-            tc->ExecuteAliasTable.cbegin(), next_it = exe_alias_table;
-           exe_alias_table != tc->ExecuteAliasTable.cend();
-           exe_alias_table = next_it)
-       {
-          ++next_it;
-          if (equal){
-              if (exe_alias_table->second.seqNum == inst->seqNum)
-              {
-                tc->ExecuteAliasTable.erase(exe_alias_table);
-              }
-          }
-          else {
-            if (exe_alias_table->second.seqNum < inst->seqNum)
-            {
-              tc->ExecuteAliasTable.erase(exe_alias_table);
-            }
-          }
-       }
-    }
-}
+
+
 #endif//__CPU_O3_COMMIT_IMPL_HH__

@@ -90,6 +90,31 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     ifetch_req = std::make_shared<Request>();
     data_read_req = std::make_shared<Request>();
     data_write_req = std::make_shared<Request>();
+
+    threadContexts[0]->enableCapability = p->enable_capability;
+    threadContexts[0]->symbolsFile = p->symbol_file;
+    threadContexts[0]->CommitStopTracking = false;
+    threadContexts[0]->ExeStopTracking = false;
+    threadContexts[0]->DisablePointerTracker = true;
+    threadContexts[0]->Collector_Status = ThreadContext::NONE;
+
+    if (p->symbol_file != ""){
+        std::string line;
+        std::ifstream myfile (threadContexts[0]->symbolsFile);
+        if (myfile.is_open()){
+            Addr pcAddr;
+            uint64_t checkType;
+            while ( std::getline (myfile,line) ){
+                std::istringstream iss(line);
+                iss >> std::hex >> pcAddr  >> checkType ;
+                (threadContexts[0]->syms_cache).insert(
+                          std::pair<Addr, TheISA::CheckType>
+                          (pcAddr, (TheISA::CheckType)checkType));
+            }
+            myfile.close();
+        }
+        else fatal("Can't open symbols file");
+    }
 }
 
 
@@ -617,7 +642,14 @@ AtomicSimpleCPU::tick()
             if (curStaticInst) {
                 fault = curStaticInst->execute(&t_info, traceData);
 
-                // keep an instruction count
+                if (fault == NoFault){
+                  ThreadContext::SymbolCacheIter syms_it =
+                      (threadContexts[0]->syms_cache).find(pcState.instAddr());
+                  if (syms_it != (threadContexts[0]->syms_cache).end()){
+                    collector(threadContexts[0], pcState, syms_it->second);
+                  }
+                }
+
                 if (fault == NoFault) {
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
@@ -696,4 +728,52 @@ AtomicSimpleCPU *
 AtomicSimpleCPUParams::create()
 {
     return new AtomicSimpleCPU(this);
+}
+
+
+void
+AtomicSimpleCPU::collector(ThreadContext * _tc,
+                         PCState &pcState,
+                         TheISA::CheckType _sym){
+
+    SimpleExecContext& t_info = *threadInfo[0];
+    SimpleThread* thread = t_info.thread;
+    if (_sym == TheISA::CheckType::AP_MALLOC_BASE_COLLECT){
+      if (curStaticInst->isFirstMicroop())
+        {  std::cout << "AP_MALLOC_BASE_COLLECT " << pcState <<
+                  " " << curStaticInst->disassemble(pcState.pc()) <<
+                  std::endl;
+           std::cout << std::hex << thread->readIntReg(X86ISA::INTREG_RAX) <<
+                  std::endl;
+        }
+    }
+    else if (_sym == TheISA::CheckType::AP_MALLOC_SIZE_COLLECT){
+      if (curStaticInst->isFirstMicroop())
+       {    std::cout << "AP_MALLOC_SIZE_COLLECT " << pcState <<
+                  " " << curStaticInst->disassemble(pcState.pc()) <<
+                  std::endl;
+           std::cout << std::hex << thread->readIntReg(X86ISA::INTREG_RDI) <<
+                  std::endl;
+       }
+    }
+    else if (_sym == TheISA::CheckType::AP_FREE_CALL){
+
+    }
+    else if (_sym == TheISA::CheckType::AP_FREE_RET){
+
+    }
+    else if (_sym == TheISA::CheckType::AP_CALLOC_BASE_COLLECT){
+
+    }
+    else if (_sym == TheISA::CheckType::AP_CALLOC_SIZE_COLLECT){
+
+    }
+    else if (_sym == TheISA::CheckType::AP_REALLOC_BASE_COLLECT){
+
+    }
+    else if (_sym == TheISA::CheckType::AP_REALLOC_SIZE_COLLECT){
+
+    }
+
+
 }

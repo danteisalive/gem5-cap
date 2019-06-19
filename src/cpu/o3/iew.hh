@@ -232,11 +232,11 @@ class DefaultIEW
     /** Check misprediction  */
     void checkMisprediction(DynInstPtr &inst);
     void updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst);
-    void squashExecuteAliasTable(DynInstPtr &inst);
+    void squashExecuteAliasTable(DynInstPtr &inst, bool include_inst);
     void collector(ThreadID tid, DynInstPtr &inst);
     TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
     void updateAliasTable(ThreadID tid, DynInstPtr &inst);
-    void checkAccuracy(ThreadID tid, DynInstPtr &inst);
+    //void checkAccuracy(ThreadID tid, DynInstPtr &inst);
   private:
     /** Sends commit proper information for a squash due to a branch
      * mispredict.

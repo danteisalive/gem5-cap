@@ -67,7 +67,7 @@ namespace X86ISA
     {
 
         // All the PIDs in this Page
-        std::map<TheISA::PointerID, uint64_t> pids;
+        //std::map<TheISA::PointerID, uint64_t> pids;
         // The base of the physical page.
         Addr paddr;
 
@@ -94,7 +94,8 @@ namespace X86ISA
         bool noExec;
         // A sequence number to keep track of LRU.
         uint64_t lruSeq;
-
+        // A flag which tells whether there are any alises in this page
+        bool existsAlias;
         TlbEntryTrie::Handle trieHandle;
 
         TlbEntry(Addr asn, Addr _vaddr, Addr _paddr,

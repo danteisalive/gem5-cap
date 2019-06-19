@@ -126,6 +126,13 @@ TLB::lookup(Addr va, bool update_lru)
     return entry;
 }
 
+bool
+TLB::lookupAlias(Addr vaddr){
+    TlbEntry *entry = trie.lookup(vaddr);
+    if (entry) return true;
+    else       return false;
+}
+
 void
 TLB::flushAll()
 {

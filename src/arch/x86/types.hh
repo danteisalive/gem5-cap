@@ -180,28 +180,27 @@ namespace X86ISA
     class CacheEntry {
 
         public:
-            int tag;
+            uint64_t tag;
             bool valid;
             bool dirty;
             uint64_t lruAge;
             uint64_t t_access_nums;
             uint64_t t_num_replaced;
             PointerID pid{0};
-            uint64_t sqn;
         public:
             CacheEntry():
-                tag(-1),valid(false), dirty(false),
+                tag(0),valid(false), dirty(false),
                 lruAge(1),t_access_nums(0), t_num_replaced(0)
             {}
 
     } ;
 
+
     class LRUAliasCache
     {
 
     private:
-        std::map<int, CacheEntry>   TheCache;
-
+        CacheEntry**                 AliasCache;
         uint64_t                     NumWays;
         uint64_t                     NumSets;
         uint64_t                     CacheSize;
@@ -231,120 +230,104 @@ namespace X86ISA
                 BitsPerBlock = std::log2(CacheBlockSize);
                 ShiftAmount = BitsPerSet + BitsPerBlock;
 
-                for (size_t idx = 0; idx < NumEntriesInCache; idx++) {
-                  TheCache[idx].tag = -1;
-                  TheCache[idx].valid = false;
-                  TheCache[idx].dirty = false;
-                  TheCache[idx].lruAge = 1;
-                  TheCache[idx].pid = PointerID{0};
+                AliasCache = new CacheEntry*[NumSets];
+                for (size_t i = 0; i < NumSets; i++) {
+                  AliasCache[i]  = new CacheEntry[NumWays];
+                }
+
+
+                for (size_t set = 0; set < NumSets; set++) {
+                    for (size_t way = 0; way < NumWays; way++) {
+                      AliasCache[set][way].tag = 0;
+                      AliasCache[set][way].valid = false;
+                      AliasCache[set][way].dirty = false;
+                      AliasCache[set][way].lruAge = 1;
+                      AliasCache[set][way].pid = PointerID{0};
+                    }
                 }
 
             }
 
         ~LRUAliasCache(){
-
+          delete [] AliasCache;
         }
 
-        bool access(Addr v_addr, bool write, PointerID& pid) {
+        // this function is called when we want to write or read an alias
+        // from the table. In the case of a write, we need to update the
+        // sqn of the entry in the case of a squash
+        bool Access(Addr vaddr,
+                    std::map<Addr,PointerID>* shadow_memory,
+                    PointerID* pid ){
+
             //TODO: stats
             total_accesses = total_accesses + 1;
 
-            Addr thisIsTheTag = v_addr >> (ShiftAmount); //tag of the VA
+            Addr thisIsTheTag = vaddr >> (ShiftAmount); //tag of the VA
 
             //Extract the set from the VA
             Addr thisIsTheSet =
-                ((v_addr - (thisIsTheTag << ShiftAmount)) >> BitsPerBlock);
+                ((vaddr - (thisIsTheTag << ShiftAmount)) >> BitsPerBlock);
 
-            int setLoopLow = thisIsTheSet * NumWays;
-            int setLoopHigh = setLoopLow + (NumWays - 1);
 
-            int hit = 0;
-            for (int j = setLoopLow; j <= setLoopHigh; j++){
-                if (TheCache[j].tag == thisIsTheTag){
-                    //We have a hit!
-                    hit = 1;
-                    total_hits = total_hits + 1;
-                    //Increase the age of everything
-                    for (int k = setLoopLow; k <= setLoopHigh; k++){
-                        TheCache[k].lruAge++;
-                    }
+            assert(thisIsTheSet < NumSets);
 
-                    if (write){
-                      TheCache[j].dirty = true;
-                      TheCache[j].pid = pid;
-                    }
-                    else {
-                      pid = TheCache[j].pid;
-                    }
 
-                    TheCache[j].lruAge = 0;
-                    TheCache[j].t_access_nums++;
+            for (size_t wayNum = 0; wayNum < NumWays; wayNum++) {
 
-                    if (!write){
-                      pid = TheCache[j].pid;
-                    }
-                    break;
-
-                }
-            }
-
-            if (hit == 0){
-
-                total_misses = total_misses + 1;
-
-                int highestAge = 0;
-                int highestSpot = 0;
-                //Loop through the set and find the oldest element
-                for (int m = setLoopLow; m <= setLoopHigh; m++){
-
-                    if (TheCache[m].lruAge > highestAge){
-                        highestAge = TheCache[m].lruAge;
-                        highestSpot = m;
-                    }
-
-                }
-
-                //Replace the oldest element with the new tag
-                TheCache[highestSpot].tag = thisIsTheTag;
-
-                //Increase the age of each element
-                for (int m = setLoopLow; m <= setLoopHigh; m++){
-                    TheCache[m].lruAge++;
-                }
-
-                if (write){
-                  TheCache[highestSpot].dirty = true;
-                  TheCache[highestSpot].pid = pid;
-                }
-                else
+                if (AliasCache[thisIsTheSet][wayNum].valid &&
+                    AliasCache[thisIsTheSet][wayNum].tag == thisIsTheTag)
                 {
-                  TheCache[highestSpot].dirty = false;
-                  pid = TheCache[highestSpot].pid;
+
+                    total_hits++;
+                    AliasCache[thisIsTheSet][wayNum].valid = true;
+                    *pid = AliasCache[thisIsTheSet][wayNum].pid;
+
+                    // increase the lru age
+                    for (size_t i = 0; i < NumWays; i++) {
+                      AliasCache[thisIsTheSet][i].lruAge++;
+                    }
+                    AliasCache[thisIsTheSet][wayNum].lruAge = 0;
+
+                    return true;
+
                 }
 
-                TheCache[highestSpot].lruAge = 0;
-                TheCache[highestSpot].t_access_nums++;
-                TheCache[highestSpot].t_num_replaced++;
-
+            }
+            // if we are here then it means a miss
+            // find the candiate for replamcement
+            total_misses++;
+            size_t candidateWay = 0;
+            size_t candiateLruAge = 0;
+            for (int i = 0; i < NumWays; i++) {
+                if (AliasCache[thisIsTheSet][i].lruAge > candiateLruAge){
+                  candiateLruAge = AliasCache[thisIsTheSet][i].lruAge;
+                  candidateWay = i;
+                }
             }
 
-            return hit;
+            for (size_t i = 0; i < NumWays; i++) {
+              AliasCache[thisIsTheSet][i].lruAge++;
+            }
 
-        }
-
-      void flush(uint64_t _sqn){
-          for (size_t idx = 0; idx < NumEntriesInCache; idx++) {
-            if (TheCache[idx].dirty &&
-                (TheCache[idx].sqn >= _sqn))
+            // new read it from shadow_memory
+            auto it = shadow_memory->find(vaddr);
+            if (it != shadow_memory->end())
             {
-                TheCache[idx].tag = -1;
-                TheCache[idx].valid = false;
-                TheCache[idx].dirty = false;
-                TheCache[idx].lruAge = 1;
-                TheCache[idx].pid = PointerID{0};
-                // also update it with last correct PID number
+                AliasCache[thisIsTheSet][candidateWay].pid = it->second;
+                *pid = it->second;
             }
-          }
+            else {
+                AliasCache[thisIsTheSet][candidateWay].pid = PointerID(0);
+                *pid = PointerID(0);
+            }
+
+            AliasCache[thisIsTheSet][candidateWay].valid = true;
+            AliasCache[thisIsTheSet][candidateWay].tag = thisIsTheTag;
+            AliasCache[thisIsTheSet][candidateWay].lruAge = 0;
+
+            return false;
+
+
       }
 
       void print_stats() {

@@ -1227,7 +1227,6 @@ void
 DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
                                     ThreadID tid, StaticInstPtr& si) {
 
-        //if (si->isSquashedAfterInjection) return;
 
         ThreadContext * tc = cpu->tcBase(tid);
         ThreadContext::SymbolCacheIter syms_it =
@@ -1242,10 +1241,10 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
               // a bug in squash method we check the bounds and permissions
               //but in a different way
               if (si->injectCheckMicroops())
-                  {
-                    si->injectMicroops(tc, thisPC,
-                                       TheISA::CheckType::AP_BOUNDS_INJECT);
-                  }
+              {
+                si->injectMicroops(tc, thisPC,
+                                   TheISA::CheckType::AP_BOUNDS_INJECT);
+              }
 
 
         }

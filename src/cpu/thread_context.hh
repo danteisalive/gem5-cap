@@ -108,19 +108,17 @@ class ThreadContext
     using VecRegContainer = TheISA::VecRegContainer;
     using VecElem = TheISA::VecElem;
   public:
-
+                    // seqNum effAddr
+    typedef std::pair<uint64_t, uint64_t> AliasTableKey;
+    typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
     //Addr here is the AP/DP point address
     typedef std::map<Addr,  TheISA::CheckType> SymbolCache;
-    //typedef std::map<TheISA::Range, TheISA::PointerID> RangeCapabilityCache;
     typedef std::map<TheISA::PointerID, TheISA::Capability>
-                                                    CapabilityRegistersFile;
-    //typedef std::map<X86ISA::IntRegIndex, TheISA::PointerID>
-      //                                              PointerTrackTable;
-
+                                                    CapabilityRegistersFile;;
     typedef std::map<Addr, TheISA::PointerID>       ComAliasTable;
     typedef std::map<Addr, TheISA::AliasTableEntry> ExeAliasTable;
     typedef SymbolCache::iterator                   SymbolCacheIter;
-    //typedef RangeCapabilityCache::iterator RangeCapCacheIter;
+
 
     typedef CapabilityRegistersFile::iterator   CapabilityRegistersFileIter;
     //temprory
@@ -144,10 +142,10 @@ class ThreadContext
     ComAliasTable                               CommitAliasTable;
     ExeAliasTable                               ExecuteAliasTable;
     CapabilityRegistersFile                     CapRegsFile;
-    TheISA::LRUCache                            LRUCapCache{128, 16, 2048};
-    TheISA::LRUAliasCache                       ExeAliasCache{1, 1, 2048};
+    TheISA::LRUAliasCache                       ExeAliasCache{2, 1, 1024};
     TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
+    ExeAliasBuffer                              ExeAliasTableBuffer;
 
     enum Status
     {

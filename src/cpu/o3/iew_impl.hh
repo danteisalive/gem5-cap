@@ -511,11 +511,7 @@ DefaultIEW<Impl>::squashDueToBranch(DynInstPtr &inst, ThreadID tid)
 
         wroteToTimeBuffer = true;
 
-        squashExecuteAliasTable(inst);
-
-        // if (inst->macroop->hasInjection()){
-        //     inst->macroop->isSquashedAfterInjection = true;
-        // }
+        squashExecuteAliasTable(inst, false);
     }
 
 }
@@ -548,11 +544,8 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
 
         wroteToTimeBuffer = true;
 
-        squashExecuteAliasTable(inst);
+        squashExecuteAliasTable(inst, true);
 
-        // if (inst->macroop->hasInjection()){
-        //     inst->macroop->isSquashedAfterInjection = true;
-        // }
     }
 }
 
@@ -596,7 +589,7 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
 
         wroteToTimeBuffer = true;
 
-        squashExecuteAliasTable(inst);
+        squashExecuteAliasTable(inst, true);
     }
 }
 
@@ -1561,9 +1554,6 @@ DefaultIEW<Impl>::writebackInsts()
               {
                 updateAliasTable(inst->threadNumber, inst);
               }
-              //for all instructions
-              updateStackAliasTable(inst->threadNumber, inst);
-
 
               if (inst->isBoundsCheckMicroop()){
                   cpu->NumOfExecutedBoundsCheck++;
@@ -1784,21 +1774,29 @@ DefaultIEW<Impl>::checkMisprediction(DynInstPtr &inst)
 
 template <class Impl>
 void
-DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
+DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst, bool include_inst)
 {
     ThreadContext * tc = cpu->tcBase(inst->threadNumber);
     if (tc->enableCapability ){
-       for (auto exe_alias_table =
-          tc->ExecuteAliasTable.cbegin(), next_it = exe_alias_table;
-           exe_alias_table != tc->ExecuteAliasTable.cend();
-           exe_alias_table = next_it)
+       // new code
+       for (auto exe_alias_buffer =
+            tc->ExeAliasTableBuffer.cbegin(), next_it = exe_alias_buffer;
+            exe_alias_buffer != tc->ExeAliasTableBuffer.cend();
+            exe_alias_buffer = next_it)
        {
           ++next_it;
-          if (exe_alias_table->second.seqNum > inst->seqNum)
+          if (include_inst &&
+             (exe_alias_buffer->first.first >= inst->seqNum))
           {
-            tc->ExecuteAliasTable.erase(exe_alias_table);
+            tc->ExeAliasTableBuffer.erase(exe_alias_buffer);
+          }
+          else if (!include_inst &&
+                  (exe_alias_buffer->first.first > inst->seqNum))
+          {
+            tc->ExeAliasTableBuffer.erase(exe_alias_buffer);
           }
        }
+
     }
 
 }
@@ -1880,19 +1878,19 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         // but as we dont know the pid at the return and we are not tracking
         // anything during the free fucntion we can safelydo it here!
         if (_pid != TheISA::PointerID(0)){
-            for (auto it = tc->ExecuteAliasTable.cbegin(), next_it = it;
-                 it != tc->ExecuteAliasTable.cend(); it = next_it)
+            for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
+                 it != tc->ExeAliasTableBuffer.cend(); it = next_it)
             {
               ++next_it;
-              if (it->second.pid.getPID() == _pid.getPID())
+              if (it->second.getPID() == _pid.getPID())
               {
                 if (ENABLE_EXE_COLLECTOR_DEBUG){
                   std::cout << "IEW: collector: " << "Free is called " <<
-                  "and is removing " << it->second.pid << " at address " <<
-                  std::hex << it->first << std::dec <<
+                  "and is removing " << it->second << " at address " <<
+                  std::hex << it->first.second << std::dec <<
                   std::endl;
                 }
-                tc->ExecuteAliasTable.erase(it);
+                tc->ExeAliasTableBuffer.erase(it);
               }
             }
         }
@@ -1958,7 +1956,7 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
        // datasize should be 4/8 bytes othersiwe it's not a base address
        if (si->getDataSize() < 4) return;
-       // return if store is not pointed to a DS or SS section
+       // return if store is not pointed to the DS or SS section
        if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
            si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
        //  to our knowledge:
@@ -1994,168 +1992,24 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
             {std::cout << "IEW: updateAliasTable" <<
             inst->pcState() << " " <<
             si->disassemble(inst->pcState().pc()) <<
-            " Base: " << si->getBase() <<
-            " Dest: " << si->getMemOpDataRegIndex() <<
-            " src2 idx: "  << inst->srcRegIdx(2).index() <<
+            " SEQNUM: " << inst->seqNum << std::endl <<
             " src2: " << std::hex <<
             inst->readIntRegOperand(inst->staticInst.get(),2) << std::dec <<
             " PID: " << _pid <<
             std::endl;}
             //put it into exe alias table and later in commit delete it
-            tc->ExecuteAliasTable[inst->effAddr].pid = _pid ;
-            tc->ExecuteAliasTable[inst->effAddr].seqNum = inst->seqNum;
+            tc->ExeAliasTableBuffer[ThreadContext::AliasTableKey(
+                                    inst->seqNum,inst->effAddr)] = _pid;
 
-            if (0)
+            if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
               {std::cout << "IEW: updateAliasTable " <<
-                 "ExeAliasTableSize: " << tc->ExecuteAliasTable.size() <<
+                 "ExeAliasTableSize: " << tc->ExeAliasTableBuffer.size() <<
                  std::endl;
-              }
-        }
-        // if this address holds a pid(0) then remove it!
-        else if (tc->ExecuteAliasTable.find(inst->effAddr) !=
-                                      tc->ExecuteAliasTable.end())
-        {
-          tc->ExecuteAliasTable.erase(inst->effAddr);
-        }
-
-  }
-
-}
-
-
-
-// this function will be called in writeback like updateAliasTable
-// we know that if an instruction updates the RSP/ESP reg, then defenitly
-// all the instructions dependent on this on RSP before this instrcution
-// are executed. So, we can safely update our exe_alias_table
-template <class Impl>
-void
-DefaultIEW<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &inst)
-{
-    #define ENABLE_EXE_STACK_ALIAS_TABLE_DEBUG 0
-
-    ThreadContext * tc = cpu->tcBase(tid);
-    const StaticInstPtr si = inst->staticInst;
-
-    if (inst->isMicroopInjected()) return;
-    if (inst->isBoundsCheckMicroop()) return;
-    //if (tc->ExeStopTracking) return;
-
-    // a little speeding things up
-    // is inst integer?
-    if (!inst->isInteger()) return;
-    // is dataszie >=4 ?
-    // some limited microops (e.g, limm)
-    //they dont have getDataSize implemented
-    // because they are derived diretly from BaseMicroop class
-    // for now everything seems fine but solve this problem
-    if (si->getDataSize() < 4) {
-      if (si->getDataSize() == 0){
-        if (ENABLE_EXE_STACK_ALIAS_TABLE_DEBUG)
-        {
-            std::cout << "updateStackAliasTable: " <<
-                inst->pcState() << " " <<
-                si->disassemble(inst->pcState().pc()) <<
-                std::endl;
-        }
-      }
-      return;
-    }
-
-    // for every dest reg of the insturction:
-    // if its integer and equals to RSP/ESP then update alias table
-    // we are sure that we can only have one RSP dest reg
-    int i;
-    for (i = 0; i < inst->numDestRegs(); i++) {
-        // is dest int ?
-        if (!inst->destRegIdx(i).isIntReg()) continue;
-        // is the reg RSP/ESP?
-        if (inst->destRegIdx(i).index() == X86ISA::INTREG_RSP) {
-          if (ENABLE_EXE_STACK_ALIAS_TABLE_DEBUG)
-          {std::cout << inst->pcState() << " " <<
-            si->disassemble(inst->pcState().pc()) <<
-            std::endl;}
-
-          break;
-        }
-
-    }
-
-    if (i == inst->numDestRegs()) return; // non of the dest regs are RSP/ESP
-
-    uint64_t newRSPValue = inst->readDestReg(si.get(), i);
-    if (prevRSPValue < newRSPValue){
-        auto exe_low_it =
-                  tc->ExecuteAliasTable.lower_bound(prevRSPValue);
-        if ((exe_low_it != tc->ExecuteAliasTable.end())){
-
-          auto exe_high_it =
-                    tc->ExecuteAliasTable.upper_bound(newRSPValue-1);
-
-          if ((exe_high_it != tc->ExecuteAliasTable.end())){
-             tc->ExecuteAliasTable.erase(exe_low_it,exe_high_it);
-          }
-          else {
-              tc->ExecuteAliasTable.erase(
-                                        exe_low_it,
-                                        tc->ExecuteAliasTable.end()
-                                        );
-          }
-
-        }
-    }
-
-    prevRSPValue = newRSPValue;
-
-}
-
-
-template <class Impl>
-void
-DefaultIEW<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
-{
-
-    const StaticInstPtr si = inst->staticInst;
-    //let's see whether this is a heap access or not
-    // this is defeniltly a memory access (any kind)
-
-        cpu->numOfMemRefs++;
-        if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
-
-          // src reg is not rsp which is always for stack
-            TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
-            if (_pid != TheISA::PointerID(0)){ // heap access?
-              cpu->heapAccesses++;
-              if (inst->staticInst->uop_pid == _pid){
-                // correct guess
-                cpu->truePredection++;
-                inst->staticInst->checked = true;
-              }
-              else {
-                // this is heap access and we have miss prediction
-                 cpu->HeapPnAm++;
-                 inst->staticInst->uop_pid = _pid;
-                 inst->staticInst->checked = true;
-              }
             }
-            else {
-              // this is not a heap but we need to make sure that
-              // we did not accidentaly assign a PID to it
-              if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
-                cpu->truePredection++;
-                inst->staticInst->checked = true;
-              }
-              else {
-                cpu->HeapPnA0++;
-                inst->staticInst->uop_pid = TheISA::PointerID(0);
-                inst->staticInst->checked = true;
-              }
-
-            }
-         }
-         else {
-           cpu->truePredection++;
-         }
+        }
+    }
 
 }
+
+
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

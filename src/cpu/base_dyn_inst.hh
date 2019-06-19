@@ -330,13 +330,13 @@ class BaseDynInst : public ExecContext, public RefCounted
     void translationCompleted(bool f) { instFlags[TranslationCompleted] = f; }
 
     bool isCapabilityCheckCompleted() {
-      //return true;
+      return true;
       if (isCapFetched()){
           return true;
       }
       else {
           assert(cpu->curCycle() >= capFetchCycle);
-          if ((cpu->curCycle() - capFetchCycle) > 10){
+          if ((cpu->curCycle() - capFetchCycle) > 100){
             setCapFetched();
             return true;
           }

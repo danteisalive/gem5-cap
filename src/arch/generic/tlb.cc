@@ -71,3 +71,8 @@ GenericTLB::demapPage(Addr vaddr, uint64_t asn)
 {
     warn("Demapping pages in the generic TLB is unnecessary.\n");
 }
+
+bool
+BaseTLB::lookupAlias(Addr vaddr){
+    panic("lookuoAlias: should not called from here!");
+}

@@ -34,7 +34,15 @@ bool MacroopBase::filterInst(ThreadContext * tc,TheISA::PCState &nextPC) {
 void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 {
       #define ENABLE_POINTER_TRACKER_DEBUG 0
-    //  if (_isInjected) panic("tracking an injected macroop!");
+      // for (size_t i = 0; i < numMicroops; i++) {
+      //     if (microops[i]->isMemRef() &&
+      //         microops[i]->getBase() == X86ISA::NUM_INTREGS){
+      //       std::cout << std::hex << nextPC.pc() << " " <<
+      //                 microops[i]->disassemble(nextPC.pc()) << std::dec <<
+      //                 " Base Reg: " << microops[i]->getBase() <<
+      //               std::endl;
+      //     }
+      // }
 
       // this is probably a a little late but still can be effective
       if (tc->ExeStopTracking) return;
@@ -54,7 +62,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                   // is dest int ?
                   if (!si->destRegIdx(i).isIntReg()) continue;
                   int dest = si->destRegIdx(i).index();
-                  if (dest < X86ISA::NUM_INTREGS + 16){
+                  if (dest < TheISA::NumIntRegsToTrack){
                       tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
                   }
 
@@ -333,7 +341,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
           }
 
           if (si->isLastMicroop()){
-              for (int i = 16;i < TheISA::NumIntRegsToTrack; ++i)
+              for (int i = 16; i < TheISA::NumIntRegsToTrack; ++i)
               {
                   tc->PointerTrackerTable[i] = TheISA::PointerID(0);
               }
@@ -564,13 +572,13 @@ MacroopBase::injectMicroops(ThreadContext * _tc,
     else if (_sym == TheISA::CheckType::AP_BOUNDS_INJECT){
         injectBoundsCheck(nextPC);
       }
-    if (_sym == TheISA::CheckType::AP_CALLOC_BASE_COLLECT){
+    else if (_sym == TheISA::CheckType::AP_CALLOC_BASE_COLLECT){
         injectAPCallocBaseCollector(_tc, nextPC);
       }
     else if (_sym == TheISA::CheckType::AP_CALLOC_SIZE_COLLECT){
         injectAPCallocSizeCollector(_tc, nextPC);
       }
-    if (_sym == TheISA::CheckType::AP_REALLOC_BASE_COLLECT){
+    else if (_sym == TheISA::CheckType::AP_REALLOC_BASE_COLLECT){
         injectAPReallocBaseCollector(_tc, nextPC);
       }
     else if (_sym == TheISA::CheckType::AP_REALLOC_SIZE_COLLECT){

@@ -1460,6 +1460,7 @@ template <class Impl>
 bool
 LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 {
+
     #define ENABLE_PREDICTOR_DEBUG 0
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
@@ -1468,10 +1469,15 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    if (inst->isMicroopInjected()) return false;
    if (inst->isBoundsCheckMicroop()) return false;
 
-   if ((si->getName().compare("ld") == 0) ||
-       (si->getName().compare("ldis") == 0)){
+   // datasize should be 4/8 bytes othersiwe it's not a base address
+   if (si->getDataSize() < 4) return false;
 
-     if (inst->destRegIdx(0).isIntReg()){
+   assert(inst->isLoad());
+   //we should change this to isMemRef
+   //if ((si->getName().compare("ld") == 0) ||
+  //     (si->getName().compare("ldis") == 0)){
+
+   if (inst->destRegIdx(0).isIntReg()){
 
          int  dest = si->getMemOpDataRegIndex();
          if (dest > X86ISA::NUM_INTREGS + 15)
@@ -1480,125 +1486,104 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
          if (si->getDataSize() < 4) return false;
 
          cpu->NumOfAliasTableAccess++;
-         //first look in Execute Alias Table
-         auto exe_alias_table = tc->ExecuteAliasTable.find(inst->effAddr);
-         auto commit_alias_table = tc->CommitAliasTable.find(inst->effAddr);
+         //first look in Execute Alias buffer
+         for (auto exe_alias_buffer = tc->ExeAliasTableBuffer.rbegin();
+                    exe_alias_buffer != tc->ExeAliasTableBuffer.rend();
+                    ++exe_alias_buffer)
+         {
+            if (exe_alias_buffer->first.second == inst->effAddr){
 
-         if (exe_alias_table != tc->ExecuteAliasTable.end()){
-             if (inst->macroop->getMacroopPid() !=
-                  exe_alias_table->second.pid)
-              {
-                 cpu->updateFetchLVPT(
-                          inst, exe_alias_table->second.pid, false
-                                    );
-                 cpu->FalsePredict++;
-                 if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
-                     exe_alias_table->second.pid != TheISA::PointerID(0)){
-                       cpu->P0An++;
-                 }
-                 else if (inst->macroop->getMacroopPid() !=
-                          TheISA::PointerID(0) &&
-                        exe_alias_table->second.pid != TheISA::PointerID(0)){
-                       cpu->PmAn++;
-                 }
-                 if (ENABLE_PREDICTOR_DEBUG){
-                   std::cout << std::hex <<
-                   "EXECUTE: False Prediction Load Instruction: " <<
-                   inst->pcState().instAddr() << " " <<
-                   std::dec  <<inst->seqNum<< " " <<
-                   "Predicted: " << inst->macroop->getMacroopPid() << " " <<
-                   "Actual: " << exe_alias_table->second.pid << std::endl;
-                 }
-                 inst->macroop->setMacroopPid(exe_alias_table->second.pid);
-                 return true;
-             }
-             else {
-                 if (ENABLE_PREDICTOR_DEBUG){
-                   std::cout << std::hex <<
-                   "EXECUTE: True Prediction Load Instruction: " <<
-                   inst->pcState().instAddr() << " " <<
-                   std::dec  <<inst->seqNum<< " " <<
-                   "Predicted: " << inst->macroop->getMacroopPid() << " " <<
-                   "Actual: " << exe_alias_table->second.pid << std::endl;
-                 }
-                 cpu->updateFetchLVPT(inst, exe_alias_table->second.pid, true);
-                 return false;
-             }
-         }
-         else if (commit_alias_table != tc->CommitAliasTable.end()){
-           if (inst->macroop->getMacroopPid() != commit_alias_table->second){
-               cpu->updateFetchLVPT(inst, commit_alias_table->second, false);
-               cpu->FalsePredict++;
-               if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
-                   commit_alias_table->second != TheISA::PointerID(0)){
-                     cpu->P0An++;
-               }
-               else if (inst->macroop->getMacroopPid() !=
-                        TheISA::PointerID(0) &&
-                        commit_alias_table->second != TheISA::PointerID(0)){
-                     cpu->PmAn++;
-               }
-               if (ENABLE_PREDICTOR_DEBUG){
-                 std::cout << std::hex <<
-                 "EXECUTE: False Prediction Load Instruction: " <<
-                 inst->pcState().instAddr() << " " <<
-                 std::dec  <<inst->seqNum<< " " <<
-                 "Predicted: " << inst->macroop->getMacroopPid() << " " <<
-                 "Actual: " << commit_alias_table->second << std::endl;
-               }
-               inst->macroop->setMacroopPid(commit_alias_table->second);
-               return true;
-           }
-           else {
-               cpu->updateFetchLVPT(inst, commit_alias_table->second, true);
-               if (ENABLE_PREDICTOR_DEBUG){
-                 std::cout << std::hex <<
-                 "EXECUTE: True Prediction Load Instruction: " <<
-                 inst->pcState().instAddr() << " " <<
-                 std::dec  <<inst->seqNum<< " " <<
-                 "Predicted: " << inst->macroop->getMacroopPid() << " " <<
-                 "Actual: " << commit_alias_table->second << std::endl;
-               }
-
-               return false;
-           }
-         }
-         // this is not a pointer refill so we need to check whether
-         // LVPT predicted right or not
-         else {
-
-           TheISA::PointerID _pid_t  = TheISA::PointerID{0};
-           if (inst->macroop->getMacroopPid() != TheISA::PointerID(0)){
-               cpu->updateFetchLVPT(inst, _pid_t, false);
-               cpu->FalsePredict++;
-               cpu->PnA0++;
-               inst->macroop->setMacroopPid(TheISA::PointerID(0));
-               if (ENABLE_PREDICTOR_DEBUG){
-                 std::cout << std::hex <<
-                 "EXECUTE: False Prediction Load Instruction: " <<
-                 inst->pcState().instAddr() << " " <<
-                 std::dec  <<inst->seqNum<< " " <<
-                 "Predicted: " << inst->macroop->getMacroopPid() << " " <<
-                 "Actual: " << _pid_t << std::endl;
-               }
-               return true;
-           }
-           else {
-               if (ENABLE_PREDICTOR_DEBUG)
+              if (inst->macroop->getMacroopPid() !=
+                   exe_alias_buffer->second)
                {
-                 std::cout << std::hex <<
-                 "EXECUTE: True Prediction Load Instruction: " <<
-                 inst->pcState().instAddr() << " " <<
-                  std::dec  <<inst->seqNum<< " " <<
-                 "Predicted: " << inst->macroop->getMacroopPid() << " " <<
-                 "Actual: " << _pid_t << std::endl;
-               }
-               cpu->updateFetchLVPT(inst, _pid_t, true);
-               return false;
-           }
+                  cpu->updateFetchLVPT(
+                           inst, exe_alias_buffer->second, false
+                                     );
+                  cpu->FalsePredict++;
+                  if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
+                      exe_alias_buffer->second != TheISA::PointerID(0)){
+                        cpu->P0An++;
+                  }
+                  else if (inst->macroop->getMacroopPid() !=
+                           TheISA::PointerID(0) &&
+                         exe_alias_buffer->second != TheISA::PointerID(0)){
+                        cpu->PmAn++;
+                  }
+                  if (ENABLE_PREDICTOR_DEBUG){
+                    std::cout << std::hex <<
+                    "EXECUTE: False Prediction Load Instruction: " <<
+                    inst->pcState().instAddr() << " " <<
+                    std::dec  <<inst->seqNum<< " " <<
+                    "Predicted: " << inst->macroop->getMacroopPid() << " " <<
+                    "Actual: " << exe_alias_buffer->second << std::endl;
+                  }
+
+                  inst->macroop->setMacroopPid(exe_alias_buffer->second);
+                  return true;
+              }
+              else {
+                  if (ENABLE_PREDICTOR_DEBUG){
+                    std::cout << std::hex <<
+                    "EXECUTE: True Prediction Load Instruction: " <<
+                    inst->pcState().instAddr() << " " <<
+                    std::dec  <<inst->seqNum<< " " <<
+                    "Predicted: " << inst->macroop->getMacroopPid() << " " <<
+                    "Actual: " << exe_alias_buffer->second << std::endl;
+                  }
+                  cpu->updateFetchLVPT(inst, exe_alias_buffer->second, true);
+                  return false;
+              }
+
+            }
+
+         }
+         // now we know that it's not in the ExeAliasTableBuffer
+         // threrefore we need to go to AliasCache
+         TheISA::PointerID pid = TheISA::PointerID(0);
+         tc->ExeAliasCache.Access(inst->effAddr,
+                                            &tc->CommitAliasTable,
+                                            &pid);
+
+        if (inst->macroop->getMacroopPid() != pid)
+        {
+            cpu->updateFetchLVPT(inst, pid, false);
+            cpu->FalsePredict++;
+            if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
+                pid != TheISA::PointerID(0))
+            {
+                cpu->P0An++;
+            }
+            else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
+                     pid != TheISA::PointerID(0))
+            {
+               cpu->PmAn++;
+            }
+            if (ENABLE_PREDICTOR_DEBUG){
+               std::cout << std::hex <<
+                          "EXECUTE: False Prediction Load Instruction: " <<
+                          inst->pcState().instAddr() << " " <<
+                          std::dec  <<inst->seqNum<< " " <<
+                          "Predicted: " << inst->macroop->getMacroopPid() <<
+                          " " << "Actual: " << pid << std::endl;
+            }
+
+            inst->macroop->setMacroopPid(pid);
+            return true;
         }
-     }
-   }
+        else {
+            if (ENABLE_PREDICTOR_DEBUG){
+                std::cout << std::hex <<
+                          "EXECUTE: True Prediction Load Instruction: " <<
+                          inst->pcState().instAddr() << " " <<
+                          std::dec  <<inst->seqNum<< " " <<
+                          "Predicted: " << inst->macroop->getMacroopPid() <<
+                          " " << "Actual: " << pid << std::endl;
+            }
+            cpu->updateFetchLVPT(inst, pid, true);
+            return false;
+        }
+      }
+   //}
 
    return false;
 }
@@ -1612,16 +1597,18 @@ LSQUnit<Impl>::squashExecuteAliasTable(DynInstPtr& inst,
                                 const InstSeqNum & squashed_num){
 
   ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+
   if (tc->enableCapability ){
-     for (auto exe_alias_table = tc->ExecuteAliasTable.cbegin(),
-          next_it = exe_alias_table;
-         exe_alias_table != tc->ExecuteAliasTable.cend();
-         exe_alias_table = next_it)
+
+     for (auto exe_alias_buffer = tc->ExeAliasTableBuffer.cbegin(),
+          next_it = exe_alias_buffer;
+         exe_alias_buffer != tc->ExeAliasTableBuffer.cend();
+         exe_alias_buffer = next_it)
      {
         ++next_it;
-        if (exe_alias_table->second.seqNum > squashed_num)
+        if (exe_alias_buffer->first.first > squashed_num)
         {
-          tc->ExecuteAliasTable.erase(exe_alias_table);
+          tc->ExeAliasTableBuffer.erase(exe_alias_buffer);
         }
 
      }
@@ -1649,44 +1636,6 @@ LSQUnit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
   return _pid;
 }
 
-
-template <class Impl>
-void
-LSQUnit<Impl>::updatePointerTracker(ThreadID tid, DynInstPtr &inst)
-{
-
-  ThreadContext * tc = cpu->tcBase(tid);
-  const StaticInstPtr si = inst->staticInst;
-
-
-  // sanitization
-  if (inst->isBoundsCheckMicroop()) return;
-  if (inst->isMicroopInjected()) return;
-  if (tc->ExeStopTracking) return;
-
-
-  if ((si->getName().compare("ld") == 0) ||
-      (si->getName().compare("ldis") == 0))
-  {
-
-    if (inst->destRegIdx(0).isIntReg()){
-        X86ISA::IntRegIndex   dest =
-                        (X86ISA::IntRegIndex)inst->destRegIdx(0).index();
-        if (dest < X86ISA::INTREG_RAX || dest >= X86ISA::NUM_INTREGS + 15)
-            return;
-
-      auto mtt_it = tc->CommitAliasTable.find(inst->effAddr);
-      if (mtt_it != tc->CommitAliasTable.end()){
-        //  tc->CommitPointerTracker[dest] = mtt_it->second;
-      }
-      else{
-        //  tc->CommitPointerTracker[dest] = TheISA::PointerID(0);
-      }
-    }
-
-  }
-
-}
 
 
 template <class Impl>

@@ -75,6 +75,8 @@ namespace X86ISA
 
         void setConfigAddress(uint32_t addr);
 
+        bool lookupAlias(Addr vaddr);
+
       protected:
 
         EntryList::iterator lookupIt(Addr va, bool update_lru = true);
