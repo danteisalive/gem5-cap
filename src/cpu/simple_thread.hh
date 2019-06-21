@@ -106,7 +106,14 @@ class SimpleThread : public ThreadState
     using VecRegContainer = TheISA::VecRegContainer;
     using VecElem = TheISA::VecElem;
   public:
+
     typedef ThreadContext::Status Status;
+
+    ThreadContext::COLLECTOR_STATUS      collector_status;
+    uint64_t                             ap_size;
+    uint64_t                             ap_base;
+    uint64_t                             PID;
+
 
   protected:
     union {
@@ -124,6 +131,7 @@ class SimpleThread : public ThreadState
 
     /** Did this instruction execute or is it predicated false */
     bool predicate;
+
 
   public:
     std::string name() const

@@ -71,6 +71,7 @@ SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
     clearArchRegs();
     tc = new ProxyThreadContext<SimpleThread>(this);
     quiesceEvent = new EndQuiesceEvent(tc);
+    PID = 0;
 }
 
 SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
@@ -101,6 +102,8 @@ SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
 
     if (use_kernel_stats)
         kernelStats = new TheISA::Kernel::Statistics();
+
+    PID = 0;
 }
 
 SimpleThread::~SimpleThread()

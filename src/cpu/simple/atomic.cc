@@ -115,6 +115,8 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
         }
         else fatal("Can't open symbols file");
     }
+
+    interval_tree = VG_newFM(interval_tree_Cmp );
 }
 
 
@@ -642,11 +644,14 @@ AtomicSimpleCPU::tick()
             if (curStaticInst) {
                 fault = curStaticInst->execute(&t_info, traceData);
 
-                if (fault == NoFault){
-                  ThreadContext::SymbolCacheIter syms_it =
+                if (threadContexts[0]->enableCapability && fault == NoFault){
+                  if (curStaticInst->isFirstMicroop())
+                  {
+                    ThreadContext::SymbolCacheIter syms_it =
                       (threadContexts[0]->syms_cache).find(pcState.instAddr());
-                  if (syms_it != (threadContexts[0]->syms_cache).end()){
-                    collector(threadContexts[0], pcState, syms_it->second);
+                    if (syms_it != (threadContexts[0]->syms_cache).end()){
+                      collector(threadContexts[0], pcState, syms_it->second);
+                    }
                   }
                 }
 
@@ -736,44 +741,226 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
                          PCState &pcState,
                          TheISA::CheckType _sym){
 
+    #define ATOMIC_CPU_COLLECTOR_DEBUG 0
+
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
-    if (_sym == TheISA::CheckType::AP_MALLOC_BASE_COLLECT){
-      if (curStaticInst->isFirstMicroop())
-        {  std::cout << "AP_MALLOC_BASE_COLLECT " << pcState <<
-                  " " << curStaticInst->disassemble(pcState.pc()) <<
-                  std::endl;
-           std::cout << std::hex << thread->readIntReg(X86ISA::INTREG_RAX) <<
-                  std::endl;
-        }
-    }
-    else if (_sym == TheISA::CheckType::AP_MALLOC_SIZE_COLLECT){
-      if (curStaticInst->isFirstMicroop())
-       {    std::cout << "AP_MALLOC_SIZE_COLLECT " << pcState <<
-                  " " << curStaticInst->disassemble(pcState.pc()) <<
-                  std::endl;
-           std::cout << std::hex << thread->readIntReg(X86ISA::INTREG_RDI) <<
-                  std::endl;
-       }
-    }
-    else if (_sym == TheISA::CheckType::AP_FREE_CALL){
+
+    if (_sym == TheISA::CheckType::AP_MALLOC_SIZE_COLLECT){
+
+      if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+         panic("AP_MALLOC_SIZE_COLLECT: Invalid Status!");
+
+      thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI);
+
+      thread->collector_status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+
+      // logs
+      if (ATOMIC_CPU_COLLECTOR_DEBUG)
+      { std::cout << "AP_MALLOC_SIZE_COLLECT: " << pcState <<
+               " " << curStaticInst->disassemble(pcState.pc()) << " Size: " <<
+               std::hex << thread->ap_size << std::endl;
+      }
 
     }
-    else if (_sym == TheISA::CheckType::AP_FREE_RET){
+    else if (_sym == TheISA::CheckType::AP_MALLOC_BASE_COLLECT){
 
-    }
-    else if (_sym == TheISA::CheckType::AP_CALLOC_BASE_COLLECT){
+      if (thread->collector_status !=
+                            ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE)
+          panic("AP_MALLOC_BASE_COLLECT: Invalid Status!");
+
+      thread->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
+
+      thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+
+      Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+      bk->payload   = (Addr)thread->ap_base;
+      bk->req_szB   = (SizeT)thread->ap_size;
+      bk->pid       = (Addr)++thread->PID;
+      Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0/*no val*/);
+      assert(!present);
+      // logs
+      if (ATOMIC_CPU_COLLECTOR_DEBUG)
+      { std::cout << "AP_MALLOC_BASE_COLLECT: " << pcState <<
+                  " " << curStaticInst->disassemble(pcState.pc()) <<
+                  " Base: " << std::hex << thread->ap_base << std::endl;
+      }
 
     }
     else if (_sym == TheISA::CheckType::AP_CALLOC_SIZE_COLLECT){
 
-    }
-    else if (_sym == TheISA::CheckType::AP_REALLOC_BASE_COLLECT){
+      if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+         panic("AP_CALLOC_SIZE_COLLECT: Invalid Status!");
 
+      thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI) *
+                        thread->readIntReg(X86ISA::INTREG_RSI);
+      thread->collector_status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+
+      // logs
+      if (ATOMIC_CPU_COLLECTOR_DEBUG)
+      { std::cout << "AP_CALLOC_SIZE_COLLECT: " << pcState <<
+               " " << curStaticInst->disassemble(pcState.pc()) << " Size: " <<
+               std::hex << thread->ap_size << std::endl;
+      }
+
+    }
+    else if (_sym == TheISA::CheckType::AP_CALLOC_BASE_COLLECT){
+
+       if (thread->collector_status !=
+                        ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE)
+          panic("AP_CALLOC_BASE_COLLECT: Invalid Status!");
+
+       thread->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
+
+       thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+
+       // logs
+       if (ATOMIC_CPU_COLLECTOR_DEBUG)
+       { std::cout << "AP_CALLOC_BASE_COLLECT: " << pcState <<
+                   " " << curStaticInst->disassemble(pcState.pc()) <<
+                   " Base: " << std::hex << thread->ap_base << std::endl;
+       }
+
+       Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+       bk->payload   = (Addr)thread->ap_base;
+       bk->req_szB   = (SizeT)thread->ap_size;
+       bk->pid       = (Addr)++thread->PID;
+       Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
+
+
+       if (present){
+         if (ATOMIC_CPU_COLLECTOR_DEBUG){
+             UWord keyW, valW;
+             VG_initIterFM( interval_tree );
+             while (VG_nextIterFM( interval_tree, &keyW, &valW )) {
+                Block* bk = (Block*)keyW;
+                assert(valW == 0);
+                assert(bk);
+                std::cout << "INTERVAL_TREE: " <<"Base: " <<
+                            std::hex << bk->payload << std::dec <<
+                            " Size: " << bk->req_szB <<" PID: " <<
+                            bk->pid << std::endl;
+              }
+             VG_doneIterFM( interval_tree );
+         }
+         assert(!present);
+       }
+
+    }
+    else if (_sym == TheISA::CheckType::AP_FREE_CALL){
+
+      uint64_t base_addr = thread->readIntReg(X86ISA::INTREG_RDI);
+      // logs
+      if (ATOMIC_CPU_COLLECTOR_DEBUG)
+      { std::cout << "AP_FREE_CALL: " << pcState <<
+                  " " << curStaticInst->disassemble(pcState.pc()) <<
+                  " FOUND: " <<  std::hex << base_addr << std::endl;
+      }
+
+      Block fake;
+      fake.payload = base_addr;
+      fake.req_szB = 1;
+      UWord foundkey = 1;
+      UWord foundval = 1;
+      Bool present = VG_lookupFM( interval_tree,
+                                  &foundkey, &foundval, (UWord)&fake );
+      if (present){
+          Block fake;
+          fake.payload = base_addr;
+          fake.req_szB = 1;
+          UWord oldKeyW;
+          Bool found = VG_delFromFM( interval_tree,
+                                   &oldKeyW, NULL, (Addr)&fake );
+          Block* bk = (Block*)oldKeyW;
+          assert(bk);
+          assert(found);
+          free(bk);
+      }
+
+
+    }
+    else if (_sym == TheISA::CheckType::AP_FREE_RET){
+      thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
     }
     else if (_sym == TheISA::CheckType::AP_REALLOC_SIZE_COLLECT){
 
-    }
+      if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+          panic("AP_REALLOC_SIZE_COLLECT: Invalid Status!");
 
+      thread->ap_size = thread->readIntReg(X86ISA::INTREG_RSI);
+      thread->collector_status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
+      uint64_t old_base_addr = thread->readIntReg(X86ISA::INTREG_RDI);
+
+      // logs
+      if (ATOMIC_CPU_COLLECTOR_DEBUG)
+      { std::cout << "AP_REALLOC_SIZE_COLLECT: " << pcState <<
+              " " << curStaticInst->disassemble(pcState.pc()) << " Size: " <<
+              std::hex << thread->ap_size << " Old Base Addr.: " <<
+              old_base_addr << std::endl;
+      }
+
+      Block fake;
+      fake.payload = old_base_addr;
+      fake.req_szB = 1;
+      UWord foundkey = 1;
+      UWord foundval = 1;
+      Bool present = VG_lookupFM( interval_tree,
+                                  &foundkey, &foundval, (UWord)&fake );
+      if (present){
+          Block fake;
+          fake.payload = old_base_addr;
+          fake.req_szB = 1;
+          UWord oldKeyW;
+          Bool found = VG_delFromFM( interval_tree,
+                                   &oldKeyW, NULL, (Addr)&fake );
+          Block* bk = (Block*)oldKeyW;
+          assert(bk);
+          assert(found);
+          free(bk);
+      }
+
+    }
+    else if (_sym == TheISA::CheckType::AP_REALLOC_BASE_COLLECT){
+
+      if (thread->collector_status !=
+                        ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
+        panic("AP_REALLOC_BASE_COLLECT: Invalid Status!");
+
+      thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+
+      thread->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
+
+      // logs
+      if (ATOMIC_CPU_COLLECTOR_DEBUG)
+      { std::cout << "AP_REALLOC_BASE_COLLECT: " << pcState <<
+                  " " << curStaticInst->disassemble(pcState.pc()) <<
+                  " Base: " << std::hex << thread->ap_base << std::endl;
+      }
+
+      Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+      bk->payload   = (Addr)thread->ap_base;
+      bk->req_szB   = (SizeT)thread->ap_size;
+      bk->pid       = (Addr)++thread->PID;
+      Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0/*no val*/);
+
+
+      if (present){
+        if (ATOMIC_CPU_COLLECTOR_DEBUG){
+            UWord keyW, valW;
+            VG_initIterFM( interval_tree );
+            while (VG_nextIterFM( interval_tree, &keyW, &valW )) {
+               Block* bk = (Block*)keyW;
+               assert(valW == 0);
+               assert(bk);
+               std::cout << "INTERVAL_TREE: " <<"Base: " <<
+                           std::hex << bk->payload << std::dec <<
+                           " Size: " << bk->req_szB <<" PID: " <<
+                           bk->pid << std::endl;
+             }
+            VG_doneIterFM( interval_tree );
+        }
+        assert(!present);
+      }
+    }
 
 }

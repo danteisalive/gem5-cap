@@ -35,7 +35,7 @@ if 'AtomicSimpleCPU' in env['CPU_MODELS']:
     need_simple_base = True
     SimObject('AtomicSimpleCPU.py')
     Source('atomic.cc')
-
+    Source('WordFM.cc')
     # The NonCachingSimpleCPU is really an atomic CPU in
     # disguise. It's therefore always enabled when the atomic CPU is
     # enabled.

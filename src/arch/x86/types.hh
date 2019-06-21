@@ -83,6 +83,7 @@ namespace X86ISA
           return (id == _pid.id);
       }
 
+
           // A better implementation of operator=
       PointerID& operator = (const PointerID& _pid)
           {

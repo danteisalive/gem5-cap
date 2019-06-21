@@ -43,13 +43,16 @@
 #ifndef __CPU_SIMPLE_ATOMIC_HH__
 #define __CPU_SIMPLE_ATOMIC_HH__
 
-#include <fstream>
 
-#include "cpu/simple/base.hh"
-#include "cpu/simple/exec_context.hh"
-#include "mem/request.hh"
-#include "params/AtomicSimpleCPU.hh"
-#include "sim/probe/probe.hh"
+// #include <fstream>
+//
+// #include "cpu/simple/base.hh"
+// #include "cpu/simple/exec_context.hh"
+// #include "cpu/simple/WordFM.hh"
+// #include "mem/request.hh"
+// #include "params/AtomicSimpleCPU.hh"
+// #include "sim/probe/probe.hh"
+
 
 class AtomicSimpleCPU : public BaseSimpleCPU
 {
@@ -75,6 +78,8 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     void collector(ThreadContext * _tc,
                 TheISA::PCState &pcState,
                 TheISA::CheckType _sym);
+
+    WordFM* interval_tree = NULL;  /* WordFM* Block* void */
     /**
      * Check if a system is in a drained state.
      *
