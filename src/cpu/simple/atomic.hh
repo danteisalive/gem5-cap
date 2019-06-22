@@ -39,20 +39,17 @@
  *
  * Authors: Steve Reinhardt
  */
-
 #ifndef __CPU_SIMPLE_ATOMIC_HH__
 #define __CPU_SIMPLE_ATOMIC_HH__
 
+#include <fstream>
 
-// #include <fstream>
-//
 // #include "cpu/simple/base.hh"
 // #include "cpu/simple/exec_context.hh"
 // #include "cpu/simple/WordFM.hh"
 // #include "mem/request.hh"
 // #include "params/AtomicSimpleCPU.hh"
 // #include "sim/probe/probe.hh"
-
 
 class AtomicSimpleCPU : public BaseSimpleCPU
 {

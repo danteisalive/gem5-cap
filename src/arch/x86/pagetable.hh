@@ -94,8 +94,10 @@ namespace X86ISA
         bool noExec;
         // A sequence number to keep track of LRU.
         uint64_t lruSeq;
+        // A flag to tell whether noALias flag is valid ro not
+        bool valid;
         // A flag which tells whether there are any alises in this page
-        bool existsAlias;
+        bool noAlias;
         TlbEntryTrie::Handle trieHandle;
 
         TlbEntry(Addr asn, Addr _vaddr, Addr _paddr,

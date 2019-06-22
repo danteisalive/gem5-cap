@@ -75,7 +75,7 @@ namespace X86ISA
 
         void setConfigAddress(uint32_t addr);
 
-        bool lookupAlias(Addr vaddr);
+        bool hasAlias(Addr vaddr);
 
       protected:
 

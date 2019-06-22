@@ -1469,13 +1469,10 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    if (inst->isMicroopInjected()) return false;
    if (inst->isBoundsCheckMicroop()) return false;
 
-   // datasize should be 4/8 bytes othersiwe it's not a base address
-   if (si->getDataSize() < 4) return false;
+   // datasize should be 8 bytes othersiwe it's not a base address
+   if (si->getDataSize() != 8) return false;
 
    assert(inst->isLoad());
-   //we should change this to isMemRef
-   //if ((si->getName().compare("ld") == 0) ||
-  //     (si->getName().compare("ldis") == 0)){
 
    if (inst->destRegIdx(0).isIntReg()){
 
@@ -1540,9 +1537,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
          // now we know that it's not in the ExeAliasTableBuffer
          // threrefore we need to go to AliasCache
          TheISA::PointerID pid = TheISA::PointerID(0);
-         tc->ExeAliasCache.Access(inst->effAddr,
-                                            &tc->CommitAliasTable,
-                                            &pid);
+         cpu->ExeAliasCache->Access(inst->effAddr, tc, &pid);
 
         if (inst->macroop->getMacroopPid() != pid)
         {
@@ -1583,7 +1578,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             return false;
         }
       }
-   //}
+
 
    return false;
 }

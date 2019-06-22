@@ -1341,6 +1341,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             std::endl <<
             " CommitAliasTable Size: " <<
             tc->CommitAliasTable.size() << std::endl <<
+            " ShadowMemory Size: " <<
+            tc->ShadowMemory.size() <<  std::endl <<
             " ExecuteAliasTable Size: " <<
             tc->ExecuteAliasTable.size() << std::endl <<
             " ExeAliasTableBuffer Size: " <<
@@ -1377,17 +1379,34 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             cpu->numOfCommitedMemRefs <<
             std::endl;
             tc->LRUPidCache.LRUPIDCachePrintStats();
-            tc->ExeAliasCache.print_stats();
+            cpu->ExeAliasCache->print_stats();
 
             std::cout << std::dec << head_inst->seqNum << " " <<
                   std::hex << cpu->readArchIntReg(X86ISA::INTREG_RSP, tid) <<
                   std::endl;
 
+            //dump
             for (auto& entry : tc->ExeAliasTableBuffer) {
                 std::cout << std::dec << entry.first.first << " " <<
                           std::hex << entry.first.second << " " << std::dec <<
                              entry.second << std::endl;
             }
+            //
+            // for (auto it1 = tc->ShadowMemory.cbegin();
+            //      it1 != tc->ShadowMemory.cend(); it1++) {
+            //   for (auto it2 = it1->second.cbegin();
+           //            it2 != it1->second.cend(); it2++) {
+            //     std::cout << std::hex << "VPN: " << it1->first << " " <<
+            //               "VADDR: " << it2->first << " " << std::dec <<
+            //               it2->second << std::endl;
+            //   }
+            // }
+
+            // for (auto& entry : tc->CommitAliasTable) {
+            //     std::cout << std::hex << entry.first << " " <<
+            //               std::dec << entry.second << " " << std::dec <<
+            //               std::endl;
+            // }
 
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
@@ -1528,6 +1547,42 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
           }
       }
 
+      // two level removal
+      // if the page pid map is empty delete the whole page pid map
+      // if the page pid map is not empty, them delete all the entrys with
+      // the same pid
+      if (_pid != TheISA::PointerID(0)){
+        for (auto it_lv1 = tc->ShadowMemory.begin(), next_it_lv1 = it_lv1;
+             it_lv1 != tc->ShadowMemory.end(); it_lv1 = next_it_lv1)
+        {
+            ++next_it_lv1;
+            if (it_lv1->second.size() == 0){
+              tc->ShadowMemory.erase(it_lv1);
+            }
+            else {
+                for (auto it_lv2 = it_lv1->second.cbegin(),
+                     next_it_lv2 = it_lv2; it_lv2 != it_lv1->second.cend();
+                     it_lv2 = next_it_lv2)
+                {
+                  ++next_it_lv2;
+                  if (it_lv2->second.getPID() == _pid.getPID())
+                  {
+                    if (ENABLE_COMMIT_COLLECTOR_DEBUG){
+                      std::cout << "Commit: collector: " <<
+                      "Free is called and is removing " <<
+                      it_lv2->second << " at address " <<
+                      std::hex << it_lv2->first << std::dec <<
+                      std::endl;
+                    }
+                    it_lv1->second.erase(it_lv2);
+                  }
+                }
+            }
+
+        }
+
+      } // two level removal
+
       tc->CommitStopTracking = true;
 
     }
@@ -1663,6 +1718,11 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
             else {
               // this is not a stack alias therfore commit it to shadow memory
               // and then erase it
+                Process *p = tc->getProcessPtr();
+                Addr vpn = p->pTable->pageAlign(it->first.second);
+                //auto page_pid_map = tc->ShadowMemory[vpn];
+                tc->ShadowMemory[vpn][it->first.second] = it->second;
+
                 tc->CommitAliasTable[it->first.second] = it->second;
                 tc->ExeAliasTableBuffer.erase(it);
               //  break;

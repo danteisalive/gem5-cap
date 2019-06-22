@@ -207,6 +207,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         tids.resize(numThreads);
     }
 
+    ExeAliasCache = new TheISA::LRUAliasCache(2, 1, 256);
+
     // The stages also need their CPU pointer setup.  However this
     // must be done at the upper level CPU because they have pointers
     // to the upper level CPU, and not this FullO3CPU.
@@ -467,6 +469,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 template <class Impl>
 FullO3CPU<Impl>::~FullO3CPU()
 {
+  delete ExeAliasCache;
 }
 
 template <class Impl>

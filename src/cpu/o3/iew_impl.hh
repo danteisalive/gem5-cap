@@ -1950,64 +1950,63 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
   if (inst->isBoundsCheckMicroop()) return;
   if (tc->ExeStopTracking) return;   // dont care about AP functions
 
-  //this should be replaced by isStore()
-  if ((si->getName().compare("st") == 0) ||
-      (si->getName().compare("stis") == 0)){
-
-       // datasize should be 4/8 bytes othersiwe it's not a base address
-       if (si->getDataSize() < 4) return;
+  // datasize should be 4/8 bytes othersiwe it's not a base address
+  if (si->getDataSize() != 8) return; // only for 64 bits system
        // return if store is not pointed to the DS or SS section
-       if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
-           si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+  if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
+      si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
        //  to our knowledge:
        // (base < 16) and base == 32 could be used for addresing.
        // igonre stores which don't use these regs
-       RegIndex baseRegInx = si->getBase();
-       if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
-            (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
+  RegIndex baseRegInx = si->getBase();
+  if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
+        (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
 
-       if (!inst->srcRegIdx(2).isIntReg()) return; // this is the dest reg
-       RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
+  if (!inst->srcRegIdx(2).isIntReg()) return; // this is the dest reg
+  RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
 
-       if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
+  if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
 
-       // srcReg[2] in store microops is the register that
-       //we want to write its value to mem
-       uint64_t  dataRegContent =
+  // srcReg[2] in store microops is the register that
+  //we want to write its value to mem
+  uint64_t  dataRegContent =
                     inst->readIntRegOperand(inst->staticInst.get(),2);
 
-       // check if this is a base address or not
-       TheISA::PointerID _pid = TheISA::PointerID(0);
-       for (auto& capElem : tc->CapRegsFile){
-            if (capElem.second.getBaseAddr() == dataRegContent){
-                _pid = capElem.first;
-                break;
-            }
-       }
+  // check if this is a base address or not
+  TheISA::PointerID _pid = TheISA::PointerID(0);
+  for (auto& capElem : tc->CapRegsFile){
+      if (capElem.second.getBaseAddr() == dataRegContent){
+          _pid = capElem.first;
+          break;
+      }
+  }
 
         // finally if it's a base adress write it in the execute alias table
-        if (_pid != TheISA::PointerID(0))
-        {
-          if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
-            {std::cout << "IEW: updateAliasTable" <<
+  if (_pid != TheISA::PointerID(0))
+  {
+      if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
+      {
+        std::cout << "IEW: updateAliasTable" <<
             inst->pcState() << " " <<
             si->disassemble(inst->pcState().pc()) <<
             " SEQNUM: " << inst->seqNum << std::endl <<
             " src2: " << std::hex <<
             inst->readIntRegOperand(inst->staticInst.get(),2) << std::dec <<
             " PID: " << _pid <<
-            std::endl;}
+            std::endl;
+      }
             //put it into exe alias table and later in commit delete it
             tc->ExeAliasTableBuffer[ThreadContext::AliasTableKey(
                                     inst->seqNum,inst->effAddr)] = _pid;
 
-            if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
-              {std::cout << "IEW: updateAliasTable " <<
-                 "ExeAliasTableSize: " << tc->ExeAliasTableBuffer.size() <<
-                 std::endl;
-            }
-        }
-    }
+      if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
+      {
+          std::cout << "IEW: updateAliasTable " <<
+                "ExeAliasTableSize: " << tc->ExeAliasTableBuffer.size() <<
+                std::endl;
+      }
+  }
+
 
 }
 

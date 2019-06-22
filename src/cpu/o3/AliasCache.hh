@@ -1,6 +1,7 @@
 /*
- * Copyright (c) 2007 The Hewlett-Packard Development Company
- * All rights reserved.
+ * Copyright (c) 2011-2012, 2014 ARM Limited
+ * Copyright (c) 2013 Advanced Micro Devices, Inc.
+ * All rights reserved
  *
  * The license below extends only to copyright in the software and shall
  * not be construed as granting a license to any other intellectual
@@ -10,6 +11,9 @@
  * terms below provided that you ensure that this notice is replicated
  * unmodified and in its entirety in all distributions of the software,
  * modified or unmodified, in source code or in binary form.
+ *
+ * Copyright (c) 2004-2006 The Regents of The University of Michigan
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -34,61 +38,57 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Authors: Gabe Black
+ * Authors: Korey Sewell
  */
 
-#include "arch/x86/pagetable.hh"
+#ifndef __CPU_O3_ALIAS_CACHE_HH__
+#define __CPU_O3_ALIAS_CACHE_HH__
 
-#include <cmath>
+#include <iostream>
+#include <map>
 
-#include "arch/x86/isa_traits.hh"
-#include "sim/serialize.hh"
+#include "arch/x86/insts/static_inst.hh"
+#include "arch/x86/types.hh"
+#include "debug/Capability.hh"
+#include "mem/page_table.hh"
+#include "sim/process.hh"
 
 namespace X86ISA
 {
 
-TlbEntry::TlbEntry()
-    : paddr(0), vaddr(0), logBytes(0), writable(0),
-      user(true), uncacheable(0), global(false), patBit(0),
-      noExec(false), lruSeq(0), valid(false) ,noAlias(false)
+
+class LRUAliasCache
 {
-}
 
-TlbEntry::TlbEntry(Addr asn, Addr _vaddr, Addr _paddr,
-                   bool uncacheable, bool read_only) :
-    paddr(_paddr), vaddr(_vaddr), logBytes(PageShift), writable(!read_only),
-    user(true), uncacheable(uncacheable), global(false), patBit(0),
-    noExec(false), lruSeq(0), valid(false) ,noAlias(false)
-{}
+    private:
+        CacheEntry**                 AliasCache;
+        uint64_t                     NumWays;
+        uint64_t                     NumSets;
+        uint64_t                     CacheSize;
+        uint64_t                     CacheBlockSize;
+        uint64_t                     NumEntriesInCache;
+        uint64_t                     BitsPerBlock;
+        uint64_t                     BitsPerSet;
+        uint64_t                     ShiftAmount;
 
-void
-TlbEntry::serialize(CheckpointOut &cp) const
-{
-    SERIALIZE_SCALAR(paddr);
-    SERIALIZE_SCALAR(vaddr);
-    SERIALIZE_SCALAR(logBytes);
-    SERIALIZE_SCALAR(writable);
-    SERIALIZE_SCALAR(user);
-    SERIALIZE_SCALAR(uncacheable);
-    SERIALIZE_SCALAR(global);
-    SERIALIZE_SCALAR(patBit);
-    SERIALIZE_SCALAR(noExec);
-    SERIALIZE_SCALAR(lruSeq);
-}
+        //TODO: move these to gem5 stats
+        uint64_t                     total_accesses;
+        uint64_t                     total_hits;
+        uint64_t                     total_misses;
 
-void
-TlbEntry::unserialize(CheckpointIn &cp)
-{
-    UNSERIALIZE_SCALAR(paddr);
-    UNSERIALIZE_SCALAR(vaddr);
-    UNSERIALIZE_SCALAR(logBytes);
-    UNSERIALIZE_SCALAR(writable);
-    UNSERIALIZE_SCALAR(user);
-    UNSERIALIZE_SCALAR(uncacheable);
-    UNSERIALIZE_SCALAR(global);
-    UNSERIALIZE_SCALAR(patBit);
-    UNSERIALIZE_SCALAR(noExec);
-    UNSERIALIZE_SCALAR(lruSeq);
-}
+    public:
+        LRUAliasCache(uint64_t _num_ways,
+                            uint64_t _cache_block_size,
+                            uint64_t _cache_size);
 
+        ~LRUAliasCache();
+
+        bool Access(Addr vaddr,
+                        ThreadContext* tc,
+                        PointerID* pid ) ;
+
+        void print_stats() ;
+
+};
 }
+#endif // __CPU_O3_ALIAS_CACHE_HH__

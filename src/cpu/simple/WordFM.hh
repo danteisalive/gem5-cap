@@ -46,11 +46,10 @@
 #ifndef __CPU_SIMPLE_WORDFM_HH__
 #define __CPU_SIMPLE_WORDFM_HH__
 
-// #include <cassert>
-// #include <cstring>
-// #include <iostream>
-// #include <string>
-
+#include <cassert>
+#include <cstring>
+#include <iostream>
+#include <string>
 
 // Size in bits on:                          32-bit archs   64-bit archs
 //                                           ------------   ------------

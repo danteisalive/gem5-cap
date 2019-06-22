@@ -117,6 +117,8 @@ class ThreadContext
                                                     CapabilityRegistersFile;;
     typedef std::map<Addr, TheISA::PointerID>       ComAliasTable;
     typedef std::map<Addr, TheISA::AliasTableEntry> ExeAliasTable;
+    typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>
+                                                    ShadowMemoryAliasTable;
     typedef SymbolCache::iterator                   SymbolCacheIter;
 
 
@@ -141,8 +143,9 @@ class ThreadContext
                              PointerTrackerTable[TheISA::NumIntRegsToTrack];
     ComAliasTable                               CommitAliasTable;
     ExeAliasTable                               ExecuteAliasTable;
+    ShadowMemoryAliasTable                      ShadowMemory;
     CapabilityRegistersFile                     CapRegsFile;
-    TheISA::LRUAliasCache                       ExeAliasCache{2, 1, 1024};
+    //TheISA::LRUAliasCache                       ExeAliasCache{2, 1, 1024};
     TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
     ExeAliasBuffer                              ExeAliasTableBuffer;
