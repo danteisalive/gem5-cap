@@ -44,6 +44,7 @@
 
 #include <fstream>
 
+#include "cpu/simple/WordFM.hh"
 #include "cpu/simple/base.hh"
 #include "cpu/simple/exec_context.hh"
 #include "mem/request.hh"
