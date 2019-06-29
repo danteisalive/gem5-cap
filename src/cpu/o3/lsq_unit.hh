@@ -56,6 +56,7 @@
 #include "arch/mmapped_ipr.hh"
 #include "config/the_isa.hh"
 #include "cpu/inst_seq.hh"
+#include "cpu/simple/WordFM.hh"
 #include "cpu/timebuf.hh"
 #include "debug/LSQUnit.hh"
 #include "mem/packet.hh"

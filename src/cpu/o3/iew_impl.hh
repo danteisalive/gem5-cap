@@ -1813,6 +1813,9 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
     if (inst->isMallocSizeCollectorMicroop()){
 
+        if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::NONE)
+            panic("AP_MALLOC_SIZE_COLLECT: Invalid Status!");
+
         if (ENABLE_EXE_COLLECTOR_DEBUG)
           {std::cout << std::hex << "IEW: MALLOC SIZE: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
@@ -1820,21 +1823,21 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                   " " << inst->seqNum <<
                   std::endl;}
 
-          uint64_t _pid_num=cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
-          uint64_t _pid_size=inst->readDestReg(inst->staticInst.get(),0);
-          tc->CapRegsFile.insert(
-                     std::pair<TheISA::PointerID, TheISA::Capability>
-                    (TheISA::PointerID(_pid_num),TheISA::Capability()));
+        uint64_t _pid_num=cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
+        uint64_t _pid_size=inst->readDestReg(inst->staticInst.get(),0);
+        tc->ap_size  = _pid_size;
+        tc->ap_pid   = _pid_num;
 
-          TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-          tc->CapRegsFile[_pid].seqNum = inst->seqNum;
-          tc->CapRegsFile[_pid].setSize(_pid_size);
+        tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+        tc->ExeStopTracking = true;
 
-          tc->ExeStopTracking = true;
-
-      }
-
+    }
     else if (inst->isMallocBaseCollectorMicroop()){
+
+      if (tc->Collector_Status !=
+                            ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE)
+          panic("AP_MALLOC_BASE_COLLECT: Invalid Status!");
+
       if (ENABLE_EXE_COLLECTOR_DEBUG)
         {std::cout << std::hex << "IEW: MALLOC BASE: " <<
                     inst->readDestReg(inst->staticInst.get(),0) <<
@@ -1845,16 +1848,24 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
 
-        TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-        tc->CapRegsFile[_pid].setBaseAddr(_pid_base);
-        tc->CapRegsFile[_pid].seqNum = inst->seqNum;
+        assert(_pid_num == tc->ap_pid);
 
+        Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+        bk->payload   = (Addr)_pid_base;
+        bk->req_szB   = (SizeT)tc->ap_size;
+        bk->pid       = (Addr)_pid_num;
+        bk->seqNum    = inst->seqNum;
+        Bool present = VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+        assert(!present);
+
+        tc->num_of_allocations++;
+        tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
         tc->ExeStopTracking = false;
         // rax now is a pointer
+        TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
         tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
 
     }
-
     else if (inst->isFreeCallMicroop()){
       if (ENABLE_EXE_COLLECTOR_DEBUG)
       {std::cout << std::hex << "IEW: FREE CALL: " <<
@@ -1865,11 +1876,30 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
         //check whether we have the cap for this AP or not
-        TheISA::PointerID _pid = SearchCapReg(tid,_pid_base);
-        if (_pid != TheISA::PointerID(0)){
-           // we can't still say that this is getting freed yet
-            tc->CapRegsFile[_pid].setCSRBit(1); // free is called for this AP
-            tc->CapRegsFile[_pid].seqNum = inst->seqNum;
+        Block fake;
+        fake.payload = _pid_base;
+        fake.req_szB = 1;
+        UWord foundkey = 1;
+        UWord foundval = 1;
+        Bool present = VG_lookupFM( cpu->interval_tree,
+                                    &foundkey, &foundval, (UWord)&fake );
+
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        Block* bk = NULL;
+        if (present){
+            Block fake;
+            fake.payload = _pid_base;
+            fake.req_szB = 1;
+            UWord oldKeyW;
+            Bool found = VG_delFromFM( cpu->interval_tree,
+                                     &oldKeyW, NULL, (Addr)&fake );
+            bk = (Block*)oldKeyW;
+            assert(bk);
+            assert(bk->pid != 0);
+            assert(found);
+            _pid = TheISA::PointerID(bk->pid);
+            free(bk);
+            tc->num_of_allocations--;
         }
 
         // delete all aliases that match this pid from exe alias table
@@ -1895,12 +1925,13 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             }
         }
 
-        tc->ExeStopTracking = true;
+        //tc->ExeStopTracking = true;
         // RDI is not a pointer anymore
         tc->PointerTrackerTable[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
 
     }
     else if (inst->isFreeRetMicroop()){
+
       if (ENABLE_EXE_COLLECTOR_DEBUG)
         {std::cout << std::hex << "IEW: FREE RET: " <<
                 inst->readDestReg(inst->staticInst.get(),0) <<
@@ -1909,31 +1940,154 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                 std::endl;}
       // do nothing, just start tracking again.
       // in commit we will check whether freeing was succesful or not
-      tc->ExeStopTracking = false;
+      //tc->ExeStopTracking = false;
 
     }
+    else if (inst->isCallocSizeCollectorMicroop()){
 
-  }
+      if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::NONE)
+         panic("AP_CALLOC_SIZE_COLLECT: Invalid Status!");
 
-}
-
-template <class Impl>
-TheISA::PointerID
-DefaultIEW<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
-{
-  ThreadContext * tc = cpu->tcBase(tid);
-
-  TheISA::PointerID _pid = TheISA::PointerID(0);
-  for (auto& capElem : tc->CapRegsFile){
-      if (capElem.second.contains(_addr)){
-          _pid = capElem.first;
-          break;
+      uint64_t _pid_num = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
+      uint64_t _pid_size_arg1 = inst->readDestReg(inst->staticInst.get(),0);
+      uint64_t _pid_size_arg2 =
+                  inst->readIntRegOperand(inst->staticInst.get(),0);
+      tc->ap_size = _pid_size_arg1 * _pid_size_arg2;
+      tc->ap_pid = _pid_num;
+      tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+      tc->ExeStopTracking = true;
+      // logs
+      if (ENABLE_EXE_COLLECTOR_DEBUG)
+      {
+        std::cout << std::hex << "IEW: CALLOC SIZE: " <<
+                inst->readDestReg(inst->staticInst.get(),0) <<
+                " " << tc->ap_size <<
+                std::endl;
       }
+
+    }
+    else if (inst->isCallocBaseCollectorMicroop()){
+
+       if (tc->Collector_Status !=
+                        ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE)
+          panic("AP_CALLOC_BASE_COLLECT: Invalid Status!");
+
+       // logs
+       if (ENABLE_EXE_COLLECTOR_DEBUG)
+         {std::cout << std::hex << "IEW: CALLOC BASE: " <<
+                     inst->readDestReg(inst->staticInst.get(),0) <<
+                     " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
+                     " " <<  inst->seqNum <<
+                     std::endl;}
+
+         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
+         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+
+         assert(_pid_num == tc->ap_pid);
+
+
+         Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+         bk->payload   = (Addr)_pid_base;
+         bk->req_szB   = (SizeT)tc->ap_size;
+         bk->pid       = (Addr)_pid_num;
+         bk->seqNum    = inst->seqNum;
+         Bool present = VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+         assert(!present);
+
+         tc->num_of_allocations++;
+         tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
+         tc->ExeStopTracking = false;
+         // rax now is a pointer
+         TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
+         tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
+
+    }
+    else if (inst->isReallocSizeCollectorMicroop()){
+
+      if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::NONE)
+          panic("AP_REALLOC_SIZE_COLLECT: Invalid Status!");
+
+      uint64_t _pid_num = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
+      uint64_t _pid_base_arg1 =
+                    inst->readDestReg(inst->staticInst.get(),0); //RDI
+      uint64_t _pid_size_arg2 =
+                    inst->readIntRegOperand(inst->staticInst.get(),0); //RSI
+
+      uint64_t old_base_addr = _pid_base_arg1;
+      tc->ap_size = _pid_size_arg2;
+      tc->ap_pid = _pid_num;
+      tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
+      tc->ExeStopTracking = true;
+      // logs
+      if (ENABLE_EXE_COLLECTOR_DEBUG)
+      {
+        std::cout << std::hex << "IEW: REALLOC SIZE: " <<
+                old_base_addr <<
+                " " << tc->ap_size <<
+                std::endl;
+      }
+
+      Block fake;
+      fake.payload = old_base_addr;
+      fake.req_szB = 1;
+      UWord foundkey = 1;
+      UWord foundval = 1;
+      Bool present = VG_lookupFM(cpu->interval_tree,
+                                  &foundkey, &foundval, (UWord)&fake );
+      if (present){
+          Block fake;
+          fake.payload = old_base_addr;
+          fake.req_szB = 1;
+          UWord oldKeyW;
+          Bool found = VG_delFromFM(cpu->interval_tree,
+                                   &oldKeyW, NULL, (Addr)&fake );
+          Block* bk = (Block*)oldKeyW;
+          assert(bk);
+          assert(found);
+          free(bk);
+          tc->num_of_allocations--;
+      }
+
+    }
+    else if (inst->isReallocBaseCollectorMicroop()){
+
+        if (tc->Collector_Status !=
+                  ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
+            panic("AP_REALLOC_BASE_COLLECT: Invalid Status!");
+
+             // logs
+            if (ENABLE_EXE_COLLECTOR_DEBUG)
+            {std::cout << std::hex << "IEW: REALLOC BASE: " <<
+                      inst->readDestReg(inst->staticInst.get(),0) <<
+                      " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
+                      " " <<  inst->seqNum <<
+                          std::endl;
+            }
+
+            uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
+            uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+
+            assert(_pid_num == tc->ap_pid);
+
+            Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+            bk->payload   = (Addr)_pid_base;
+            bk->req_szB   = (SizeT)tc->ap_size;
+            bk->pid       = (Addr)_pid_num;
+            bk->seqNum    = inst->seqNum;
+            Bool present = VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+            assert(!present);
+
+            tc->num_of_allocations++;
+            tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
+            tc->ExeStopTracking = false;
+            // rax now is a pointer
+            TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
+            tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
+
+    }
   }
 
-  return _pid;
 }
-
 
 
 template <class Impl>
@@ -1974,13 +2128,12 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
   // check if this is a base address or not
   TheISA::PointerID _pid = TheISA::PointerID(0);
-  for (auto& capElem : tc->CapRegsFile){
-      if (capElem.second.getBaseAddr() == dataRegContent){
-          _pid = capElem.first;
-          break;
-      }
-  }
+  Block* bk = cpu->find_Block_containing(dataRegContent);
+  if (bk && (bk->payload == dataRegContent)) { // just the base addresses
+    assert(bk->pid != 0);
+    _pid = TheISA::PointerID(bk->pid);
 
+  }
         // finally if it's a base adress write it in the execute alias table
   if (_pid != TheISA::PointerID(0))
   {
@@ -2005,6 +2158,9 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
                 "ExeAliasTableSize: " << tc->ExeAliasTableBuffer.size() <<
                 std::endl;
       }
+  }
+  else {
+      // update the shadow memory (where should we do this?)
   }
 
 

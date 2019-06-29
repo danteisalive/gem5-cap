@@ -208,7 +208,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
     }
 
     ExeAliasCache = new TheISA::LRUAliasCache(2, 1, 256);
-
+    interval_tree = VG_newFM(interval_tree_Cmp );
     // The stages also need their CPU pointer setup.  However this
     // must be done at the upper level CPU because they have pointers
     // to the upper level CPU, and not this FullO3CPU.
@@ -401,11 +401,9 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         o3_tc->enableCapability = params->enable_capability;
         o3_tc->symbolsFile = params->symbol_file;
-        o3_tc->CommitStopTracking = false;
         o3_tc->ExeStopTracking = false;
-        o3_tc->DisablePointerTracker = true;
         o3_tc->Collector_Status = ThreadContext::NONE;
-
+        o3_tc->num_of_allocations = 0;
         DPRINTF(Capability, "SymbolFile[%i] process is %s\n",
                         tid, params->symbol_file);
 
@@ -1593,13 +1591,47 @@ FullO3CPU<Impl>::updateFetchLVPT(
                     inst->threadNumber,
                     predict
                     );
+}
 
-    // fetch.getFetchLVPT()->update(
-    //                             inst->pcState().instAddr(),
-    //                             _new_pid,
-    //                             inst->threadNumber,
-    //                             predict
-    //                           );
+template <class Impl>
+Block*
+FullO3CPU<Impl>::find_Block_containing(Addr vaddr){
+
+    if (likely(fbc_cache0
+                  && fbc_cache0->payload <= vaddr
+                  && vaddr < fbc_cache0->payload + fbc_cache0->req_szB))
+    {
+        return fbc_cache0;
+    }
+
+    if (likely(fbc_cache1
+                  && fbc_cache1->payload <= vaddr
+                  && vaddr < fbc_cache1->payload + fbc_cache1->req_szB))
+    {
+        // found at 1; swap 0 and 1
+        Block* tmp = fbc_cache0;
+        fbc_cache0 = fbc_cache1;
+        fbc_cache1 = tmp;
+        return fbc_cache0;
+    }
+
+   Block fake;
+   fake.payload = vaddr;
+   fake.req_szB = 1;
+   UWord foundkey = 1;
+   UWord foundval = 1;
+   Bool found = VG_lookupFM( interval_tree,
+                               &foundkey, &foundval, (UWord)&fake );
+   if (!found) {
+      return NULL;
+   }
+
+   assert(foundval == 0); // we don't store vals in the interval tree
+   assert(foundkey != 1);
+   Block* res = (Block*)foundkey;
+   assert(res != &fake);
+
+   return res;
 }
 
 template <class Impl>

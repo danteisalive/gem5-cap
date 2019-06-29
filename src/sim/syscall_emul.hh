@@ -978,6 +978,26 @@ mremapFunc(SyscallDesc *desc, int callnum, Process *process, ThreadContext *tc)
                 }
 
                 process->pTable->remap(start, old_length, new_start);
+
+                if (tc->enableCapability){
+                    Addr vaddr = start;
+                    Addr size = old_length;
+                    Addr new_vaddr = new_start;
+                    Addr pageSize = process->pTable->getPageSize();
+                    while (size > 0) {
+                      Addr vpn_old = process->pTable->pageAlign(vaddr);
+                      Addr vpn_new = process->pTable->pageAlign(new_vaddr);
+                      auto it_lv1 = tc->ShadowMemory.find(vpn_old);
+                      if (it_lv1 != tc->ShadowMemory.end()){
+                        tc->ShadowMemory[vpn_new] = it_lv1->second;
+                        tc->ShadowMemory.erase(it_lv1);
+                      }
+                      size -= pageSize;
+                      vaddr += pageSize;
+                      new_vaddr += pageSize;
+                    }
+                }
+
                 warn("mremapping to new vaddr %08p-%08p, adding %d\n",
                      new_start, new_start + new_length,
                      new_length - old_length);
@@ -1000,8 +1020,47 @@ mremapFunc(SyscallDesc *desc, int callnum, Process *process, ThreadContext *tc)
         }
     } else {
         if (use_provided_address && provided_address != start)
+        {
             process->pTable->remap(start, new_length, provided_address);
+            if (tc->enableCapability){
+                Addr vaddr = start;
+                Addr size = new_length;
+                Addr new_vaddr = provided_address;
+                Addr pageSize = process->pTable->getPageSize();
+                while (size > 0) {
+                  Addr vpn_old = process->pTable->pageAlign(vaddr);
+                  Addr vpn_new = process->pTable->pageAlign(new_vaddr);
+                  auto it_lv1 = tc->ShadowMemory.find(vpn_old);
+                  if (it_lv1 != tc->ShadowMemory.end()){
+                    tc->ShadowMemory[vpn_new] = it_lv1->second;
+                    tc->ShadowMemory.erase(it_lv1);
+                  }
+                  size -= pageSize;
+                  vaddr += pageSize;
+                  new_vaddr += pageSize;
+                }
+            }
+
+        }
+
         process->pTable->unmap(start + new_length, old_length - new_length);
+
+        if (tc->enableCapability){
+          Addr vaddr = start + new_length;
+          Addr size = old_length - new_length;
+          Addr pageSize = process->pTable->getPageSize();
+          // delete all the aliases related to unmapped pages
+          while (size > 0) {
+              Addr vpn = process->pTable->pageAlign(vaddr);
+              auto it_lv1 = tc->ShadowMemory.find(vpn);
+              if (it_lv1 != tc->ShadowMemory.end()){
+                tc->ShadowMemory.erase(it_lv1);
+              }
+              size -= pageSize;
+              vaddr += pageSize;
+          }
+        }
+
         return use_provided_address ? provided_address : start;
     }
 }

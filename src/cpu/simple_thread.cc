@@ -72,6 +72,9 @@ SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
     tc = new ProxyThreadContext<SimpleThread>(this);
     quiesceEvent = new EndQuiesceEvent(tc);
     PID = 0;
+    collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+    num_of_allocations = 0;
+    stop_tracking = false;
 }
 
 SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
@@ -104,6 +107,9 @@ SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
         kernelStats = new TheISA::Kernel::Statistics();
 
     PID = 0;
+    collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+    num_of_allocations = 0;
+    stop_tracking = false;
 }
 
 SimpleThread::~SimpleThread()

@@ -50,6 +50,7 @@
 #include "cpu/o3/comm.hh"
 #include "cpu/o3/lsq.hh"
 #include "cpu/o3/scoreboard.hh"
+#include "cpu/simple/WordFM.hh"
 #include "cpu/timebuf.hh"
 #include "debug/IEW.hh"
 #include "sim/probe/probe.hh"
@@ -234,7 +235,6 @@ class DefaultIEW
     void updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst);
     void squashExecuteAliasTable(DynInstPtr &inst, bool include_inst);
     void collector(ThreadID tid, DynInstPtr &inst);
-    TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
     void updateAliasTable(ThreadID tid, DynInstPtr &inst);
     //void checkAccuracy(ThreadID tid, DynInstPtr &inst);
   private:

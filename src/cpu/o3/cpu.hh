@@ -66,6 +66,7 @@
 #include "cpu/o3/cpu_policy.hh"
 #include "cpu/o3/scoreboard.hh"
 #include "cpu/o3/thread_state.hh"
+#include "cpu/simple/WordFM.hh"
 #include "cpu/simple_thread.hh"
 #include "cpu/timebuf.hh"
 
@@ -73,6 +74,8 @@
 #include "debug/Capability.hh"
 #include "params/DerivO3CPU.hh"
 #include "sim/process.hh"
+
+#define likely(x)       __builtin_expect((x),1)
 
 template <class>
 class Checker;
@@ -132,7 +135,10 @@ class FullO3CPU : public BaseO3CPU
     BaseTLB *dtb;
 
     TheISA::LRUAliasCache* ExeAliasCache;
-
+    WordFM* interval_tree = NULL;  /* WordFM* Block* void */
+    // 2-entry cache for find_Block_containing
+    Block* fbc_cache0 = NULL;
+    Block* fbc_cache1 = NULL;
     /** Overall CPU status. */
     Status _status;
 
@@ -258,6 +264,7 @@ class FullO3CPU : public BaseO3CPU
     /** Destructor. */
     ~FullO3CPU();
 
+    Block* find_Block_containing ( Addr a );
     /** Registers statistics. */
     void regStats() override;
 

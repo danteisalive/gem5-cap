@@ -113,6 +113,9 @@ class SimpleThread : public ThreadState
     uint64_t                             ap_size;
     uint64_t                             ap_base;
     uint64_t                             PID;
+    uint64_t                             num_of_allocations;
+    bool                                 stop_tracking;
+    TheISA::PCState                      prevPcState;
 
 
   protected:

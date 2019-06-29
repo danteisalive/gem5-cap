@@ -311,10 +311,8 @@ class DefaultCommit
     /** Marks completed instructions using information sent from IEW. */
     void markCompletedInsts();
 
-    void collector(ThreadID tid, DynInstPtr &head_inst);
     void updatePointerTracker(ThreadID tid, DynInstPtr &head_inst);
     void updateAliasTable(ThreadID tid, DynInstPtr &head_inst);
-    TheISA::PointerID SearchCapReg(ThreadID tid, uint64_t _addr);
     void updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst);
     /** Gets the thread to commit, based on the SMT policy. */
     ThreadID getCommittingThread();

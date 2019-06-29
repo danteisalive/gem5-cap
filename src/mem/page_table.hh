@@ -81,7 +81,7 @@ class EmulationPageTable : public Serializable
     }
 
     uint64_t pid() const { return _pid; };
-
+    Addr getPageSize() {return pageSize;}
     virtual ~EmulationPageTable() {};
 
     /* generic page table mapping flags

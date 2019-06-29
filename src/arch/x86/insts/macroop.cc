@@ -89,7 +89,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                        si->uop_pid = tc->PointerTrackerTable[base];
                        if (ENABLE_POINTER_TRACKER_DEBUG)
                        {std::cout << "LD NEED AN INJECTION: " <<
-                            si->uop_pid << " " << tc->CapRegsFile.size() <<
+                            si->uop_pid << " " <<
                             nextPC <<
                             std::endl;}
                     }
@@ -109,7 +109,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
                       si->uop_pid = tc->PointerTrackerTable[base];
                       if (ENABLE_POINTER_TRACKER_DEBUG){
                         std::cout << "ST NEED AN INJECTION: " <<
-                             si->uop_pid << " " << tc->CapRegsFile.size() <<
+                             si->uop_pid << " " <<
                              nextPC <<
                              std::endl;
                       }
@@ -803,8 +803,6 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
     }
     else if (numMicroops <= 0){
         panic("Invalid  Number Of Microops");
-        //DPRINTF(Capability, "INVALID NUMBER OF MICROOPS\n");
-
     }
 }
 
@@ -815,48 +813,62 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
  MacroopBase::injectAPCallocSizeCollector(ThreadContext * _tc, PCState &nextPC)
  {
 
+   if (numMicroops > 0 && !_isInjected){
 
-     if (numMicroops > 0 && !_isInjected){
+       _isInjected = true;
 
-         _isInjected = true;
-
-         // remember to set and clear last micro of original microops
-         microops[0]->clearFirstMicroop();
-
-
-         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
-
-         for (int i=0; i < numMicroops; i++)
-             microopTemp[i+1] = microops[i];
-
-         StaticInstPtr micro_0 = new X86ISAInst::Mov(
-                         machInst,
-                         "AP_MAALOC_SIZE_COLLECT_INJECT",
-                         (1ULL << StaticInst::IsMicroop) |
-                         (1ULL << StaticInst::IsFirstMicroop) |
-                         (1ULL << StaticInst::IsMicroopInjected)|
-                         (1ULL << StaticInst::IsCallocSizeCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
-                         InstRegIndex(X86ISA::INTREG_RDI),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
-                         /*env.dataSize*/8,
-                         0);
+       // remember to set and clear last micro of original microops
+       microops[0]->clearFirstMicroop();
 
 
-         microopTemp[0]   = micro_0;
+       StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
-         delete [] microops;
-         microops = microopTemp;
-         numMicroops = numMicroops + 1;
+       for (int i=0; i < numMicroops; i++)
+           microopTemp[i+2] = microops[i];
+
+       StaticInstPtr micro_1 = new X86ISAInst::AddImmBig(
+                       machInst,
+                       "AP_CALLOC_SIZE_COLLECT_INJECT",
+                       (1ULL << StaticInst::IsMicroop) |
+                       (1ULL << StaticInst::IsMicroopInjected)|
+                       (1ULL << StaticInst::IsSerializing)|
+                       (1ULL << StaticInst::IsSerializeBefore),
+                       InstRegIndex(X86ISA::INTREG_R16),
+                       1,
+                       InstRegIndex(X86ISA::INTREG_R16),
+                       8,
+                       0);
+
+       StaticInstPtr micro_0 = new X86ISAInst::Mov(
+                       machInst,
+                       "AP_CALLOC_SIZE_COLLECT_INJECT",
+                       (1ULL << StaticInst::IsMicroop) |
+                       (1ULL << StaticInst::IsCallocSizeCollectorMicroop)|
+                       (1ULL << StaticInst::IsMicroopInjected)|
+                       (1ULL << StaticInst::IsFirstMicroop)|
+                       (1ULL << StaticInst::IsSerializing)|
+                       (1ULL << StaticInst::IsSerializeBefore),
+                       InstRegIndex(X86ISA::INTREG_RSI),
+                       InstRegIndex(X86ISA::INTREG_RDI),
+                       InstRegIndex(X86ISA::NUM_INTREGS+17),
+                       8,
+                       0);
 
 
 
+       microopTemp[0]   = micro_0;
+       microopTemp[1]   = micro_1;
 
-     }
-     else if (numMicroops <= 0){
-         panic("Invalid  Number Of Microops");
+       delete [] microops;
+       microops = microopTemp;
+       numMicroops = numMicroops + 2;
 
-     }
+   }
+   else if (numMicroops <= 0){
+       panic("Invalid  Number Of Microops");
+
+   }
+
 
  }
 
@@ -865,47 +877,59 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
  MacroopBase::injectAPCallocBaseCollector(ThreadContext * _tc, PCState &nextPC)
  {
 
-     if (numMicroops > 0 && !_isInjected){
+    if (numMicroops > 0 && !_isInjected){
 
-         _isInjected = true;
+           _isInjected = true;
 
-         // remember to set and clear last micro of original microops
-         microops[0]->clearFirstMicroop();
-
-
-         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
-
-         for (int i=0; i < numMicroops; i++)
-             microopTemp[i+1] = microops[i];
-
-         StaticInstPtr micro_0 = new X86ISAInst::Mov(
-                         machInst,
-                         "AP_MALLOC_BASE_COLLECT_INJECT",
-                         (1ULL << StaticInst::IsMicroop) |
-                         (1ULL << StaticInst::IsFirstMicroop) |
-                         (1ULL << StaticInst::IsMicroopInjected)|
-                         (1ULL << StaticInst::IsCallocBaseCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
-                         InstRegIndex(X86ISA::INTREG_RAX),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
-                         /*env.dataSize*/8,
-                         0);
+           // remember to set and clear last micro of original microops
+           microops[0]->clearFirstMicroop();
 
 
-         microopTemp[0]   = micro_0;
+           StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
-         delete [] microops;
-         microops = microopTemp;
-         numMicroops = numMicroops + 1;
+           for (int i=0; i < numMicroops; i++)
+               microopTemp[i+2] = microops[i];
 
+           StaticInstPtr micro_0 = new X86ISAInst::Mov(
+                                 machInst,
+                                 "AP_CALLOC_BASE_COLLECT_INJECT",
+                                 (1ULL << StaticInst::IsMicroop) |
+                                 (1ULL << StaticInst::IsFirstMicroop) |
+                                 (1ULL << StaticInst::IsMicroopInjected)|
+                                 (1ULL << StaticInst::IsSerializing)|
+                                 (1ULL << StaticInst::IsSerializeBefore),
+                                 InstRegIndex(X86ISA::INTREG_R16),
+                                 InstRegIndex(X86ISA::INTREG_R16),
+                                 InstRegIndex(X86ISA::INTREG_R16),
+                                 8,
+                                 0);
 
+           StaticInstPtr micro_1 = new X86ISAInst::Mov(
+                           machInst,
+                           "AP_CALLOC_BASE_COLLECT_INJECT",
+                           (1ULL << StaticInst::IsMicroop) |
+                           (1ULL << StaticInst::IsMicroopInjected)|
+                           (1ULL << StaticInst::IsCallocBaseCollectorMicroop)|
+                           (1ULL << StaticInst::IsSerializing)|
+                           (1ULL << StaticInst::IsSerializeBefore),
+                           InstRegIndex(X86ISA::NUM_INTREGS+17),
+                           InstRegIndex(X86ISA::INTREG_RAX),
+                           InstRegIndex(X86ISA::NUM_INTREGS+17),
+                           8,
+                           0);
 
-     }
-     else if (numMicroops <= 0){
-         panic("Invalid  Number Of Microops");
-         //DPRINTF(Capability, "INVALID NUMBER OF MICROOPS\n");
+           microopTemp[0] = micro_0;
+           microopTemp[1] = micro_1;
 
-     }
+           delete [] microops;
+           microops = microopTemp;
+           numMicroops = numMicroops + 2;
+
+   }
+   else if (numMicroops <= 0){
+           panic("Invalid  Number Of Microops");
+   }
+
  }
 
 
@@ -923,39 +947,55 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
          microops[0]->clearFirstMicroop();
 
 
-         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
+         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
          for (int i=0; i < numMicroops; i++)
-             microopTemp[i+1] = microops[i];
+             microopTemp[i+2] = microops[i];
+
+         StaticInstPtr micro_1 = new X86ISAInst::AddImmBig(
+                         machInst,
+                         "AP_REALLOC_SIZE_COLLECT_INJECT",
+                         (1ULL << StaticInst::IsMicroop) |
+                         (1ULL << StaticInst::IsMicroopInjected)|
+                         (1ULL << StaticInst::IsSerializing)|
+                         (1ULL << StaticInst::IsSerializeBefore),
+                         InstRegIndex(X86ISA::INTREG_R16),
+                         1,
+                         InstRegIndex(X86ISA::INTREG_R16),
+                         8,
+                         0);
 
          StaticInstPtr micro_0 = new X86ISAInst::Mov(
                          machInst,
-                         "AP_MAALOC_SIZE_COLLECT_INJECT",
+                         "AP_REALLOC_SIZE_COLLECT_INJECT",
                          (1ULL << StaticInst::IsMicroop) |
-                         (1ULL << StaticInst::IsFirstMicroop) |
+                         (1ULL << StaticInst::IsReallocSizeCollectorMicroop)|
                          (1ULL << StaticInst::IsMicroopInjected)|
-                         (1ULL << StaticInst::IsReallocSizeCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
+                         (1ULL << StaticInst::IsFirstMicroop)|
+                         (1ULL << StaticInst::IsSerializing)|
+                         (1ULL << StaticInst::IsSerializeBefore),
+                         InstRegIndex(X86ISA::INTREG_RSI),
                          InstRegIndex(X86ISA::INTREG_RDI),
                          InstRegIndex(X86ISA::NUM_INTREGS+17),
-                         /*env.dataSize*/8,
+                         8,
                          0);
 
 
+
          microopTemp[0]   = micro_0;
+         microopTemp[1]   = micro_1;
 
          delete [] microops;
          microops = microopTemp;
-         numMicroops = numMicroops + 1;
-
-
-
+         numMicroops = numMicroops + 2;
 
      }
      else if (numMicroops <= 0){
          panic("Invalid  Number Of Microops");
 
      }
+
+
 
  }
 
@@ -965,48 +1005,60 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                                           PCState &nextPC)
 {
 
-     if (numMicroops > 0 && !_isInjected){
+    if (numMicroops > 0 && !_isInjected){
 
-         _isInjected = true;
+           _isInjected = true;
 
-         // remember to set and clear last micro of original microops
-         microops[0]->clearFirstMicroop();
-
-
-         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
-
-         for (int i=0; i < numMicroops; i++)
-             microopTemp[i+1] = microops[i];
-
-         StaticInstPtr micro_0 = new X86ISAInst::Mov(
-                         machInst,
-                         "AP_MALLOC_BASE_COLLECT_INJECT",
-                         (1ULL << StaticInst::IsMicroop) |
-                         (1ULL << StaticInst::IsFirstMicroop) |
-                         (1ULL << StaticInst::IsMicroopInjected)|
-                         (1ULL << StaticInst::IsReallocBaseCollectorMicroop),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
-                         InstRegIndex(X86ISA::INTREG_RAX),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
-                         /*env.dataSize*/8,
-                         0);
+           // remember to set and clear last micro of original microops
+           microops[0]->clearFirstMicroop();
 
 
-         microopTemp[0]   = micro_0;
+           StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
-         delete [] microops;
-         microops = microopTemp;
-         numMicroops = numMicroops + 1;
+           for (int i=0; i < numMicroops; i++)
+               microopTemp[i+2] = microops[i];
 
+           StaticInstPtr micro_0 = new X86ISAInst::Mov(
+                                 machInst,
+                                 "AP_REALLOC_BASE_COLLECT_INJECT",
+                                 (1ULL << StaticInst::IsMicroop) |
+                                 (1ULL << StaticInst::IsFirstMicroop) |
+                                 (1ULL << StaticInst::IsMicroopInjected)|
+                                 (1ULL << StaticInst::IsSerializing)|
+                                 (1ULL << StaticInst::IsSerializeBefore),
+                                 InstRegIndex(X86ISA::INTREG_R16),
+                                 InstRegIndex(X86ISA::INTREG_R16),
+                                 InstRegIndex(X86ISA::INTREG_R16),
+                                 8,
+                                 0);
 
+           StaticInstPtr micro_1 = new X86ISAInst::Mov(
+                           machInst,
+                           "AP_REALLOC_BASE_COLLECT_INJECT",
+                           (1ULL << StaticInst::IsMicroop) |
+                           (1ULL << StaticInst::IsMicroopInjected)|
+                           (1ULL << StaticInst::IsReallocBaseCollectorMicroop)|
+                           (1ULL << StaticInst::IsSerializing)|
+                           (1ULL << StaticInst::IsSerializeBefore),
+                           InstRegIndex(X86ISA::NUM_INTREGS+17),
+                           InstRegIndex(X86ISA::INTREG_RAX),
+                           InstRegIndex(X86ISA::NUM_INTREGS+17),
+                           8,
+                           0);
 
-     }
-     else if (numMicroops <= 0){
-         panic("Invalid  Number Of Microops");
-         //DPRINTF(Capability, "INVALID NUMBER OF MICROOPS\n");
+           microopTemp[0] = micro_0;
+           microopTemp[1] = micro_1;
 
-     }
- }
+           delete [] microops;
+           microops = microopTemp;
+           numMicroops = numMicroops + 2;
+
+   }
+   else if (numMicroops <= 0){
+           panic("Invalid  Number Of Microops");
+   }
+
+}
 
 
 }

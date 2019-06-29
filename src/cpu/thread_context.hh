@@ -113,39 +113,29 @@ class ThreadContext
     typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
     //Addr here is the AP/DP point address
     typedef std::map<Addr,  TheISA::CheckType> SymbolCache;
-    typedef std::map<TheISA::PointerID, TheISA::Capability>
-                                                    CapabilityRegistersFile;;
-    typedef std::map<Addr, TheISA::PointerID>       ComAliasTable;
     typedef std::map<Addr, TheISA::AliasTableEntry> ExeAliasTable;
     typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>
                                                     ShadowMemoryAliasTable;
     typedef SymbolCache::iterator                   SymbolCacheIter;
-
-
-    typedef CapabilityRegistersFile::iterator   CapabilityRegistersFileIter;
-    //temprory
-    typedef std::map<Addr, TheISA::Capability> CapabilityData;
 
     enum COLLECTOR_STATUS
     {
       NONE, MALLOC_SIZE, CALLOC_SIZE, REALLOC_SIZE, FREE_CALL
     };
 
-    bool DisablePointerTracker;
-    bool CommitStopTracking;
     bool ExeStopTracking;
     bool enableCapability;
     std::string symbolsFile;
+    uint64_t num_of_allocations;
+    uint64_t ap_pid;
+    uint64_t ap_size;
 
     SymbolCache                                 syms_cache;
     TheISA::PointerID                           PID = TheISA::PointerID(0);
     TheISA::PointerID
                              PointerTrackerTable[TheISA::NumIntRegsToTrack];
-    ComAliasTable                               CommitAliasTable;
     ExeAliasTable                               ExecuteAliasTable;
     ShadowMemoryAliasTable                      ShadowMemory;
-    CapabilityRegistersFile                     CapRegsFile;
-    //TheISA::LRUAliasCache                       ExeAliasCache{2, 1, 1024};
     TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
     ExeAliasBuffer                              ExeAliasTableBuffer;

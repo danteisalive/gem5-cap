@@ -1302,7 +1302,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (tc->enableCapability){
-      collector(tid, head_inst);
       updateStackAliasTable(tid, head_inst);
       updateAliasTable(tid, head_inst);
 
@@ -1339,15 +1338,14 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             "--------------------START OF EPOCH----------------------------" <<
             std::endl << std::dec << cpu->thread[tid]->numInsts.value() <<
             std::endl <<
-            " CommitAliasTable Size: " <<
-            tc->CommitAliasTable.size() << std::endl <<
+            " NumOfAllocations: " <<
+            tc->num_of_allocations << std::endl <<
             " ShadowMemory Size: " <<
             tc->ShadowMemory.size() <<  std::endl <<
             " ExecuteAliasTable Size: " <<
             tc->ExecuteAliasTable.size() << std::endl <<
             " ExeAliasTableBuffer Size: " <<
             tc->ExeAliasTableBuffer.size() << std::endl <<
-            " NumOfAllocations: " << tc->CapRegsFile.size() <<
             std::endl;
 
             double accuracy =
@@ -1363,7 +1361,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " PnA0: " << cpu->PnA0 <<
             " PmAn: " << cpu->PmAn <<std::endl <<
             " Number Of Mem Refs: " << cpu->numOfMemRefs <<
-            // " Heap Access: " << cpu->heapAccesses <<
+            // " Heap Access: " << cpu->heapAccesses <
             " True Predections: " << cpu->truePredection <<
             " PnA0: " << cpu->HeapPnA0 <<
             " PnAm: " << cpu->HeapPnAm <<std::endl <<
@@ -1391,22 +1389,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                           std::hex << entry.first.second << " " << std::dec <<
                              entry.second << std::endl;
             }
-            //
-            // for (auto it1 = tc->ShadowMemory.cbegin();
-            //      it1 != tc->ShadowMemory.cend(); it1++) {
-            //   for (auto it2 = it1->second.cbegin();
-           //            it2 != it1->second.cend(); it2++) {
-            //     std::cout << std::hex << "VPN: " << it1->first << " " <<
-            //               "VADDR: " << it2->first << " " << std::dec <<
-            //               it2->second << std::endl;
-            //   }
-            // }
-
-            // for (auto& entry : tc->CommitAliasTable) {
-            //     std::cout << std::hex << entry.first << " " <<
-            //               std::dec << entry.second << " " << std::dec <<
-            //               std::endl;
-            // }
 
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
@@ -1450,155 +1432,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     return true;
 }
 
-
-template <class Impl>
-void
-DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
-{
-  #define ENABLE_COMMIT_COLLECTOR_DEBUG 0
-
-  ThreadContext * tc = cpu->tcBase(tid);
-
-    if (inst->isMallocSizeCollectorMicroop()){
-      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
-        {std::cout << std::hex << "COMMIT: MALLOC SIZE: " <<
-                inst->readDestReg(inst->staticInst.get(),0) <<
-                " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                " " << inst->seqNum <<
-                std::endl;}
-
-        //first check whether everything is correct or not
-        uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
-        uint64_t _pid_size = inst->readDestReg(inst->staticInst.get(),0);
-
-        TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-
-        assert(tc->CapRegsFile[_pid].seqNum == inst->seqNum);
-        assert(tc->CapRegsFile[_pid].getSize() == _pid_size);
-
-
-        tc->CommitStopTracking = true;
-
-    }
-
-    else if (inst->isMallocBaseCollectorMicroop()){
-
-      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
-        {std::cout << std::hex << "COMMIT: MALLOC BASE: " <<
-                  inst->readDestReg(inst->staticInst.get(),0) <<
-                  " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                  " " << inst->seqNum <<
-                  std::endl;}
-
-        uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
-        uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
-        TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-
-        assert(tc->CapRegsFile[_pid].seqNum == inst->seqNum);
-        assert(tc->CapRegsFile[_pid].getBaseAddr() == _pid_base);
-
-        // now the cap is commited
-        tc->CapRegsFile[_pid].setCSRBit(0); //Commit Base Pickup
-
-        tc->CommitStopTracking = false;
-
-
-    }
-
-    else if (inst->isFreeCallMicroop()){
-
-      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
-        {std::cout << std::hex << "COMMIT: FREE CALL: " <<
-                inst->readDestReg(inst->staticInst.get(),0) <<
-                " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                " " << inst->seqNum <<
-                std::endl;}
-      uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
-      //check whether we have the cap for this AP or not
-      TheISA::PointerID _pid = SearchCapReg(tid,_pid_base);
-      if (_pid != TheISA::PointerID(0)){
-          // should check the seqNum and flag bit #1
-          // to make sure tat we have the base address correctly
-          // stil do nothing here
-          // after getting back from
-          assert(tc->CapRegsFile[_pid].seqNum == inst->seqNum);
-          assert(tc->CapRegsFile[_pid].getCSRBit(1)); // free flag bit
-          // now remove it
-          tc->CapRegsFile.erase(_pid);
-      }
-      // remove all the aliases related to this pid from commit alias table
-      // exe allias table is handled in IEW stage. so we dont need to update it
-      // this is slow but because we do it every time free is called it's fine
-      if (_pid != TheISA::PointerID(0)){
-          for (auto it = tc->CommitAliasTable.cbegin(), next_it = it;
-               it != tc->CommitAliasTable.cend(); it = next_it)
-          {
-            ++next_it;
-            if (it->second.getPID() == _pid.getPID())
-            {
-              if (ENABLE_COMMIT_COLLECTOR_DEBUG){
-                std::cout << "Commit: collector: " << "Free is called " <<
-                "and is removing " << it->second << " at address " <<
-                std::hex << it->first << std::dec <<
-                std::endl;
-              }
-              tc->CommitAliasTable.erase(it);
-            }
-          }
-      }
-
-      // two level removal
-      // if the page pid map is empty delete the whole page pid map
-      // if the page pid map is not empty, them delete all the entrys with
-      // the same pid
-      if (_pid != TheISA::PointerID(0)){
-        for (auto it_lv1 = tc->ShadowMemory.begin(), next_it_lv1 = it_lv1;
-             it_lv1 != tc->ShadowMemory.end(); it_lv1 = next_it_lv1)
-        {
-            ++next_it_lv1;
-            if (it_lv1->second.size() == 0){
-              tc->ShadowMemory.erase(it_lv1);
-            }
-            else {
-                for (auto it_lv2 = it_lv1->second.cbegin(),
-                     next_it_lv2 = it_lv2; it_lv2 != it_lv1->second.cend();
-                     it_lv2 = next_it_lv2)
-                {
-                  ++next_it_lv2;
-                  if (it_lv2->second.getPID() == _pid.getPID())
-                  {
-                    if (ENABLE_COMMIT_COLLECTOR_DEBUG){
-                      std::cout << "Commit: collector: " <<
-                      "Free is called and is removing " <<
-                      it_lv2->second << " at address " <<
-                      std::hex << it_lv2->first << std::dec <<
-                      std::endl;
-                    }
-                    it_lv1->second.erase(it_lv2);
-                  }
-                }
-            }
-
-        }
-
-      } // two level removal
-
-      tc->CommitStopTracking = true;
-
-    }
-
-    else if (inst->isFreeRetMicroop()){
-      if (ENABLE_COMMIT_COLLECTOR_DEBUG)
-        {std::cout << std::hex << "COMMIT: FREE RET: " <<
-                inst->readDestReg(inst->staticInst.get(),0) <<
-                " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                " " << inst->seqNum <<
-                std::endl;}
-      // do nothing just start tracking again
-      tc->CommitStopTracking = true;
-    }
-
-}
 
 
 // delete all aliases which are in the range of newly freed frame
@@ -1652,23 +1485,6 @@ DefaultCommit<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst)
 
 }
 
-template <class Impl>
-TheISA::PointerID
-DefaultCommit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
-{
-  ThreadContext * tc = cpu->tcBase(tid);
-
-  TheISA::PointerID _pid = TheISA::PointerID(0);
-  for (auto& capElem : tc->CapRegsFile){
-      if (capElem.second.contains(_addr)){
-          _pid = capElem.first;
-          break;
-      }
-  }
-
-  return _pid;
-}
-
 
 // In this fucntion if
 template <class Impl>
@@ -1688,8 +1504,6 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   // sanitization
   if (head_inst->isMicroopInjected()) return;
   if (head_inst->isBoundsCheckMicroop()) return;
-  //if (tc->CommitStopTracking) return;
-
   // here commit the youngest entry of the ExeAliasBuffer to shadow memory
   // which is actually the CommitAliasTable
   for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
@@ -1723,7 +1537,7 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
                 //auto page_pid_map = tc->ShadowMemory[vpn];
                 tc->ShadowMemory[vpn][it->first.second] = it->second;
 
-                tc->CommitAliasTable[it->first.second] = it->second;
+              //  tc->CommitAliasTable[it->first.second] = it->second;
                 tc->ExeAliasTableBuffer.erase(it);
               //  break;
             }

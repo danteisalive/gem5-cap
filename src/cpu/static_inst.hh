@@ -133,30 +133,6 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// Number of coprocesor destination regs.
     int8_t numCCDestRegs() const { return _numCCDestRegs; }
     //@}
-
-    void addSrcReg(RegId regIdx)
-    {
-        assert(_numSrcRegs + 1  < TheISA::MaxInstSrcRegs);
-        _srcRegIdx[_numSrcRegs] = regIdx;
-        _numSrcRegs++;
-    }
-
-    void addDestReg (RegId regIdx)
-    {
-        assert(_numDestRegs + 1 < TheISA::MaxInstDestRegs);
-        _destRegIdx[_numDestRegs] = regIdx;
-        _numDestRegs++;
-    }
-
-    void removeSrcReg()
-    {
-        _numSrcRegs--;
-    }
-
-    void removeDestReg ()
-    {
-        _numDestRegs--;
-    }
     /// @name Flag accessors.
     /// These functions are used to access the values of the various
     /// instruction property flags.  See StaticInst::Flags for descriptions
@@ -245,7 +221,6 @@ class StaticInst : public RefCounted, public StaticInstFlags
     void setDelayedCommit() { flags[IsDelayedCommit] = true; }
     void setFlag(Flags f) { flags[f] = true; }
     void resetFlag(Flags f) { flags[f] = false; }
-
     /// Operation class.  Used to select appropriate function unit in issue.
     OpClass opClass()     const { return _opClass; }
 
@@ -269,6 +244,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     TheISA::PointerID uop_pid{0};
     bool checked;
+    Addr atomic_vaddr; // this address is used in atomic mode
     //bool capabilityCacheMiss;
 
   protected:
@@ -287,6 +263,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     const char *mnemonic;
 
     TheISA::PointerID pid{0};
+
 
     /**
      * String representation of disassembly (lazily evaluated via
@@ -310,7 +287,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
           _numFPDestRegs(0), _numIntDestRegs(0), _numCCDestRegs(0),
           _numVecDestRegs(0), _numVecElemDestRegs(0), machInst(_machInst),
           mnemonic(_mnemonic), cachedDisassembly(0)
-    { _isInjected = false; checked = false;}
+    { _isInjected = false; checked = false; atomic_vaddr = 0;}
 
   public:
     virtual ~StaticInst();

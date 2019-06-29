@@ -684,6 +684,11 @@ BaseSimpleCPU::advancePC(const Fault &fault)
                 curMacroStaticInst = StaticInst::nullStaticInstPtr;
             TheISA::PCState pcState = thread->pcState();
             TheISA::advancePC(pcState, curStaticInst);
+            if (pcState.pc() == 0xc7b360 &&
+                curStaticInst->isLastMicroop())
+            {
+                thread->prevPcState = thread->pcState();
+            }
             thread->pcState(pcState);
         }
     }
@@ -692,7 +697,6 @@ BaseSimpleCPU::advancePC(const Fault &fault)
         // Use a fake sequence number since we only have one
         // instruction in flight at the same time.
         const InstSeqNum cur_sn(0);
-
         if (t_info.predPC == thread->pcState()) {
             // Correctly predicted branch
             branchPred->update(cur_sn, curThread);

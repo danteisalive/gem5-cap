@@ -1618,14 +1618,12 @@ template <class Impl>
 TheISA::PointerID
 LSQUnit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
 {
-  ThreadContext * tc = cpu->tcBase(tid);
 
   TheISA::PointerID _pid = TheISA::PointerID(0);
-  for (auto& capElem : tc->CapRegsFile){
-      if (capElem.second.contains(_addr)){
-          _pid = capElem.first;
-          break;
-      }
+  Block* bk = cpu->find_Block_containing(_addr);
+  if (bk){
+    assert(bk->pid != 0);
+    _pid = TheISA::PointerID(bk->pid);
   }
 
   return _pid;

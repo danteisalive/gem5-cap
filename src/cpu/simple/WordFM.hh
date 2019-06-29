@@ -97,6 +97,7 @@ typedef
       Addr        pid;
       ULong       n_reads;
       ULong       n_writes;
+      Addr        seqNum;
    }
    Block;
 //------------------------------------------------------------------//
