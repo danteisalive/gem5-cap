@@ -124,7 +124,7 @@ Options.addSEOptions(parser)
 
 parser.add_option("--enable-capability", default=False,action ="store_true",help="""Enable capability mode.""")
 parser.add_option("--symbol-file",default="",help="""The symbol file to initiliaze symbole cache.""")
-
+parser.add_option("--elf-file",default="",help="""""")
 if '--ruby' in sys.argv:
     Ruby.define_options(parser)
 
@@ -172,9 +172,11 @@ CPUClass.numThreads = numThreads
 
 CPUClass.enable_capability = options.enable_capability
 CPUClass.symbol_file = options.symbol_file
+CPUClass.ELF_File = options.cmd
 if FutureClass != None:
     FutureClass.enable_capability = options.enable_capability
     FutureClass.symbol_file = options.symbol_file
+    FutureClass.elf_file = options.cmd
 
 
 # Check -- do not allow SMT with multiple CPUs

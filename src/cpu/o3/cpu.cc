@@ -438,6 +438,20 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          NumOfCommitedBoundsCheck = 0; NumOfInjectedBoundsCheck = 0;
          NumOfExecutedBoundsCheck = 0; numOfCommitedMemRefs = 0;
 
+         //symtab
+         std::stringstream test(params->ELF_File);
+         std::string segment;
+         std::vector<std::string> seglist;
+
+         while (std::getline(test, segment, '/'))
+         {
+            seglist.push_back(segment);
+         }
+
+         if (!readSymTab(seglist[seglist.size()-1].c_str(),o3_tc)){
+           warn("cannot read symtab!");
+         }
+
         // Setup quiesce event.
         this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);
 
@@ -446,10 +460,6 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         // Add the TC to the CPU's list of TC's.
         this->threadContexts.push_back(tc);
-
-
-
-
 
 
     }

@@ -71,6 +71,83 @@ getArgument(ThreadContext *tc, int &number, uint16_t size, bool fp)
     }
 }
 
+
+bool readSymTab(const char* file_name, ThreadContext *tc){
+  Elf         *elf;
+  Elf_Scn     *scn = NULL;
+  GElf_Shdr   shdr;
+  Elf_Data    *data;
+  int         fd, ii, count;
+  Elf64_Ehdr	*ehdr = NULL;
+  std::map<int, Elf64_Word>  shs_flags;
+  elf_version(EV_CURRENT);
+
+  fd = open(file_name, O_RDONLY);
+  elf = elf_begin(fd, ELF_C_READ, NULL);
+
+  int i = 0;
+  while ((scn = elf_nextscn(elf, scn)) != NULL) {
+      gelf_getshdr(scn, &shdr);
+      shs_flags[i] = shdr.sh_flags;
+      //printf("sh_number: %d sh_flags: %lu\n", i, shdr.sh_flags);
+      i++;
+  }
+
+
+  ehdr = elf64_getehdr(elf);
+  if (shs_flags.size() > ehdr->e_shnum){
+    panic("invalid number of section headers!");
+  }
+
+
+  scn = NULL;
+  while ((scn = elf_nextscn(elf, scn)) != NULL) {
+      gelf_getshdr(scn, &shdr);
+      if (shdr.sh_type == SHT_SYMTAB) {
+          /* found a symbol table, go print it. */
+          break;
+      }
+  }
+
+  if (scn == NULL){
+    warn("didn't found a symbol table!");
+    return false;
+  }
+
+  data = elf_getdata(scn, NULL);
+  count = shdr.sh_size / shdr.sh_entsize;
+
+  /* print the symbol names */
+  for (ii = 0; ii < count; ++ii) {
+      GElf_Sym sym;
+      gelf_getsym(data, ii, &sym);
+      if (ELF64_ST_TYPE(sym.st_info) == 2 ||  // FUNC
+          ELF64_ST_TYPE(sym.st_info) == 5 ||  // object
+          ELF64_ST_TYPE(sym.st_info) == 1) // common
+      {
+
+        // printf("value: %lx size: %lu name: %s shndx: %u ",
+        //           sym.st_value, sym.st_size ,
+        //           elf_strptr(elf, shdr.sh_link, sym.st_name), sym.st_shndx);
+        if (sym.st_shndx >= shs_flags.size()){
+            panic("section header number >= shs_flags.size()!");
+        }
+        if (shs_flags[sym.st_shndx] & SHF_WRITE){
+          //printf("WRITE ");
+        }
+        if (shs_flags[sym.st_shndx] & SHF_EXECINSTR){
+          //printf("EXECUTE ");
+        }
+      //  printf("\n");
+
+      }
+  }
+  elf_end(elf);
+  close(fd);
+
+  return true;
+}
+
 void initCPU(ThreadContext *tc, int cpuId)
 {
     // This function is essentially performing a reset. The actual INIT

@@ -102,7 +102,7 @@ namespace X86ISA
         return 0;
     }
 
-
+    bool readSymTab(const char* file_name, ThreadContext *tc);
     /**
      * Reconstruct the rflags register from the internal gem5 register
      * state.
