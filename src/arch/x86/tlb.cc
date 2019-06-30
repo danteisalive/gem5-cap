@@ -127,7 +127,11 @@ TLB::lookup(Addr va, bool update_lru)
 }
 
 bool
-TLB::hasAlias(Addr vaddr){
+TLB::hasAlias(Addr vaddr, bool* hasAlias){
+  TlbEntry *entry = trie.lookup(vaddr);
+  if (entry){
+
+  }
   return true;
 }
 

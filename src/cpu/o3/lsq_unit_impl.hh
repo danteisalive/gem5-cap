@@ -1534,6 +1534,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             }
 
          }
+
          // now we know that it's not in the ExeAliasTableBuffer
          // threrefore we need to go to AliasCache
          TheISA::PointerID pid = TheISA::PointerID(0);

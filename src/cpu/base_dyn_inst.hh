@@ -330,7 +330,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     void translationCompleted(bool f) { instFlags[TranslationCompleted] = f; }
 
     bool isCapabilityCheckCompleted() {
-      return true;
+      //return true;
       if (isCapFetched()){
           return true;
       }

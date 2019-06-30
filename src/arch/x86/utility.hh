@@ -40,13 +40,17 @@
 #ifndef __ARCH_X86_UTILITY_HH__
 #define __ARCH_X86_UTILITY_HH__
 
+#include <fcntl.h>
+#include <gelf.h>
+#include <libelf.h>
+#include <unistd.h>
+
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
 #include "sim/full_system.hh"
 
 namespace X86ISA
 {
-
     inline PCState
     buildRetPC(const PCState &curPC, const PCState &callPC)
     {

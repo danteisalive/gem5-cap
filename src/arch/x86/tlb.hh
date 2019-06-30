@@ -74,8 +74,12 @@ namespace X86ISA
         TlbEntry *lookup(Addr va, bool update_lru = true);
 
         void setConfigAddress(uint32_t addr);
-
-        bool hasAlias(Addr vaddr);
+        // if returned true then hasAlias has a valid value
+        // if returend true and hasAlias is false then we dont need to go the
+        // AliasCache otherwise we ned to check it
+        // if returned false then hasAlias is not valid and we need to go
+        // to the AliasCache
+        bool hasAlias(Addr vaddr, bool* hasAlias);
 
       protected:
 
