@@ -136,6 +136,8 @@ class BaseDynInst : public ExecContext, public RefCounted
         IsStrictlyOrdered,
         ReqMade,
         MemOpDone,
+        CapabilityFetched,
+        CapabilityChecked,
         MaxFlags
     };
 
@@ -329,22 +331,6 @@ class BaseDynInst : public ExecContext, public RefCounted
                               return instFlags[TranslationCompleted]; }
     void translationCompleted(bool f) { instFlags[TranslationCompleted] = f; }
 
-    bool isCapabilityCheckCompleted() {
-      //return true;
-      if (isCapFetched()){
-          return true;
-      }
-      else {
-          assert(cpu->curCycle() >= capFetchCycle);
-          if ((cpu->curCycle() - capFetchCycle) > 100){
-            setCapFetched();
-            return true;
-          }
-          else {
-            return false;
-          }
-      }
-    }
 
     /** True if this address was found to match a previous load and they issued
      * out of order. If that happend, then it's only a problem if an incoming
@@ -362,6 +348,39 @@ class BaseDynInst : public ExecContext, public RefCounted
     void hitExternalSnoop(bool f) { instFlags[HitExternalSnoop] = f; }
 
     //change me!
+
+    bool isCapabilityChecked() const
+    {
+        return instFlags[CapabilityChecked];
+    }
+    void setCapabilityChecked() {
+        instFlags[CapabilityChecked] = true;
+    }
+    bool isCapFetched() const {return  instFlags[CapabilityFetched]; }
+    void setCapFetched(){ instFlags[CapabilityFetched] = true; }
+
+    // only used by inst queue to see whther miss is handled or not
+    bool isCapabilityCheckCompleted()
+    {
+      //return true;
+      if (isCapFetched()){
+          setCapabilityChecked();
+          return true;
+      }
+      else {
+          assert(cpu->curCycle() >= capFetchCycle);
+          if ((cpu->curCycle() - capFetchCycle) > 100){ // wait for 100 cycles
+            setCapFetched();
+            setCapabilityChecked();
+            return true;
+          }
+          else {
+            return false;
+          }
+      }
+    }
+
+
     bool isAliasCacheMissed() const {return false;}
     bool aliasFetchComplete() const {return false;}
 
@@ -631,16 +650,11 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool isBoundsCheckNeeded() const
     {return staticInst->isBoundsCheckNeeded();}
 
-    bool isCapabilityChecked() const
-    {return staticInst->isCapabilityChecked() ;}
-    bool isCapFetched() const {return  staticInst->isCapFetched(); }
-    void setCapFetched(){ staticInst->setCapFetched(); }
-    void clearCapFetched(){ staticInst->clearCapFetched(); }
     void setFlag(StaticInstFlags::Flags f) { staticInst->setFlag(f); }
     void resetFlag(StaticInstFlags::Flags f) { staticInst->resetFlag(f); }
     void setFlag(Flags f) {instFlags[f] = true;}
     void resetFlag(Flags f) {instFlags[f] = false;}
-    void setRegMade(bool val) {instFlags[ReqMade] = val;}
+    void setReqMade(bool val) {instFlags[ReqMade] = val;}
     /** Temporarily sets this instruction as a serialize before instruction. */
     void setSerializeBefore() { status.set(SerializeBefore); }
 

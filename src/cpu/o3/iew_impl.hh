@@ -1327,7 +1327,7 @@ DefaultIEW<Impl>::executeInsts()
                   inst->isBoundsCheckMicroop() &&
                   fault == NoFault){
 
-                    if (!inst->isCapabilityCheckCompleted())
+                    if (!inst->isCapabilityChecked())
                     {
                         DPRINTF(IEW, "Execute: Delayed capability check, "
                               "deferring inst due to capability$ miss.\n");

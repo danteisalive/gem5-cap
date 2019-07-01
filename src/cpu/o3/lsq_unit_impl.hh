@@ -699,19 +699,17 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
                                           inst->staticInst->uop_pid.getPID());
 
           inst->capFetchCycle = cpu->curCycle();
-          // std::cout << std::dec << "Cap$ Access Time: " <<
-          //           inst->capFetchCycle << " PID: " <<
-          //           inst->staticInst->uop_pid <<
-          //           " Result: " << hit <<
-          //           std::endl;
 
-          if (hit) inst->setCapFetched();
-          else     inst->clearCapFetched();
+          if (hit)
+          {
+            inst->setCapFetched();
+            inst->setCapabilityChecked();
+          }
         }
         else {
           // this bounds check microop is cheked
-          inst->setFlag(StaticInstFlags::IsCapabilityChecked);
           inst->setCapFetched();
+          inst->setCapabilityChecked();
         }
      }
 
@@ -719,9 +717,9 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
        inst->isBoundsCheckMicroop() &&
        load_fault == NoFault){
 
-          if (inst->isCapabilityCheckCompleted())
+          if (inst->isCapabilityChecked())
           {
-              inst->setRegMade(false);
+              inst->setReqMade(false);
           }
           else {
             // there is a miss for this cap
