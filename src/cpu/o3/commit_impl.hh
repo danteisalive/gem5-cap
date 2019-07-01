@@ -1358,7 +1358,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " Prediction Accuracy(1e6 Instr.): " << accuracy << std::endl <<
             " NumOfMissPredictions: " << cpu->FalsePredict <<std::endl <<
             " P0An: " << cpu->P0An <<
-            " PnA0: " << cpu->PnA0 <<
+            " PnA0: " << cpu->FalsePredict - cpu->P0An - cpu->PmAn <<
             " PmAn: " << cpu->PmAn <<std::endl <<
             " Number Of Mem Refs: " << cpu->numOfMemRefs <<
             // " Heap Access: " << cpu->heapAccesses <

@@ -361,13 +361,48 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool hitExternalSnoop() const { return instFlags[HitExternalSnoop]; }
     void hitExternalSnoop(bool f) { instFlags[HitExternalSnoop] = f; }
 
+    //change me!
+    bool isAliasCacheMissed() const {return false;}
+    bool aliasFetchComplete() const {return false;}
+
+    bool needAliasCacheAccess() const {
+
+      ThreadContext * tc = cpu->tcBase(threadNumber);
+
+      if (tc->ExeStopTracking) return false;
+      if (isMicroopInjected()) return false;
+      if (isBoundsCheckMicroop()) return false;
+
+      // datasize should be 8 bytes othersiwe it's not a base address
+      if (staticInst->getDataSize() != 8) return false;
+
+      assert(isLoad());
+
+      if (destRegIdx(0).isIntReg()){
+         int  dest = staticInst->getMemOpDataRegIndex();
+         if (dest > X86ISA::NUM_INTREGS + 15){
+              return false;
+        }
+        else {
+             return true;
+        }
+      }
+      else {
+        return false;
+      }
+
+   }
     /**
      * Returns true if the DTB address translation is being delayed due to a hw
      * page table walk.
      */
     bool isTranslationDelayed() const
     {
+        // for bounds check microops
         if (isBoundsCheckMicroop()) return false;
+        // for loads which need to access alias cache
+        if (isAliasCacheMissed() && aliasFetchComplete()) return false;
+        // general translation delay
         return (translationStarted() && !translationCompleted());
     }
 
@@ -958,6 +993,7 @@ Fault
 BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
                                    Request::Flags flags)
 {
+    // this a is check for bounds microop
     ThreadContext * tc =  cpu->tcBase(threadNumber);
     if (tc->enableCapability && isBoundsCheckMicroop()){
       effAddr = addr;

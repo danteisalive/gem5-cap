@@ -1479,8 +1479,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
          int  dest = si->getMemOpDataRegIndex();
          if (dest > X86ISA::NUM_INTREGS + 15)
              return false;
-         // we already know that a base address a 4/8 bytes
-         if (si->getDataSize() < 4) return false;
+
 
          cpu->NumOfAliasTableAccess++;
          //first look in Execute Alias buffer
@@ -1554,6 +1553,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             {
                cpu->PmAn++;
             }
+
             if (ENABLE_PREDICTOR_DEBUG){
                std::cout << std::hex <<
                           "EXECUTE: False Prediction Load Instruction: " <<
