@@ -728,6 +728,16 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
           }
     }
 
+    if (tc->enableCapability &&
+       !inst->isAliasFetchComplete() &&
+       load_fault == NoFault)
+    {
+          std::cout << "need to queue " <<
+            inst->staticInst->disassemble(inst->pcState().pc()) <<
+            inst->seqNum <<  std::endl;
+         return load_fault;
+    }
+
     if (inst->isTranslationDelayed() &&
         load_fault == NoFault)
         return load_fault;
@@ -1532,6 +1542,18 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
          }
 
+         // update the tlb entry for this page alias
+         // move this to alias cache
+         Process *p = tc->getProcessPtr();
+         Addr vpn = p->pTable->pageAlign(inst->effAddr); // find the vpn
+         auto it_lv1 = tc->ShadowMemory.find(vpn);
+         if (it_lv1 != tc->ShadowMemory.end() && it_lv1->second.size() != 0)
+         {
+            cpu->dtb->lookupAndUpdateEntry(inst->effAddr,true);
+         }
+         else {
+            cpu->dtb->lookupAndUpdateEntry(inst->effAddr,false);
+         }
          // now we know that it's not in the ExeAliasTableBuffer
          // threrefore we need to go to AliasCache
          TheISA::PointerID pid = TheISA::PointerID(0);

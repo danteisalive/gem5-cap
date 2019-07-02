@@ -97,7 +97,7 @@ namespace X86ISA
         // A flag to tell whether noALias flag is valid ro not
         bool valid;
         // A flag which tells whether there are any alises in this page
-        bool noAlias;
+        bool hasAlias;
         TlbEntryTrie::Handle trieHandle;
 
         TlbEntry(Addr asn, Addr _vaddr, Addr _paddr,

@@ -80,6 +80,7 @@ namespace X86ISA
         // if returned false then hasAlias is not valid and we need to go
         // to the AliasCache
         bool hasAlias(Addr vaddr, bool* hasAlias);
+        bool lookupAndUpdateEntry(Addr vaddr, bool hasAlias);
 
       protected:
 

@@ -102,7 +102,8 @@ class BaseTLB : public SimObject
         panic("Not implemented.\n");
     }
 
-    virtual bool lookupAlias(Addr vaddr);
+    virtual bool hasAlias(Addr vaddr, bool* hasAlias);
+    virtual bool lookupAndUpdateEntry(Addr vaddr, bool hasAlias);
     /**
      * Do post-translation physical address finalization.
      *

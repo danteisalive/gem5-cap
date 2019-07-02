@@ -172,11 +172,10 @@ CPUClass.numThreads = numThreads
 
 CPUClass.enable_capability = options.enable_capability
 CPUClass.symbol_file = options.symbol_file
-CPUClass.ELF_File = options.cmd
+
 if FutureClass != None:
     FutureClass.enable_capability = options.enable_capability
     FutureClass.symbol_file = options.symbol_file
-    FutureClass.elf_file = options.cmd
 
 
 # Check -- do not allow SMT with multiple CPUs

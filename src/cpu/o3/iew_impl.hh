@@ -1336,6 +1336,22 @@ DefaultIEW<Impl>::executeInsts()
                     }
                  }
 
+                 if (tc->enableCapability &&
+                     fault == NoFault){
+
+                    if (!inst->isAliasFetchComplete())
+                    {
+                        DPRINTF(IEW, "Execute: Delayed capability check, "
+                                  "deferring inst due to capability$ miss.\n");
+                        std::cout << "Added to queue " <<
+                        inst->staticInst->disassemble(inst->pcState().pc()) <<
+                        inst->seqNum << std::endl;
+
+                        instQueue.deferCapInst(inst);
+                        continue;
+                    }
+                 }
+
                 if (inst->isTranslationDelayed() &&
                     fault == NoFault) {
                     // A hw page table walk is currently going on; the
@@ -1867,37 +1883,55 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
     }
     else if (inst->isFreeCallMicroop()){
-      if (ENABLE_EXE_COLLECTOR_DEBUG)
-      {std::cout << std::hex << "IEW: FREE CALL: " <<
+        if (ENABLE_EXE_COLLECTOR_DEBUG)
+        {std::cout << std::hex << "IEW: FREE CALL: " <<
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                   " " << inst->seqNum <<
-                  std::endl;}
+                  std::endl;
+        }
 
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
         //check whether we have the cap for this AP or not
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        Block* bk = NULL;
         Block fake;
         fake.payload = _pid_base;
         fake.req_szB = 1;
-        UWord foundkey = 1;
-        UWord foundval = 1;
-        Bool present = VG_lookupFM( cpu->interval_tree,
-                                    &foundkey, &foundval, (UWord)&fake );
-
-        TheISA::PointerID _pid = TheISA::PointerID(0);
-        Block* bk = NULL;
-        if (present){
-            Block fake;
-            fake.payload = _pid_base;
-            fake.req_szB = 1;
-            UWord oldKeyW;
-            Bool found = VG_delFromFM( cpu->interval_tree,
+        UWord oldKeyW;
+        Bool found = VG_delFromFM( cpu->interval_tree,
                                      &oldKeyW, NULL, (Addr)&fake );
+        if (found){
             bk = (Block*)oldKeyW;
             assert(bk);
             assert(bk->pid != 0);
-            assert(found);
             _pid = TheISA::PointerID(bk->pid);
+            // update ShadowMemory
+            for (auto it_lv1 = tc->ShadowMemory.begin(),
+                          next_it_lv1 = it_lv1;
+                          it_lv1 != tc->ShadowMemory.end();
+                          it_lv1 = next_it_lv1)
+            {
+                ++next_it_lv1;
+                if (it_lv1->second.size() == 0)
+                {
+                    tc->ShadowMemory.erase(it_lv1);
+                }
+                else {
+                    for (auto it_lv2 = it_lv1->second.cbegin(),
+                             next_it_lv2 = it_lv2;
+                             it_lv2 != it_lv1->second.cend();
+                             it_lv2 = next_it_lv2)
+                    {
+                        ++next_it_lv2;
+                        if (it_lv2->second.getPID() == bk->pid)
+                        {
+                          it_lv1->second.erase(it_lv2);
+                        }
+                    }
+                }
+            }
+
             free(bk);
             tc->num_of_allocations--;
         }
@@ -2027,25 +2061,64 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                 std::endl;
       }
 
+      TheISA::PointerID _pid = TheISA::PointerID(0);
       Block fake;
       fake.payload = old_base_addr;
       fake.req_szB = 1;
-      UWord foundkey = 1;
-      UWord foundval = 1;
-      Bool present = VG_lookupFM(cpu->interval_tree,
-                                  &foundkey, &foundval, (UWord)&fake );
-      if (present){
-          Block fake;
-          fake.payload = old_base_addr;
-          fake.req_szB = 1;
-          UWord oldKeyW;
-          Bool found = VG_delFromFM(cpu->interval_tree,
+      UWord oldKeyW;
+      Bool found = VG_delFromFM(cpu->interval_tree,
                                    &oldKeyW, NULL, (Addr)&fake );
-          Block* bk = (Block*)oldKeyW;
-          assert(bk);
-          assert(found);
-          free(bk);
-          tc->num_of_allocations--;
+
+      if (found){
+        Block* bk = (Block*)oldKeyW;
+        assert(bk);
+        assert(bk->pid != 0);
+        _pid = TheISA::PointerID(bk->pid);
+          // update ShadowMemory
+        for (auto it_lv1 = tc->ShadowMemory.begin(),
+                        next_it_lv1 = it_lv1;
+                        it_lv1 != tc->ShadowMemory.end();
+                        it_lv1 = next_it_lv1)
+        {
+            ++next_it_lv1;
+            if (it_lv1->second.size() == 0)
+            {
+                tc->ShadowMemory.erase(it_lv1);
+            }
+            else {
+                for (auto it_lv2 = it_lv1->second.cbegin(),
+                           next_it_lv2 = it_lv2;
+                           it_lv2 != it_lv1->second.cend();
+                           it_lv2 = next_it_lv2)
+                {
+                      ++next_it_lv2;
+                      if (it_lv2->second.getPID() == bk->pid)
+                      {
+                        it_lv1->second.erase(it_lv2);
+                      }
+                }
+            }
+        }
+        free(bk);
+        tc->num_of_allocations--;
+      }
+
+      if (_pid != TheISA::PointerID(0)){
+          for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
+               it != tc->ExeAliasTableBuffer.cend(); it = next_it)
+          {
+            ++next_it;
+            if (it->second.getPID() == _pid.getPID())
+            {
+              if (ENABLE_EXE_COLLECTOR_DEBUG){
+                std::cout << "IEW: collector: " << "Free is called " <<
+                "and is removing " << it->second << " at address " <<
+                std::hex << it->first.second << std::dec <<
+                std::endl;
+              }
+              tc->ExeAliasTableBuffer.erase(it);
+            }
+          }
       }
 
     }

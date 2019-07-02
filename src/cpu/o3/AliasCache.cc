@@ -166,6 +166,91 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
     }
 
+    bool LRUAliasCache::initiateAccess(Addr vaddr, ThreadContext* tc){
+        //TODO: stats
+        total_accesses = total_accesses + 1;
+
+        Addr thisIsTheTag = vaddr >> (ShiftAmount); //tag of the VA
+
+        //Extract the set from the VA
+        Addr thisIsTheSet =
+            ((vaddr - (thisIsTheTag << ShiftAmount)) >> BitsPerBlock);
+
+
+        assert(thisIsTheSet < NumSets);
+
+
+        for (size_t wayNum = 0; wayNum < NumWays; wayNum++) {
+
+            if (AliasCache[thisIsTheSet][wayNum].valid &&
+                AliasCache[thisIsTheSet][wayNum].tag == thisIsTheTag)
+            {
+
+                total_hits++;
+                AliasCache[thisIsTheSet][wayNum].valid = true;
+
+                // increase the lru age
+                for (size_t i = 0; i < NumWays; i++) {
+                  AliasCache[thisIsTheSet][i].lruAge++;
+                }
+                AliasCache[thisIsTheSet][wayNum].lruAge = 0;
+
+                return true;
+
+            }
+
+        }
+        // if we are here then it means a miss
+        // find the candiate for replamcement
+        total_misses++;
+        size_t candidateWay = 0;
+        size_t candiateLruAge = 0;
+        for (int i = 0; i < NumWays; i++) {
+            if (AliasCache[thisIsTheSet][i].lruAge > candiateLruAge){
+              candiateLruAge = AliasCache[thisIsTheSet][i].lruAge;
+              candidateWay = i;
+            }
+        }
+
+        for (size_t i = 0; i < NumWays; i++) {
+          AliasCache[thisIsTheSet][i].lruAge++;
+        }
+
+        // new read it from shadow_memory
+        // if the page does not have any pid then it's defenitly a
+        // PID(0). In this case just send it back and do not update
+        // alias cache as it will just polute the cache and deacrese the
+        // hit rate. If there is a page for it update the cache in any case
+        Process *p = tc->getProcessPtr();
+        Addr vpn = p->pTable->pageAlign(vaddr); // find the vpn
+
+        auto it_lv1 = tc->ShadowMemory.find(vpn);
+        if (it_lv1 != tc->ShadowMemory.end() && it_lv1->second.size() != 0)
+        {
+            // the page is there and not empty
+            auto it_lv2 = it_lv1->second.find(vaddr);
+            if (it_lv2 != it_lv1->second.end()){
+              AliasCache[thisIsTheSet][candidateWay].pid = it_lv2->second;
+            }
+            else {
+              AliasCache[thisIsTheSet][candidateWay].pid = PointerID(0);
+            }
+
+            AliasCache[thisIsTheSet][candidateWay].valid = true;
+            AliasCache[thisIsTheSet][candidateWay].tag = thisIsTheTag;
+            AliasCache[thisIsTheSet][candidateWay].lruAge = 0;
+        }
+        else {
+        // there is no alias in this page threfore just send back PID(0)
+            total_misses--; // this was acutually a hit
+            total_hits++;
+        }
+
+        return false;
+
+
+    }
+
     void LRUAliasCache::print_stats() {
         printf("Alias Cache Stats: %lu, %lu, %lu, %f \n",
         total_accesses, total_hits, total_misses,

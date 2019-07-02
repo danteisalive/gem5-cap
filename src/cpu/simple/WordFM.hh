@@ -98,6 +98,7 @@ typedef
       ULong       n_reads;
       ULong       n_writes;
       Addr        seqNum;
+      uint8_t     type; // 1 = malloc 2 = calloc  3 = realloc
    }
    Block;
 //------------------------------------------------------------------//

@@ -57,4 +57,3 @@ class NonCachingSimpleCPU(AtomicSimpleCPU):
     @classmethod
     def support_take_over(cls):
         return True
-

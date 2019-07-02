@@ -1204,9 +1204,15 @@ InstructionQueue<Impl>::getBlockedCapInstToExecute()
 {
     for (ListIt it = deferredCapInsts.begin(); it != deferredCapInsts.end();
          ++it) {
-        if ((*it)->isCapabilityCheckCompleted() || (*it)->isSquashed()) {
+        if ((*it)->isAliasFetchComplete() ||
+            (*it)->isCapabilityCheckCompleted() ||
+            (*it)->isSquashed())
+        {
             DynInstPtr mem_inst = *it;
             deferredCapInsts.erase(it);
+            //std::cout << "removed from queue " <<
+            //mem_inst->staticInst->disassemble(mem_inst->pcState().pc()) <<
+            //mem_inst->seqNum << std::endl;
             return mem_inst;
         }
     }

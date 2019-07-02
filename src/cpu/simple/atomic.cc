@@ -96,6 +96,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     threadContexts[0]->ExeStopTracking = false;
     threadContexts[0]->Collector_Status = ThreadContext::NONE;
 
+    max_insts_any_thread = p->max_insts_any_thread;
     if (p->symbol_file != ""){
         std::string line;
         std::ifstream myfile (threadContexts[0]->symbolsFile);
@@ -123,6 +124,7 @@ AtomicSimpleCPU::~AtomicSimpleCPU()
     if (tickEvent.scheduled()) {
         deschedule(tickEvent);
     }
+
 }
 
 DrainState
@@ -382,6 +384,8 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t * data, unsigned size,
     dcache_latency = 0;
 
     req->taskId(taskId());
+    curStaticInst->atomic_vaddr = addr;
+
     while (1) {
         req->setVirt(0, addr, size, flags, dataMasterId(), thread->pcState().instAddr());
 
@@ -564,6 +568,8 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
 void
 AtomicSimpleCPU::tick()
 {
+
+    #define ENABLE_LOGGING 1
     DPRINTF(SimpleCPU, "Tick\n");
 
     // Change thread if multi-threaded
@@ -661,10 +667,40 @@ AtomicSimpleCPU::tick()
                     if (curStaticInst->isStore() &&
                         curStaticInst->getDataSize() == 8)
                     {
+                       if (ENABLE_LOGGING)
+                          updateAliasTableWithStack(threadContexts[0],pcState);
+                       else
                           updateAliasTable(threadContexts[0],pcState);
                     }
                 }
 
+                if (ENABLE_LOGGING)
+                  if (threadContexts[0]->enableCapability && fault == NoFault){
+                      if (curStaticInst->isLoad() &&
+                          curStaticInst->getDataSize() == 8)
+                      {
+                         getLog(threadContexts[0],pcState);
+                      }
+                  }
+
+                if (ENABLE_LOGGING){
+                  if ((uint64_t)t_info.numInsts.value() ==
+                      max_insts_any_thread - 1){
+                    for (auto it = PIDLogs.cbegin(); it != PIDLogs.cend();
+                         ++it)
+                    {
+                      std::cout << std::hex << it->first << " : ";
+                      for (size_t i = 0; i < it->second.size(); i++) {
+                        std::cout << std::dec << it->second[i].pid <<
+                        //"(" << it->second[i].type << ")" <<
+                        " -> ";
+                      }
+                      std::cout << std::endl;
+                    }
+
+
+                  }
+                }
                 // dump stats
 
                 if (threadContexts[0]->enableCapability &&
@@ -802,6 +838,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       bk->payload   = (Addr)thread->ap_base;
       bk->req_szB   = (SizeT)thread->ap_size;
       bk->pid       = (Addr)++thread->PID;
+      bk->type      = 1; //malloc
       Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0/*no val*/);
       assert(!present);
       // logs
@@ -851,6 +888,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
        bk->payload   = (Addr)thread->ap_base;
        bk->req_szB   = (SizeT)thread->ap_size;
        bk->pid       = (Addr)++thread->PID;
+       bk->type      = 2; //calloc
        Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
 
 
@@ -915,6 +953,36 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           assert(bk->pid != 0);
           assert(found);
           freedPIDVector.push_back(bk->pid);
+
+          if (ENABLE_LOGGING){ // delete all aliases related to this PID
+
+              for (auto it_lv1 = threadContexts[0]->ShadowMemory.begin(),
+                        next_it_lv1 = it_lv1;
+                        it_lv1 != threadContexts[0]->ShadowMemory.end();
+                        it_lv1 = next_it_lv1)
+              {
+                  ++next_it_lv1;
+                  if (it_lv1->second.size() == 0)
+                  {
+                      threadContexts[0]->ShadowMemory.erase(it_lv1);
+                  }
+                  else {
+                      for (auto it_lv2 = it_lv1->second.cbegin(),
+                           next_it_lv2 = it_lv2;
+                           it_lv2 != it_lv1->second.cend();
+                           it_lv2 = next_it_lv2)
+                      {
+                        ++next_it_lv2;
+                        if (it_lv2->second.getPID() == bk->pid)
+                        {
+                          it_lv1->second.erase(it_lv2);
+                        }
+                      }
+                  }
+              }
+
+          }
+
           free(bk);
           thread->num_of_allocations--;
       }
@@ -968,6 +1036,36 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           Block* bk = (Block*)oldKeyW;
           assert(bk);
           assert(found);
+          freedPIDVector.push_back(bk->pid);
+
+          if (ENABLE_LOGGING){ // delete all aliases related to this PID
+
+              for (auto it_lv1 = threadContexts[0]->ShadowMemory.begin(),
+                        next_it_lv1 = it_lv1;
+                        it_lv1 != threadContexts[0]->ShadowMemory.end();
+                        it_lv1 = next_it_lv1)
+              {
+                  ++next_it_lv1;
+                  if (it_lv1->second.size() == 0)
+                  {
+                      threadContexts[0]->ShadowMemory.erase(it_lv1);
+                  }
+                  else {
+                      for (auto it_lv2 = it_lv1->second.cbegin(),
+                           next_it_lv2 = it_lv2;
+                           it_lv2 != it_lv1->second.cend();
+                           it_lv2 = next_it_lv2)
+                      {
+                        ++next_it_lv2;
+                        if (it_lv2->second.getPID() == bk->pid)
+                        {
+                          it_lv1->second.erase(it_lv2);
+                        }
+                      }
+                  }
+              }
+
+          }
           free(bk);
           thread->num_of_allocations--;
       }
@@ -994,6 +1092,8 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       bk->payload   = (Addr)thread->ap_base;
       bk->req_szB   = (SizeT)thread->ap_size;
       bk->pid       = (Addr)++thread->PID;
+      bk->type      = 3; //realloc
+
       Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0/*no val*/);
 
 
@@ -1094,37 +1194,131 @@ void AtomicSimpleCPU::updateAliasTable(ThreadContext * _tc,
 
 }
 
-void AtomicSimpleCPU::CleanupAliasTable(ThreadContext * _tc,
+
+// this function is slow and gatters unnecesaary information and only should
+// be used with getLog function in debuging mode
+void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
                          PCState &pcState)
 {
-  // two level removal
-  // if the page pid map is empty delete the whole page pid map
-  // if the page pid map is not empty, them delete all the entrys with
-  // the same pid
-  //
-  // for (auto it_lv1 = threadContexts[0]->ShadowMemory.begin(),
-  //                    next_it_lv1 = it_lv1;
-  //        it_lv1 != threadContexts[0]->ShadowMemory.end();
-  //        it_lv1 = next_it_lv1)
-  // {
-  //       ++next_it_lv1;
-  //       if (it_lv1->second.size() == 0){
-  //         threadContexts[0]->ShadowMemory.erase(it_lv1);
-  //       }
-  //       else {
-  //           for (auto it_lv2 = it_lv1->second.cbegin(),
-  //                next_it_lv2 = it_lv2; it_lv2 != it_lv1->second.cend();
-  //                it_lv2 = next_it_lv2)
-  //           {
-  //             ++next_it_lv2;
-  //             if (it_lv2->second.getPID() == bk->pid)
-  //             {
-  //               it_lv1->second.erase(it_lv2);
-  //             }
-  //           }
-  //       }
-  //
-  // } // two level removal
+    #define ATOMIC_UPDATE_ALIAS_TABLE_WITH_STACK 0
+    SimpleExecContext& t_info = *threadInfo[0];
+    SimpleThread* thread = t_info.thread;
+
+    if (!trackAlias(pcState)) return;
+
+    // srcRegIdx(2) in store microops is the src
+    // check whther it is an integer reg or not
+    if (!curStaticInst->srcRegIdx(2).isIntReg()) return;
+
+    if (!(curStaticInst->getSegment() == TheISA::SEGMENT_REG_DS ||
+        curStaticInst->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+
+    // first delete all the aliases with the updated rsp
+    uint64_t RSPValue = thread->readIntReg(X86ISA::INTREG_RSP);
+    Addr stack_base = 0x7FFFFFFFF000ULL;
+    Addr max_stack_size = 8 * 1024 * 1024;
+    Addr next_thread_stack_base = stack_base - max_stack_size;
+
+    // rsp val is between program stack
+    if ((RSPValue >= next_thread_stack_base && RSPValue <= stack_base)){
+      // two level removal of stack aliases between RSPValue and
+      // next_thread_stack_base
+      Process *p = threadContexts[0]->getProcessPtr();
+      Addr vpn = p->pTable->pageAlign(RSPValue);
+      auto it_lv1 = threadContexts[0]->ShadowMemory.find(vpn);
+      if (it_lv1 != threadContexts[0]->ShadowMemory.end()){
+          if (it_lv1->second.size() == 0){
+            threadContexts[0]->ShadowMemory.erase(it_lv1);
+          }
+          else {
+              for (auto it = it_lv1->second.cbegin(), next_it = it;
+                    it != it_lv1->second.cend(); it = next_it)
+              {
+                   ++next_it;
+                   if (it->first >= next_thread_stack_base &&
+                      it->first <= RSPValue)
+                   {
+                     it_lv1->second.erase(it);
+                   }
+              }
+          }
+      }
+
+    } // end of stack update
+
+
+    Addr vaddr = thread->readIntReg(curStaticInst->getMemOpDataRegIndex());
+    // first find the page vpn and store into the page cluster
+    Block* bk = find_Block_containing(vaddr);
+
+    Process* p = threadContexts[0]->getProcessPtr();
+    assert(curStaticInst->atomic_vaddr != 0);
+    Addr vpn = p->pTable->pageAlign(curStaticInst->atomic_vaddr);
+
+    // if found: update the ShadowMemory
+    if (bk && (bk->payload == vaddr)) { // just the base addresses
+      assert(bk->pid != 0);
+      threadContexts[0]->ShadowMemory[vpn][curStaticInst->atomic_vaddr] =
+                                                                      bk->pid;
+      if (ATOMIC_UPDATE_ALIAS_TABLE_WITH_STACK) {
+        std::cout << curStaticInst->disassemble(pcState.pc()) << " " <<
+                   std::hex <<
+                   thread->readIntReg(curStaticInst->getMemOpDataRegIndex()) <<
+                   std::hex << " (" << bk->payload << "," <<
+                   bk->payload + bk->req_szB << ") = " <<
+                   std::dec << "PID: " << bk->pid <<
+                   std::endl;
+      }
+    }
+    else {
+      // if not found in the capability cache, then check if the alias is
+      // overwritten
+      auto it_lv1 = threadContexts[0]->ShadowMemory.find(vpn);
+      if (it_lv1 != threadContexts[0]->ShadowMemory.end()){
+         auto it_lv2 = it_lv1->second.find(curStaticInst->atomic_vaddr);
+         if (it_lv2 != it_lv1->second.end()){
+            it_lv1->second.erase(it_lv2);
+         }
+         if (it_lv1->second.empty()){
+           threadContexts[0]->ShadowMemory.erase(it_lv1);
+         }
+      }
+
+    }
+
+
+}
+
+void AtomicSimpleCPU::getLog(ThreadContext * _tc,
+                         PCState &pcState)
+{
+  SimpleExecContext& t_info = *threadInfo[0];
+  SimpleThread* thread = t_info.thread;
+
+  if (thread->stop_tracking) return;
+
+  if (curStaticInst->destRegIdx(0).isIntReg()){
+
+      int  dest = curStaticInst->getMemOpDataRegIndex();
+      if (dest > X86ISA::NUM_INTREGS + 15)
+          return;
+
+      assert(curStaticInst->atomic_vaddr != 0);
+
+      Process *p = threadContexts[0]->getProcessPtr();
+      Addr vpn = p->pTable->pageAlign(curStaticInst->atomic_vaddr);
+      auto it_lv1 = threadContexts[0]->ShadowMemory.find(vpn);
+      if (it_lv1 != threadContexts[0]->ShadowMemory.end()){
+          auto it_lv2 = it_lv1->second.find(curStaticInst->atomic_vaddr);
+          if (it_lv2 != it_lv1->second.end()){
+             Block bk;
+             bk.pid = it_lv2->second.getPID();
+             bk.type = 0;
+             PIDLogs[pcState.pc()].push_back(bk);
+          }
+      }
+
+  }
 
 }
 

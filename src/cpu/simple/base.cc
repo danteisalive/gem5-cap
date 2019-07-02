@@ -417,6 +417,27 @@ BaseSimpleCPU::serializeThread(CheckpointOut &cp, ThreadID tid) const
     assert(_status == Idle || _status == Running);
 
     threadInfo[tid]->thread->serialize(cp);
+
+    // std::string line;
+    // std::ifstream myfile ("");
+    // if (myfile.is_open()){
+    //     Addr pcAddr;
+    //     uint64_t checkType;
+    //     while ( std::getline (myfile,line) ){
+    //         std::istringstream iss(line);
+    //         iss >> std::hex >> pcAddr  >> checkType ;
+    //         (o3_tc->syms_cache).insert(
+    //           std::pair<Addr, TheISA::CheckType>
+    //           (pcAddr, (TheISA::CheckType)checkType));
+    //         DPRINTF(Capability,
+    //           "line:'%s' PCAddr: %#lx CheckType: %s\n",
+    //           line, pcAddr,
+    //           TheISA::CheckTypeToStr((TheISA::CheckType)checkType));
+    //     }
+    //     myfile.close();
+    // }
+    // else
+    //   fatal("Can't open symbols file");
 }
 
 void

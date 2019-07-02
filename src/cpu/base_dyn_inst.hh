@@ -138,6 +138,7 @@ class BaseDynInst : public ExecContext, public RefCounted
         MemOpDone,
         CapabilityFetched,
         CapabilityChecked,
+        AliasFetchComplete,
         MaxFlags
     };
 
@@ -234,7 +235,7 @@ class BaseDynInst : public ExecContext, public RefCounted
 
     //bool capFetched;
     uint64_t capFetchCycle;
-    uint64_t capFiniCycle;
+    uint64_t aliasFetchCycle;
 
     /////////////////////// TLB Miss //////////////////////
     /**
@@ -305,6 +306,7 @@ class BaseDynInst : public ExecContext, public RefCounted
         cpu->demapPage(vaddr, asn);
     }
 
+    bool isAliasCacheMissed(Addr vaddr);
     Fault initiateMemRead(Addr addr, unsigned size, Request::Flags flags);
 
     Fault writeMem(uint8_t *data, unsigned size, Addr addr,
@@ -381,11 +383,8 @@ class BaseDynInst : public ExecContext, public RefCounted
     }
 
 
-    bool isAliasCacheMissed() const {return false;}
-    bool aliasFetchComplete() const {return false;}
-
     bool needAliasCacheAccess() const {
-
+      return false;
       ThreadContext * tc = cpu->tcBase(threadNumber);
 
       if (tc->ExeStopTracking) return false;
@@ -411,6 +410,24 @@ class BaseDynInst : public ExecContext, public RefCounted
       }
 
    }
+
+   bool isAliasFetchComplete(){
+
+     if (instFlags[AliasFetchComplete])
+     {
+       return true;
+     }
+     else {
+       assert(cpu->curCycle() >= aliasFetchCycle);
+       if ((cpu->curCycle() - aliasFetchCycle) > 100){ // wait for 100 cycles
+         instFlags[AliasFetchComplete] = true;
+         return true;
+       }
+       else {
+         return false;
+       }
+     }
+   }
     /**
      * Returns true if the DTB address translation is being delayed due to a hw
      * page table walk.
@@ -419,8 +436,6 @@ class BaseDynInst : public ExecContext, public RefCounted
     {
         // for bounds check microops
         if (isBoundsCheckMicroop()) return false;
-        // for loads which need to access alias cache
-        if (isAliasCacheMissed() && aliasFetchComplete()) return false;
         // general translation delay
         return (translationStarted() && !translationCompleted());
     }
@@ -1003,6 +1018,49 @@ class BaseDynInst : public ExecContext, public RefCounted
 };
 
 template<class Impl>
+bool
+BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
+  ThreadContext * tc =  cpu->tcBase(threadNumber);
+  // first check the tlb entry for valid and exist flags
+  bool hasAlias = true;
+  // in this case the hasAlias has a valid value
+  if (cpu->dtb->hasAlias(vaddr, &hasAlias)){
+     if (hasAlias){
+       // check to see if there is a miss or hit for this access
+       if (!cpu->ExeAliasCache->initiateAccess(vaddr, tc)){
+         // if this is miss return and wait
+         // otherwise continue executing the load
+         instFlags[AliasFetchComplete] = false;
+         return true;
+       }
+       else {
+         // hit and threrefore no need to wait
+         instFlags[AliasFetchComplete] = true;
+         return false;
+       }
+     }
+     else {
+       // no alias therefore no need to stall
+       instFlags[AliasFetchComplete] = true;
+       return false;
+     }
+  }
+  else {
+    // we need to check alias for this one
+    // due to tlb miss or because valid bit is not set
+    if (!cpu->ExeAliasCache->initiateAccess(vaddr, tc)){
+      instFlags[AliasFetchComplete] = false;
+      return true;
+    }
+    else {
+      instFlags[AliasFetchComplete] = true;
+      return false;
+    }
+
+  }
+}
+
+template<class Impl>
 Fault
 BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
                                    Request::Flags flags)
@@ -1015,6 +1073,22 @@ BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
       instFlags[EffAddrValid] = true;
       instFlags[ReqMade] = false;
       return NoFault;
+    }
+
+    // this is a check to see if this load needs to access alias
+    if (needAliasCacheAccess()){
+      if (!instFlags[AliasFetchComplete] && isAliasCacheMissed(addr)){
+        // there is a miss to alias cache we need to wait and maybe stall
+        std::cout << "miss alias " <<
+                    staticInst->disassemble(pcState().pc()) <<
+                    seqNum << std::endl;
+        aliasFetchCycle = cpu->curCycle();
+        return NoFault;
+      }
+    }
+    else {
+      // no need to check alias cache for this load
+      instFlags[AliasFetchComplete] = true;
     }
 
     instFlags[ReqMade] = true;

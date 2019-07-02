@@ -79,12 +79,16 @@ class AtomicSimpleCPU : public BaseSimpleCPU
                 TheISA::CheckType _sym);
 
     void updateAliasTable(ThreadContext * _tc, TheISA::PCState &pcState);
+    void updateAliasTableWithStack(ThreadContext * _tc,
+                                   TheISA::PCState &pcState);
     bool trackAlias(TheISA::PCState &pcState);
     Block* find_Block_containing ( Addr a );
-    void CleanupAliasTable(ThreadContext * _tc, TheISA::PCState &pcState);
+    void getLog(ThreadContext * _tc, TheISA::PCState &pcState);
 
     WordFM* interval_tree = NULL;  /* WordFM* Block* void */
     std::vector<uint64_t> freedPIDVector;
+    std::map<Addr, std::vector<Block>> PIDLogs;
+    uint64_t max_insts_any_thread;
     // 2-entry cache for find_Block_containing
     Block* fbc_cache0 = NULL;
     Block* fbc_cache1 = NULL;

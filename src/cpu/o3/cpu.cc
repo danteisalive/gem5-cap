@@ -439,7 +439,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          NumOfExecutedBoundsCheck = 0; numOfCommitedMemRefs = 0;
 
          //symtab
-         std::stringstream test(params->ELF_File);
+         Process *p = o3_tc->getProcessPtr();
+         std::stringstream test(p->progName());
          std::string segment;
          std::vector<std::string> seglist;
 

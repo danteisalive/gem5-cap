@@ -164,8 +164,6 @@ class DerivO3CPU(BaseCPU):
     LVPTTagSize = Param.Unsigned(16, "Size of the LVPT tags, in bits")
     LVPTInstShiftAmt = Param.Unsigned(0, "bits to shift instructions by")
 
-    ELF_File = Param.String(Parent.ELF_File, "ELF FILE")
-
     needsTSO = Param.Bool(buildEnv['TARGET_ISA'] == 'x86',
                           "Enable TSO Memory model")
 

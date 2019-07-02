@@ -67,7 +67,7 @@ BaseDynInst<Impl>::BaseDynInst(const StaticInstPtr &_staticInst,
 {
     seqNum = seq_num;
     capFetchCycle = 0;
-    capFiniCycle = 0;
+    aliasFetchCycle = 0;
     pc = _pc;
     predPC = _predPC;
 
@@ -79,8 +79,8 @@ BaseDynInst<Impl>::BaseDynInst(const StaticInstPtr &_staticInst,
                                const StaticInstPtr &_macroop)
     : staticInst(_staticInst), traceData(NULL), macroop(_macroop)
 {
-        capFetchCycle = 0;
-    capFiniCycle = 0;
+    capFetchCycle = 0;
+    aliasFetchCycle = 0;
     seqNum = 0;
     initVars();
 }
@@ -90,7 +90,7 @@ void
 BaseDynInst<Impl>::initVars()
 {
     capFetchCycle = 0;
-    capFiniCycle = 0;
+    aliasFetchCycle = 0;
     memData = NULL;
     effAddr = 0;
     physEffAddrLow = 0;

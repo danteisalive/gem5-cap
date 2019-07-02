@@ -126,12 +126,37 @@ TLB::lookup(Addr va, bool update_lru)
     return entry;
 }
 
+
+// valid and hasAlias are undated in the mispredictedPID function After
+// the tlb miss is handeled
 bool
 TLB::hasAlias(Addr vaddr, bool* hasAlias){
   TlbEntry *entry = trie.lookup(vaddr);
   if (entry){
-
+      if (entry->valid){
+        *hasAlias = entry->hasAlias;
+        return true; // we cannot say whther there is an alias or not
+      }
+      else{
+        return false;
+      }
   }
+  return false; // no entry and this will be a miss
+}
+
+
+bool
+TLB::lookupAndUpdateEntry(Addr vaddr, bool hasAlias){
+  TlbEntry *entry = trie.lookup(vaddr);
+
+  if (entry){
+      entry->valid = true;
+      entry->hasAlias = hasAlias;
+  }
+  else {
+    return false;
+  }
+
   return true;
 }
 

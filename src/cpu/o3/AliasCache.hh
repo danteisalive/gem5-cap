@@ -87,6 +87,8 @@ class LRUAliasCache
                         ThreadContext* tc,
                         PointerID* pid ) ;
 
+        bool initiateAccess(Addr vaddr,ThreadContext* tc);
+
         void print_stats() ;
 
 };

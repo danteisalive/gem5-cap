@@ -73,6 +73,11 @@ GenericTLB::demapPage(Addr vaddr, uint64_t asn)
 }
 
 bool
-BaseTLB::lookupAlias(Addr vaddr){
-    panic("lookuoAlias: should not called from here!");
+BaseTLB::hasAlias(Addr vaddr, bool* hasAlias){
+    panic("hasAlias: should not called from here!");
+}
+
+bool
+BaseTLB::lookupAndUpdateEntry(Addr vaddr, bool hasAlias){
+    panic("lookupAndUpdateEntry: should not called from here!");
 }
