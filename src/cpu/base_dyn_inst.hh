@@ -385,7 +385,6 @@ class BaseDynInst : public ExecContext, public RefCounted
 
     bool needAliasCacheAccess() const {
       return false;
-      ThreadContext * tc = cpu->tcBase(threadNumber);
 
       if (!trackAlias()) return false;
       if (isMicroopInjected()) return false;
@@ -430,7 +429,7 @@ class BaseDynInst : public ExecContext, public RefCounted
    }
 
 
-    bool trackAlias(){
+    bool trackAlias() const{
 
        ThreadContext * tc = cpu->tcBase(threadNumber);
 

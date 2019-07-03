@@ -44,7 +44,7 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 {
       #define ENABLE_POINTER_TRACKER_DEBUG 0
       // this is probably a a little late but still can be effective
-      if (!filterInst()) return;
+      if (!filterInst(tc,nextPC)) return;
       // its like we are executing microps here
       for (size_t i = 0; i < numMicroops; i++) {
           const StaticInstPtr si = microops[i];
