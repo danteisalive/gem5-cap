@@ -1278,6 +1278,8 @@ DefaultIEW<Impl>::executeInsts()
 
         DynInstPtr inst = instQueue.getInstToExecute();
 
+        ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+
         DPRINTF(IEW, "Execute: Processing PC %s, [tid:%i] [sn:%i].\n",
                 inst->pcState(), inst->threadNumber,inst->seqNum);
 
@@ -1307,7 +1309,7 @@ DefaultIEW<Impl>::executeInsts()
         Fault fault = NoFault;
 
         ThreadID tid = inst->threadNumber;
-        ThreadContext * tc = cpu->tcBase(tid);
+        //ThreadContext * tc = cpu->tcBase(tid);
 
         // Execute instruction.
         // Note that if the instruction faults, it will be handled
@@ -1322,7 +1324,7 @@ DefaultIEW<Impl>::executeInsts()
                 // event adds the instruction to the queue to commit
                 fault = ldstQueue.executeLoad(inst);
 
-                ThreadContext * tc = cpu->tcBase(tid);
+
                 if (tc->enableCapability &&
                   inst->isBoundsCheckMicroop() &&
                   fault == NoFault){
@@ -1845,7 +1847,6 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         tc->ap_pid   = _pid_num;
 
         tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
-        tc->ExeStopTracking = true;
 
     }
     else if (inst->isMallocBaseCollectorMicroop()){
@@ -1871,12 +1872,12 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         bk->req_szB   = (SizeT)tc->ap_size;
         bk->pid       = (Addr)_pid_num;
         bk->seqNum    = inst->seqNum;
-        Bool present = VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+        unsigned char present =
+                      VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
         assert(!present);
 
         tc->num_of_allocations++;
         tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
-        tc->ExeStopTracking = false;
         // rax now is a pointer
         TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
         tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
@@ -1899,7 +1900,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         fake.payload = _pid_base;
         fake.req_szB = 1;
         UWord oldKeyW;
-        Bool found = VG_delFromFM( cpu->interval_tree,
+        unsigned char found = VG_delFromFM( cpu->interval_tree,
                                      &oldKeyW, NULL, (Addr)&fake );
         if (found){
             bk = (Block*)oldKeyW;
@@ -1959,7 +1960,6 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             }
         }
 
-        //tc->ExeStopTracking = true;
         // RDI is not a pointer anymore
         tc->PointerTrackerTable[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
 
@@ -1974,7 +1974,6 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                 std::endl;}
       // do nothing, just start tracking again.
       // in commit we will check whether freeing was succesful or not
-      //tc->ExeStopTracking = false;
 
     }
     else if (inst->isCallocSizeCollectorMicroop()){
@@ -1989,7 +1988,6 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       tc->ap_size = _pid_size_arg1 * _pid_size_arg2;
       tc->ap_pid = _pid_num;
       tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
-      tc->ExeStopTracking = true;
       // logs
       if (ENABLE_EXE_COLLECTOR_DEBUG)
       {
@@ -2025,12 +2023,12 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
          bk->req_szB   = (SizeT)tc->ap_size;
          bk->pid       = (Addr)_pid_num;
          bk->seqNum    = inst->seqNum;
-         Bool present = VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+         unsigned char present =
+                      VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
          assert(!present);
 
          tc->num_of_allocations++;
          tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
-         tc->ExeStopTracking = false;
          // rax now is a pointer
          TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
          tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
@@ -2051,7 +2049,6 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       tc->ap_size = _pid_size_arg2;
       tc->ap_pid = _pid_num;
       tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
-      tc->ExeStopTracking = true;
       // logs
       if (ENABLE_EXE_COLLECTOR_DEBUG)
       {
@@ -2066,7 +2063,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       fake.payload = old_base_addr;
       fake.req_szB = 1;
       UWord oldKeyW;
-      Bool found = VG_delFromFM(cpu->interval_tree,
+      unsigned char found = VG_delFromFM(cpu->interval_tree,
                                    &oldKeyW, NULL, (Addr)&fake );
 
       if (found){
@@ -2147,12 +2144,12 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             bk->req_szB   = (SizeT)tc->ap_size;
             bk->pid       = (Addr)_pid_num;
             bk->seqNum    = inst->seqNum;
-            Bool present = VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+            unsigned char present =
+                      VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
             assert(!present);
 
             tc->num_of_allocations++;
             tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
-            tc->ExeStopTracking = false;
             // rax now is a pointer
             TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
             tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
@@ -2175,7 +2172,7 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
   if (inst->isMicroopInjected()) return;
   if (inst->isBoundsCheckMicroop()) return;
-  if (tc->ExeStopTracking) return;   // dont care about AP functions
+  if (!trackAlias(inst)) return;   // dont care about AP functions
 
   // datasize should be 4/8 bytes othersiwe it's not a base address
   if (si->getDataSize() != 8) return; // only for 64 bits system
@@ -2221,8 +2218,8 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
             " PID: " << _pid <<
             std::endl;
       }
-            //put it into exe alias table and later in commit delete it
-            tc->ExeAliasTableBuffer[ThreadContext::AliasTableKey(
+      //put it into exe alias table and later in commit delete it
+      tc->ExeAliasTableBuffer[ThreadContext::AliasTableKey(
                                     inst->seqNum,inst->effAddr)] = _pid;
 
       if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
@@ -2236,6 +2233,30 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
       // update the shadow memory (where should we do this?)
   }
 
+
+}
+
+template <class Impl>
+bool
+DefaultIEW<Impl>::trackAlias(DynInstPtr inst){
+
+    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+
+    Block fake;
+    fake.payload = (Addr)inst->pcState().pc();
+    fake.req_szB = 1;
+    UWord foundkey = 1;
+    UWord foundval = 1;
+    unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+                                    &foundkey, &foundval, (UWord)&fake );
+    if (found)
+    {
+      return false;
+    }
+    else
+    {
+      return true;
+    }
 
 }
 

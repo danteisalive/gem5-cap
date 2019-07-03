@@ -518,16 +518,7 @@ namespace X86ISA
     };
 
     enum CheckType {
-        BOUNDS = 0,
-        READ = 1,
-        WRITE = 2,
-        EXECUTE = 3,
-        FREE = 4,
-        ALLOC_SIZE = 5,
-        ALLOC_ADDR = 6,
-        AP_MALLOC = 7,
-        STACK = 8,
-        DP = 9,
+        AP_IGONRE               = 0x0,
         AP_BOUNDS_INJECT        = 0xd,
         AP_MALLOC_BASE_COLLECT  = 0xb,
         AP_MALLOC_SIZE_COLLECT  = 0xc,
@@ -544,26 +535,8 @@ namespace X86ISA
     CheckTypeToStr(CheckType type)
     {
         switch (type) {
-          case BOUNDS:
-            return "Bounds Check";
-          case READ:
-            return "Read Permission Check";
-          case WRITE:
-            return "Write Permission Check";
-          case EXECUTE:
-            return "Execute Permission Check";
-          case FREE:
-            return "Free Check";
-          case ALLOC_ADDR:
-            return "ALLOC ADDR PICK";
-          case ALLOC_SIZE:
-            return "ALLOC SIZE PICK";
-          case AP_MALLOC:
-            return "AP_MALLOC";
-          case STACK:
-            return "STACK";
-          case DP:
-            return "DP";
+          case AP_IGONRE:
+            return "AP_IGONRE";
           case AP_MALLOC_BASE_COLLECT:
             return "AP_MALLOC_BASE_COLLECT";
           case AP_MALLOC_SIZE_COLLECT:

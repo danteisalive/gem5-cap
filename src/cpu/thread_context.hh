@@ -53,6 +53,7 @@
 #include "base/types.hh"
 #include "config/the_isa.hh"
 #include "cpu/reg_class.hh"
+#include "cpu/simple/WordFM.hh"
 
 // @todo: Figure out a more architecture independent way to obtain the ITB and
 // DTB pointers.
@@ -124,7 +125,6 @@ class ThreadContext
       NONE, MALLOC_SIZE, CALLOC_SIZE, REALLOC_SIZE, FREE_CALL
     };
 
-    bool ExeStopTracking;
     bool enableCapability;
     std::string symbolsFile;
     uint64_t num_of_allocations;
@@ -140,6 +140,9 @@ class ThreadContext
     TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
     ExeAliasBuffer                              ExeAliasTableBuffer;
+
+    WordFM*                                     FunctionSymbols;
+    WordFM*                                     FunctionsToIgnore;
 
     enum Status
     {

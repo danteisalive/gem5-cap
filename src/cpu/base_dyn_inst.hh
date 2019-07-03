@@ -387,7 +387,7 @@ class BaseDynInst : public ExecContext, public RefCounted
       return false;
       ThreadContext * tc = cpu->tcBase(threadNumber);
 
-      if (tc->ExeStopTracking) return false;
+      if (!trackAlias()) return false;
       if (isMicroopInjected()) return false;
       if (isBoundsCheckMicroop()) return false;
 
@@ -427,6 +427,29 @@ class BaseDynInst : public ExecContext, public RefCounted
          return false;
        }
      }
+   }
+
+
+    bool trackAlias(){
+
+       ThreadContext * tc = cpu->tcBase(threadNumber);
+
+       Block fake;
+       fake.payload = (Addr)pcState().pc();
+       fake.req_szB = 1;
+       UWord foundkey = 1;
+       UWord foundval = 1;
+       unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+                                       &foundkey, &foundval, (UWord)&fake );
+       if (found)
+       {
+         return false;
+       }
+       else
+       {
+         return true;
+       }
+
    }
     /**
      * Returns true if the DTB address translation is being delayed due to a hw

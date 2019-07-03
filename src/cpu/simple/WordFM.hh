@@ -82,9 +82,9 @@ typedef    signed long long int   Long;
 typedef  unsigned long SizeT;
 
 /* Bool is always 8 bits. */
-typedef  unsigned char  Bool;
-#define  True   ((Bool)1)
-#define  False  ((Bool)0)
+//typedef  unsigned char  unsigned char;
+//#define  True   (Bool)1
+//#define  False  (Bool)0
 
 /* An address: 32-bit or 64-bit wide depending on host architecture */
 typedef unsigned long Addr;
@@ -99,6 +99,7 @@ typedef
       ULong       n_writes;
       Addr        seqNum;
       uint8_t     type; // 1 = malloc 2 = calloc  3 = realloc
+      std::string name;
    }
    Block;
 //------------------------------------------------------------------//
@@ -119,7 +120,7 @@ typedef
 typedef
    struct {
       UWord w;
-      Bool b;
+      unsigned char b;
    }
    MaybeWord;
 
@@ -160,7 +161,7 @@ Word cmp_unsigned_Words ( UWord w1, UWord w2 );
    however it wants.
 */
 
-Bool avl_insert_wrk ( AvlNode**         rootp,
+unsigned char avl_insert_wrk ( AvlNode**         rootp,
                       /*OUT*/MaybeWord* oldV,
                       AvlNode*          a,
                       Word              (*kCmp)(UWord,UWord) );
@@ -170,7 +171,7 @@ Bool avl_insert_wrk ( AvlNode**         rootp,
    the tree.  Returns True if the depth of the tree has shrunk.
 */
 
-Bool avl_remove_wrk ( AvlNode** rootp,
+unsigned char avl_remove_wrk ( AvlNode** rootp,
                       AvlNode*  a,
                       Word(*kCmp)(UWord,UWord) );
 
@@ -178,14 +179,14 @@ Bool avl_remove_wrk ( AvlNode** rootp,
  * Warning: dumps core if *rootp is empty
  */
 
-Bool avl_removeroot_wrk ( AvlNode** rootp,
+unsigned char avl_removeroot_wrk ( AvlNode** rootp,
                           Word(*kCmp)(UWord,UWord) );
 
 
 AvlNode* avl_find_node ( AvlNode* t, Word k, Word(*kCmp)(UWord,UWord) );
 
 
-Bool avl_find_bounds ( AvlNode* t,
+unsigned char avl_find_bounds ( AvlNode* t,
                        /*OUT*/UWord* kMinP, /*OUT*/UWord* vMinP,
                        /*OUT*/UWord* kMaxP, /*OUT*/UWord* vMaxP,
                        UWord minKey, UWord minVal,
@@ -200,7 +201,7 @@ void stackClear(WordFM* fm);
 void stackPush(WordFM* fm, AvlNode* n, Int i);
 
 // Pop from the iterator stack.
-Bool stackPop(WordFM* fm, AvlNode** n, Int* i);
+unsigned char stackPop(WordFM* fm, AvlNode** n, Int* i);
 
 
 AvlNode* avl_dopy ( AvlNode* nd,
@@ -222,18 +223,18 @@ void avl_free ( AvlNode* nd,
 void VG_deleteFM ( WordFM* fm, void(*kFin)(UWord), void(*vFin)(UWord) );
 
 /* Add (k,v) to fm. */
-Bool VG_addToFM ( WordFM* fm, UWord k, UWord v );
+unsigned char VG_addToFM ( WordFM* fm, UWord k, UWord v );
 
 // Delete key from fm, returning associated key and val if found
-Bool VG_delFromFM ( WordFM* fm,
+unsigned char VG_delFromFM ( WordFM* fm,
                       /*OUT*/UWord* oldK, /*OUT*/UWord* oldV, UWord key );
 
 // Look up in fm, assigning found key & val at spec'd addresses
-Bool VG_lookupFM ( WordFM* fm,
+unsigned char VG_lookupFM ( WordFM* fm,
                      /*OUT*/UWord* keyP, /*OUT*/UWord* valP, UWord key );
 
 // See comment in pub_tool_wordfm.h for explanation
-Bool VG_findBoundsFM ( WordFM* fm,
+unsigned char VG_findBoundsFM ( WordFM* fm,
                         /*OUT*/UWord* kMinP, /*OUT*/UWord* vMinP,
                         /*OUT*/UWord* kMaxP, /*OUT*/UWord* vMaxP,
                         UWord minKey, UWord minVal,
@@ -254,7 +255,7 @@ void VG_initIterFM ( WordFM* fm );
 void VG_initIterAtFM ( WordFM* fm, UWord start_at );
 // get next key/val pair.  Will tl_assert if fm has been modified
 // or looked up in since initIter{,At}FM was called.
-Bool VG_nextIterFM ( WordFM* fm, /*OUT*/UWord* pKey, /*OUT*/UWord* pVal );
+unsigned char VG_nextIterFM ( WordFM* fm, UWord* pKey,UWord* pVal );
 
 // clear the I'm iterating flag
 void VG_doneIterFM ( WordFM* fm );

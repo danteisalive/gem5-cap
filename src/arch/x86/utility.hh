@@ -45,6 +45,7 @@
 #include <libelf.h>
 #include <unistd.h>
 
+#include "cpu/simple/WordFM.hh"
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
 #include "sim/full_system.hh"

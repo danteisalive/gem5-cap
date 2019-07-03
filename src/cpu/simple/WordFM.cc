@@ -103,14 +103,14 @@ Word cmp_unsigned_Words ( UWord w1, UWord w2 ) {
    return 0;
 }
 
-/* Insert element a into the AVL tree t.  Returns True if the depth of
+/* Insert element a into the AVL tree t.  Returns 1 if the depth of
    the tree has grown.  If element with that key is already present,
    just copy a->val to existing node, first returning old ->val field
    of existing node in *oldV, so that the caller can finalize it
    however it wants.
 */
 
-Bool avl_insert_wrk ( AvlNode**         rootp,
+unsigned char avl_insert_wrk ( AvlNode**         rootp,
                       /*OUT*/MaybeWord* oldV,
                       AvlNode*          a,
                       Word              (*kCmp)(UWord,UWord) )
@@ -121,12 +121,12 @@ Bool avl_insert_wrk ( AvlNode**         rootp,
    a->child[0] = 0;
    a->child[1] = 0;
    a->balance  = 0;
-   oldV->b     = False;
+   oldV->b     = 0;
 
    /* insert into an empty tree? */
    if (!(*rootp)) {
       (*rootp) = a;
-      return True;
+      return 1;
    }
 
    cmpres = kCmp ? /*boxed*/   kCmp( (*rootp)->key, a->key )
@@ -139,8 +139,8 @@ Bool avl_insert_wrk ( AvlNode**         rootp,
          AvlNode* left_subtree = (*rootp)->child[0];
          if (avl_insert_wrk(&left_subtree, oldV, a, kCmp)) {
             switch ((*rootp)->balance--) {
-               case  1: return False;
-               case  0: return True;
+               case  1: return 0;
+               case  0: return 1;
                case -1: break;
                default: assert(0);
             }
@@ -156,12 +156,12 @@ Bool avl_insert_wrk ( AvlNode**         rootp,
          } else {
             (*rootp)->child[0] = left_subtree;
          }
-         return False;
+         return 0;
       } else {
          (*rootp)->child[0] = a;
          if ((*rootp)->balance--)
-            return False;
-         return True;
+            return 0;
+         return 1;
       }
       assert(0);/*NOTREACHED*/
    }
@@ -172,8 +172,8 @@ Bool avl_insert_wrk ( AvlNode**         rootp,
          AvlNode* right_subtree = (*rootp)->child[1];
          if (avl_insert_wrk(&right_subtree, oldV, a, kCmp)) {
             switch((*rootp)->balance++){
-               case -1: return False;
-               case  0: return True;
+               case -1: return 0;
+               case  0: return 1;
                case  1: break;
                default: assert(0);
             }
@@ -189,35 +189,35 @@ Bool avl_insert_wrk ( AvlNode**         rootp,
          } else {
             (*rootp)->child[1] = right_subtree;
          }
-         return False;
+         return 0;
       } else {
          (*rootp)->child[1] = a;
          if ((*rootp)->balance++)
-            return False;
-         return True;
+            return 0;
+         return 1;
       }
       assert(0);/*NOTREACHED*/
    }
    else {
       /* cmpres == 0, a duplicate - replace the val, but don't
          incorporate the node in the tree */
-      oldV->b = True;
+      oldV->b = 1;
       oldV->w = (*rootp)->val;
       (*rootp)->val = a->val;
-      return False;
+      return 0;
    }
 }
 
 
 /* Remove an element a from the AVL tree t.  a must be part of
-   the tree.  Returns True if the depth of the tree has shrunk.
+   the tree.  Returns 1 if the depth of the tree has shrunk.
 */
 
-Bool avl_remove_wrk ( AvlNode** rootp,
+unsigned char avl_remove_wrk ( AvlNode** rootp,
                       AvlNode*  a,
                       Word(*kCmp)(UWord,UWord) )
 {
-   Bool ch;
+   unsigned char ch;
    Word cmpres;
    cmpres = kCmp ? /*boxed*/   kCmp( (*rootp)->key, a->key )
                  : /*unboxed*/ cmp_unsigned_Words( (UWord)(*rootp)->key,
@@ -231,8 +231,8 @@ Bool avl_remove_wrk ( AvlNode** rootp,
       (*rootp)->child[0]=left_subtree;
       if (ch) {
          switch ((*rootp)->balance++) {
-            case -1: return True;
-            case  0: return False;
+            case -1: return 1;
+            case  0: return 0;
             case  1: break;
             default: assert(0);
          }
@@ -241,12 +241,12 @@ Bool avl_remove_wrk ( AvlNode** rootp,
                avl_swl( rootp );
                (*rootp)->balance = -1;
                (*rootp)->child[0]->balance = 1;
-               return False;
+               return 0;
             case 1:
                avl_swl( rootp );
                (*rootp)->balance = 0;
                (*rootp)->child[0]->balance = 0;
-               return True;
+               return 1;
             case -1:
                break;
             default:
@@ -255,7 +255,7 @@ Bool avl_remove_wrk ( AvlNode** rootp,
          avl_swr( &((*rootp)->child[1]) );
          avl_swl( rootp );
          avl_nasty( *rootp );
-         return True;
+         return 1;
       }
    }
    else
@@ -267,8 +267,8 @@ Bool avl_remove_wrk ( AvlNode** rootp,
       (*rootp)->child[1] = right_subtree;
       if (ch) {
          switch ((*rootp)->balance--) {
-            case  1: return True;
-            case  0: return False;
+            case  1: return 1;
+            case  0: return 0;
             case -1: break;
             default: assert(0);
          }
@@ -277,12 +277,12 @@ Bool avl_remove_wrk ( AvlNode** rootp,
                avl_swr( rootp );
                (*rootp)->balance = 1;
                (*rootp)->child[1]->balance = -1;
-               return False;
+               return 0;
             case -1:
                avl_swr( rootp );
                (*rootp)->balance = 0;
                (*rootp)->child[1]->balance = 0;
-               return True;
+               return 1;
             case 1:
                break;
             default:
@@ -291,7 +291,7 @@ Bool avl_remove_wrk ( AvlNode** rootp,
          avl_swl( &((*rootp)->child[0]) );
          avl_swr( rootp );
          avl_nasty( *rootp );
-         return True;
+         return 1;
       }
    }
    else {
@@ -307,21 +307,21 @@ Bool avl_remove_wrk ( AvlNode** rootp,
  * Warning: dumps core if *rootp is empty
  */
 
-Bool avl_removeroot_wrk( AvlNode** rootp, Word(*kCmp)(UWord,UWord) )
+unsigned char avl_removeroot_wrk( AvlNode** rootp, Word(*kCmp)(UWord,UWord) )
 {
-   Bool     ch;
+   unsigned char     ch;
    AvlNode* a;
    if (!(*rootp)->child[0]) {
       if (!(*rootp)->child[1]) {
          (*rootp) = 0;
-         return True;
+         return 1;
       }
       (*rootp) = (*rootp)->child[1];
-      return True;
+      return 1;
    }
    if (!(*rootp)->child[1]) {
       (*rootp) = (*rootp)->child[0];
-      return True;
+      return 1;
    }
    if ((*rootp)->balance < 0) {
       /* remove from the left subtree */
@@ -338,7 +338,7 @@ Bool avl_removeroot_wrk( AvlNode** rootp, Word(*kCmp)(UWord,UWord) )
    a->balance  = (*rootp)->balance;
    (*rootp)    = a;
    if (a->balance == 0) return ch;
-   return False;
+   return 0;
 }
 
 
@@ -348,7 +348,7 @@ AvlNode* avl_find_node ( AvlNode* t, Word k, Word(*kCmp)(UWord,UWord) )
    if (kCmp) {
       /* Boxed comparisons */
       Word cmpresS;
-      while (True) {
+      while (1) {
          if (t == NULL) return NULL;
          cmpresS = kCmp(t->key, k);
          if (cmpresS > 0) t = t->child[0]; else
@@ -359,7 +359,7 @@ AvlNode* avl_find_node ( AvlNode* t, Word k, Word(*kCmp)(UWord,UWord) )
       /* Unboxed comparisons */
       Word  cmpresS; /* signed */
       UWord cmpresU; /* unsigned */
-      while (True) {
+      while (1) {
          if (t == NULL) return NULL; /* unlikely ==> predictable */
          cmpresS = cmp_unsigned_Words( (UWord)t->key, (UWord)k );
          if (cmpresS == 0) return t; /* unlikely ==> predictable */
@@ -371,7 +371,7 @@ AvlNode* avl_find_node ( AvlNode* t, Word k, Word(*kCmp)(UWord,UWord) )
 }
 
 
-Bool avl_find_bounds ( AvlNode* t,
+unsigned char avl_find_bounds ( AvlNode* t,
                        /*OUT*/UWord* kMinP, /*OUT*/UWord* vMinP,
                        /*OUT*/UWord* kMaxP, /*OUT*/UWord* vMaxP,
                        UWord minKey, UWord minVal,
@@ -403,13 +403,13 @@ Bool avl_find_bounds ( AvlNode* t,
          call was invalid -- an error on the caller's part, and we
          cannot give any meaningful values for the bounds.  (Well,
          maybe we could, but we're not gonna.  Ner!) */
-      return False;
+      return 0;
    }
    if (kMinP) *kMinP = kLowerBound;
    if (vMinP) *vMinP = vLowerBound;
    if (kMaxP) *kMaxP = kUpperBound;
    if (vMaxP) *vMaxP = vUpperBound;
-   return True;
+   return 1;
 }
 
 // Clear the iterator stack.
@@ -435,7 +435,7 @@ void stackPush(WordFM* fm, AvlNode* n, Int i)
 }
 
 // Pop from the iterator stack.
-Bool stackPop(WordFM* fm, AvlNode** n, Int* i)
+unsigned char stackPop(WordFM* fm, AvlNode** n, Int* i)
 {
    assert(fm->stackTop <= WFM_STKMAX);
 
@@ -446,9 +446,9 @@ Bool stackPop(WordFM* fm, AvlNode** n, Int* i)
       assert(1 <= *i && *i <= 3);
       fm->nodeStack[fm->stackTop] = NULL;
       fm-> numStack[fm->stackTop] = 0;
-      return True;
+      return 1;
    } else {
-      return False;
+      return 0;
    }
 }
 
@@ -547,14 +547,14 @@ void VG_deleteFM ( WordFM* fm, void(*kFin)(UWord), void(*vFin)(UWord) )
 }
 
 /* Add (k,v) to fm. */
-Bool VG_addToFM ( WordFM* fm, UWord k, UWord v )
+unsigned char VG_addToFM ( WordFM* fm, UWord k, UWord v )
 {
    MaybeWord oldV;
    AvlNode* node;
    node = static_cast<AvlNode*>(malloc(sizeof(AvlNode)));
    node->key = k;
    node->val = v;
-   oldV.b = False;
+   oldV.b = 0;
    oldV.w = 0;
    avl_insert_wrk( &fm->root, &oldV, node, fm->kCmp );
    //if (oldV.b && fm->vFin)
@@ -565,7 +565,7 @@ Bool VG_addToFM ( WordFM* fm, UWord k, UWord v )
 }
 
 // Delete key from fm, returning associated key and val if found
-Bool VG_delFromFM ( WordFM* fm,
+unsigned char VG_delFromFM ( WordFM* fm,
                       /*OUT*/UWord* oldK, /*OUT*/UWord* oldV, UWord key )
 {
    AvlNode* node = avl_find_node( fm->root, key, fm->kCmp );
@@ -576,14 +576,14 @@ Bool VG_delFromFM ( WordFM* fm,
       if (oldV)
          *oldV = node->val;
       free(node);
-      return True;
+      return 1;
    } else {
-      return False;
+      return 0;
    }
 }
 
 // Look up in fm, assigning found key & val at spec'd addresses
-Bool VG_lookupFM ( WordFM* fm,
+unsigned char VG_lookupFM ( WordFM* fm,
                      /*OUT*/UWord* keyP, /*OUT*/UWord* valP, UWord key )
 {
    AvlNode* node = avl_find_node( fm->root, key, fm->kCmp );
@@ -592,14 +592,14 @@ Bool VG_lookupFM ( WordFM* fm,
          *keyP = node->key;
       if (valP)
          *valP = node->val;
-      return True;
+      return 1;
    } else {
-      return False;
+      return 0;
    }
 }
 
 // See comment in pub_tool_wordfm.h for explanation
-Bool VG_findBoundsFM ( WordFM* fm,
+unsigned char VG_findBoundsFM ( WordFM* fm,
                         /*OUT*/UWord* kMinP, /*OUT*/UWord* vMinP,
                         /*OUT*/UWord* kMaxP, /*OUT*/UWord* vMaxP,
                         UWord minKey, UWord minVal,
@@ -653,7 +653,7 @@ void VG_initIterAtFM ( WordFM* fm, UWord start_at )
    // We need to do regular search and fill in the stack.
    t = fm->root;
 
-   while (True) {
+   while (1) {
       if (t == NULL) return;
 
       cmpresS
@@ -686,7 +686,7 @@ void VG_initIterAtFM ( WordFM* fm, UWord start_at )
 
 // get next key/val pair.  Will tl_assert if fm has been modified
 // or looked up in since initIter{,At}FM was called.
-Bool VG_nextIterFM ( WordFM* fm, /*OUT*/UWord* pKey, /*OUT*/UWord* pVal )
+unsigned char VG_nextIterFM ( WordFM* fm,UWord* pKey, UWord* pVal )
 {
    Int i = 0;
    AvlNode* n = NULL;
@@ -708,7 +708,7 @@ Bool VG_nextIterFM ( WordFM* fm, /*OUT*/UWord* pKey, /*OUT*/UWord* pVal )
          stackPush(fm, n, 3);
          if (pKey) *pKey = n->key;
          if (pVal) *pVal = n->val;
-         return True;
+         return 1;
       case 3:
          /* if (n->child[1]) stackPush(fm, n->child[1], 1); */
          if (n->child[1]) { n = n->child[1]; goto case_1; }
@@ -719,7 +719,7 @@ Bool VG_nextIterFM ( WordFM* fm, /*OUT*/UWord* pKey, /*OUT*/UWord* pVal )
    }
 
    // Stack empty, iterator is exhausted, return NULL
-   return False;
+   return 0;
 }
 
 // clear the I'm iterating flag

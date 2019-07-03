@@ -121,24 +121,82 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
   for (ii = 0; ii < count; ++ii) {
       GElf_Sym sym;
       gelf_getsym(data, ii, &sym);
-      if (ELF64_ST_TYPE(sym.st_info) == 2 ||  // FUNC
-          ELF64_ST_TYPE(sym.st_info) == 5 ||  // object
-          ELF64_ST_TYPE(sym.st_info) == 1) // common
+      if (ELF64_ST_TYPE(sym.st_info) == STT_FUNC ||
+          ELF64_ST_TYPE(sym.st_info) == STT_COMMON ||
+          ELF64_ST_TYPE(sym.st_info) == STT_OBJECT)
       {
 
-        // printf("value: %lx size: %lu name: %s shndx: %u ",
-        //           sym.st_value, sym.st_size ,
-        //           elf_strptr(elf, shdr.sh_link, sym.st_name), sym.st_shndx);
-        if (sym.st_shndx >= shs_flags.size()){
-            panic("section header number >= shs_flags.size()!");
-        }
-        if (shs_flags[sym.st_shndx] & SHF_WRITE){
-          //printf("WRITE ");
-        }
-        if (shs_flags[sym.st_shndx] & SHF_EXECINSTR){
-          //printf("EXECUTE ");
-        }
-      //  printf("\n");
+          if (sym.st_shndx >= shs_flags.size()){
+              panic("section header number >= shs_flags.size()!");
+          }
+
+          if ((ELF64_ST_TYPE(sym.st_info) == STT_FUNC) &&
+              (sym.st_size > 0))
+          {
+
+              const char* pStr = elf_strptr(elf, shdr.sh_link, sym.st_name);
+              std::string s1(pStr);
+              // std::cout  <<  std::hex << sym.st_value << std::dec <<
+              //           " " << sym.st_size << " " << s1  << std::endl;
+
+              Block fake;
+              fake.payload = (Addr)sym.st_value;
+              fake.req_szB = 1;
+              UWord foundkey = 1;
+              UWord foundval = 1;
+              unsigned char found = VG_lookupFM( tc->FunctionSymbols,
+                                          &foundkey, &foundval, (UWord)&fake );
+              if (found) {
+                Block* bk = (Block*)foundkey;
+                bk->name += " ";
+                bk->name += s1;
+              }
+              else {
+                Block* bk = new Block();
+                bk->payload   = (Addr)sym.st_value;
+                bk->req_szB   = (SizeT)sym.st_size;
+                bk->name      = s1;
+                unsigned char present =
+                        VG_addToFM( tc->FunctionSymbols, (UWord)bk, (UWord)0);
+                present = present;
+                //assert(!present);
+              }
+
+              // find functions to ignore
+              auto it = tc->syms_cache.find((Addr)sym.st_value);
+              if (it != tc->syms_cache.end()){
+                  if (it->second == TheISA::CheckType::AP_IGONRE ||
+                      it->second == TheISA::CheckType::AP_FREE_CALL){
+
+                    Block fake;
+                    fake.payload = (Addr)sym.st_value;
+                    fake.req_szB = 1;
+                    UWord foundkey = 1;
+                    UWord foundval = 1;
+                    unsigned char found =
+                            VG_lookupFM( tc->FunctionsToIgnore,
+                                        &foundkey, &foundval, (UWord)&fake );
+                    if (!found){
+                      Block* bk = new Block();
+                      bk->payload   = (Addr)sym.st_value;
+                      bk->req_szB   = (SizeT)sym.st_size;
+                      bk->name      = s1;
+                      unsigned char present =
+                          VG_addToFM(tc->FunctionsToIgnore,(UWord)bk,(UWord)0);
+                      present = present;
+                      //assert(!present);
+                    }
+
+                  }
+              }
+          }
+
+          // if (shs_flags[sym.st_shndx] & SHF_WRITE){
+          //   //printf("WRITE ");
+          // }
+          // if (shs_flags[sym.st_shndx] & SHF_EXECINSTR){
+          //   //printf("EXECUTE ");
+          // }
 
       }
   }

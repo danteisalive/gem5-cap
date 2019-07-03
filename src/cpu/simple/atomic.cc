@@ -93,7 +93,6 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
 
     threadContexts[0]->enableCapability = p->enable_capability;
     threadContexts[0]->symbolsFile = p->symbol_file;
-    threadContexts[0]->ExeStopTracking = false;
     threadContexts[0]->Collector_Status = ThreadContext::NONE;
 
     max_insts_any_thread = p->max_insts_any_thread;
@@ -115,7 +114,34 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
         else fatal("Can't open symbols file");
     }
 
-    interval_tree = VG_newFM(interval_tree_Cmp );
+    interval_tree = VG_newFM(interval_tree_Cmp);
+    threadContexts[0]->FunctionSymbols = VG_newFM(interval_tree_Cmp);
+    threadContexts[0]->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
+    //symtab
+    Process *process = threadContexts[0]->getProcessPtr();
+    std::stringstream test(process->progName());
+    std::string segment;
+    std::vector<std::string> seglist;
+
+    while (std::getline(test, segment, '/'))
+    {
+       seglist.push_back(segment);
+    }
+
+    if (!readSymTab(seglist[seglist.size()-1].c_str(),threadContexts[0])){
+      warn("cannot read symtab!");
+    }
+
+    UWord keyW, valW;
+    VG_initIterFM(threadContexts[0]->FunctionsToIgnore);
+    while (
+        VG_nextIterFM(threadContexts[0]->FunctionsToIgnore, &keyW, &valW )) {
+       Block* bk = (Block*)keyW;
+       assert(valW == 0);
+       assert(bk);
+       std::cout << std::hex << bk->payload << " " << bk->name << std::endl;
+    }
+    VG_doneIterFM( threadContexts[0]->FunctionsToIgnore );
 }
 
 
@@ -653,6 +679,10 @@ AtomicSimpleCPU::tick()
                 SimpleThread* thread = t_info.thread;
 
                 if (threadContexts[0]->enableCapability && fault == NoFault){
+                  trackAlias(pcState);
+                }
+
+                if (threadContexts[0]->enableCapability && fault == NoFault){
                   if (curStaticInst->isFirstMicroop())
                   {
                     ThreadContext::SymbolCacheIter syms_it =
@@ -684,18 +714,24 @@ AtomicSimpleCPU::tick()
                   }
 
                 if (ENABLE_LOGGING){
-                  if ((uint64_t)t_info.numInsts.value() ==
-                      max_insts_any_thread - 1){
-                    for (auto it = PIDLogs.cbegin(); it != PIDLogs.cend();
-                         ++it)
-                    {
-                      std::cout << std::hex << it->first << " : ";
-                      for (size_t i = 0; i < it->second.size(); i++) {
-                        std::cout << std::dec << it->second[i].pid <<
-                        //"(" << it->second[i].type << ")" <<
-                        " -> ";
-                      }
-                      std::cout << std::endl;
+                  if (((uint64_t)t_info.numInsts.value() ==
+                      max_insts_any_thread - 1) &&
+                      curStaticInst->isLastMicroop()){
+                    // for (auto it = PIDLogs.cbegin(); it != PIDLogs.cend();
+                    //      ++it)
+                    // {
+                    //   std::cout << std::hex << it->first << " : ";
+                    //   for (size_t i = 0; i < it->second.size(); i++) {
+                    //     std::cout << std::dec << it->second[i].pid <<
+                    //     //"(" << it->second[i].type << ")" <<
+                    //     " -> ";
+                    //   }
+                    //   std::cout << std::endl;
+                    // }
+
+                    for (auto& elem : debug_function_calls){
+                        std::cout << elem.first << ": " <<
+                                     elem.second << std::endl;
                     }
 
 
@@ -813,7 +849,6 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI);
 
       thread->collector_status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
-      thread->stop_tracking = true;
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
       { std::cout << "AP_MALLOC_SIZE_COLLECT: " << pcState <<
@@ -832,14 +867,13 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
 
       thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
       thread->num_of_allocations++;
-      thread->stop_tracking = false;
 
       Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
       bk->payload   = (Addr)thread->ap_base;
       bk->req_szB   = (SizeT)thread->ap_size;
       bk->pid       = (Addr)++thread->PID;
       bk->type      = 1; //malloc
-      Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0/*no val*/);
+      unsigned char present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
       assert(!present);
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
@@ -857,7 +891,6 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI) *
                         thread->readIntReg(X86ISA::INTREG_RSI);
       thread->collector_status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
-      thread->stop_tracking = true;
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
       { std::cout << "AP_CALLOC_SIZE_COLLECT: " << pcState <<
@@ -876,7 +909,6 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
 
        thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
        thread->num_of_allocations++;
-       thread->stop_tracking = false;
        // logs
        if (ATOMIC_CPU_COLLECTOR_DEBUG)
        { std::cout << "AP_CALLOC_BASE_COLLECT: " << pcState <<
@@ -889,7 +921,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
        bk->req_szB   = (SizeT)thread->ap_size;
        bk->pid       = (Addr)++thread->PID;
        bk->type      = 2; //calloc
-       Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
+       unsigned char present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
 
 
        if (present){
@@ -913,10 +945,6 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
     }
     else if (_sym == TheISA::CheckType::AP_FREE_CALL){
 
-      // if (thread->collector_status !=
-      //                  ThreadContext::COLLECTOR_STATUS::NONE)
-      //    panic("AP_FREE_CALL: Invalid Status!");
-
       uint64_t base_addr = thread->readIntReg(X86ISA::INTREG_RDI);
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
@@ -925,19 +953,12 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
                   " FOUND: " <<  std::hex << base_addr << std::endl;
       }
 
-      // thread->stop_tracking = true;
-      // std::cout << std::hex << thread->prevPcState.pc() <<  std::endl;
-      // threadContexts[0]->syms_cache[thread->prevPcState.pc() + 5] =
-      //                                     TheISA::CheckType::AP_FREE_RET;
-
-      //thread->collector_status = ThreadContext::COLLECTOR_STATUS::FREE_CALL;
-
       Block fake;
       fake.payload = base_addr;
       fake.req_szB = 1;
       UWord foundkey = 1;
       UWord foundval = 1;
-      Bool present = VG_lookupFM( interval_tree,
+      unsigned char present = VG_lookupFM( interval_tree,
                                   &foundkey, &foundval, (UWord)&fake );
 
       Block* bk = NULL;
@@ -946,7 +967,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           fake.payload = base_addr;
           fake.req_szB = 1;
           UWord oldKeyW;
-          Bool found = VG_delFromFM( interval_tree,
+          unsigned char found = VG_delFromFM( interval_tree,
                                    &oldKeyW, NULL, (Addr)&fake );
           bk = (Block*)oldKeyW;
           assert(bk);
@@ -990,15 +1011,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
     }
     else if (_sym == TheISA::CheckType::AP_FREE_RET){
 
-      // if (thread->collector_status !=
-      //                  ThreadContext::COLLECTOR_STATUS::FREE_CALL)
-      //    panic("AP_FREE_RET: Invalid Status!");
-
-      thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
-      //thread->stop_tracking = false;
-      //std::cout << std::hex << pcState.pc() <<  std::endl;
-    //  auto it = threadContexts[0]->syms_cache.find(pcState.pc());
-    //  assert(it != threadContexts[0]->syms_cache.end());
+      //thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
 
     }
     else if (_sym == TheISA::CheckType::AP_REALLOC_SIZE_COLLECT){
@@ -1008,7 +1021,6 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
 
       thread->ap_size = thread->readIntReg(X86ISA::INTREG_RSI);
       thread->collector_status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
-      thread->stop_tracking = true;
       uint64_t old_base_addr = thread->readIntReg(X86ISA::INTREG_RDI);
 
       // logs
@@ -1024,14 +1036,14 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       fake.req_szB = 1;
       UWord foundkey = 1;
       UWord foundval = 1;
-      Bool present = VG_lookupFM( interval_tree,
+      unsigned char present = VG_lookupFM( interval_tree,
                                   &foundkey, &foundval, (UWord)&fake );
       if (present){
           Block fake;
           fake.payload = old_base_addr;
           fake.req_szB = 1;
           UWord oldKeyW;
-          Bool found = VG_delFromFM( interval_tree,
+          unsigned char found = VG_delFromFM( interval_tree,
                                    &oldKeyW, NULL, (Addr)&fake );
           Block* bk = (Block*)oldKeyW;
           assert(bk);
@@ -1078,7 +1090,6 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
         panic("AP_REALLOC_BASE_COLLECT: Invalid Status!");
 
       thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
-      thread->stop_tracking = false;
       thread->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
       thread->num_of_allocations++;
       // logs
@@ -1094,7 +1105,8 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       bk->pid       = (Addr)++thread->PID;
       bk->type      = 3; //realloc
 
-      Bool present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0/*no val*/);
+      unsigned char present =
+                VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
 
 
       if (present){
@@ -1126,7 +1138,7 @@ void AtomicSimpleCPU::updateAliasTable(ThreadContext * _tc,
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
 
-    if (!trackAlias(pcState)) return;
+    if (thread->stop_tracking) return;
 
     // srcRegIdx(2) in store microops is the src
     // check whther it is an integer reg or not
@@ -1204,7 +1216,7 @@ void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
 
-    if (!trackAlias(pcState)) return;
+    if (thread->stop_tracking) return;
 
     // srcRegIdx(2) in store microops is the src
     // check whther it is an integer reg or not
@@ -1315,6 +1327,20 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
              bk.pid = it_lv2->second.getPID();
              bk.type = 0;
              PIDLogs[pcState.pc()].push_back(bk);
+
+             // find the function which loaded a pointer
+             Block fake;
+             fake.payload = (Addr)pcState.pc();
+             fake.req_szB = 1;
+             UWord foundkey = 1;
+             UWord foundval = 1;
+             unsigned char found =
+                    VG_lookupFM(threadContexts[0]->FunctionSymbols,
+                                         &foundkey, &foundval, (UWord)&fake );
+            if (found) {
+                Block* bk = (Block*)foundkey;
+                debug_function_calls[bk->name]++;
+            }
           }
       }
 
@@ -1322,27 +1348,26 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
 
 }
 
-bool AtomicSimpleCPU::trackAlias(PCState &pcState){
+void AtomicSimpleCPU::trackAlias(PCState &pcState){
 
     uint64_t pc = pcState.pc();
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
 
-    if (thread->stop_tracking)
+    Block fake;
+    fake.payload = (Addr)pc;
+    fake.req_szB = 1;
+    UWord foundkey = 1;
+    UWord foundval = 1;
+    unsigned char found = VG_lookupFM( threadContexts[0]->FunctionsToIgnore,
+                                    &foundkey, &foundval, (UWord)&fake );
+    if (found)
     {
-      return false;
-    }
-    else if (pc >= 0xc7b360 && pc <= 0xc7b44a)
-    {
-      return false;
-    }
-    else if (pc >= 0xc77560 && pc <= 0xc781e9)
-    {
-      return false;
+      thread->stop_tracking = true;
     }
     else
     {
-      return true;
+      thread->stop_tracking = false;
     }
 
 }
@@ -1373,7 +1398,7 @@ Block* AtomicSimpleCPU::find_Block_containing ( Addr vaddr ){
    fake.req_szB = 1;
    UWord foundkey = 1;
    UWord foundval = 1;
-   Bool found = VG_lookupFM( interval_tree,
+   unsigned char found = VG_lookupFM( interval_tree,
                                &foundkey, &foundval, (UWord)&fake );
    if (!found) {
       return NULL;

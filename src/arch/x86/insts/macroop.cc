@@ -21,31 +21,30 @@
 namespace X86ISA
 {
 
-bool MacroopBase::filterInst(ThreadContext * tc,TheISA::PCState &nextPC) {
+bool MacroopBase::filterInst(ThreadContext * tc, TheISA::PCState &nextPC) {
 
-      for (size_t i = 0; i < numMicroops; i++) {
-        std::cout << nextPC << " " <<
-        microops[i]->disassemble(nextPC.pc()) <<
-        std::endl;
-      }
+    Block fake;
+    fake.payload = (Addr)nextPC.pc();
+    fake.req_szB = 1;
+    UWord foundkey = 1;
+    UWord foundval = 1;
+    unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+                                    &foundkey, &foundval, (UWord)&fake );
+    if (found)
+    {
       return false;
+    }
+    else
+    {
+      return true;
+    }
 }
 
 void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 {
       #define ENABLE_POINTER_TRACKER_DEBUG 0
-      // for (size_t i = 0; i < numMicroops; i++) {
-      //     if (microops[i]->isMemRef() &&
-      //         microops[i]->getBase() == X86ISA::NUM_INTREGS){
-      //       std::cout << std::hex << nextPC.pc() << " " <<
-      //                 microops[i]->disassemble(nextPC.pc()) << std::dec <<
-      //                 " Base Reg: " << microops[i]->getBase() <<
-      //               std::endl;
-      //     }
-      // }
-
       // this is probably a a little late but still can be effective
-      if (tc->ExeStopTracking) return;
+      if (!filterInst()) return;
       // its like we are executing microps here
       for (size_t i = 0; i < numMicroops; i++) {
           const StaticInstPtr si = microops[i];

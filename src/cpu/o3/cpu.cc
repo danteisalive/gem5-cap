@@ -209,6 +209,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
     ExeAliasCache = new TheISA::LRUAliasCache(2, 1, 256);
     interval_tree = VG_newFM(interval_tree_Cmp );
+
     // The stages also need their CPU pointer setup.  However this
     // must be done at the upper level CPU because they have pointers
     // to the upper level CPU, and not this FullO3CPU.
@@ -401,9 +402,10 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         o3_tc->enableCapability = params->enable_capability;
         o3_tc->symbolsFile = params->symbol_file;
-        o3_tc->ExeStopTracking = false;
         o3_tc->Collector_Status = ThreadContext::NONE;
         o3_tc->num_of_allocations = 0;
+
+        o3_tc->FunctionSymbols = VG_newFM(interval_tree_Cmp );
         DPRINTF(Capability, "SymbolFile[%i] process is %s\n",
                         tid, params->symbol_file);
 
@@ -439,8 +441,11 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          NumOfExecutedBoundsCheck = 0; numOfCommitedMemRefs = 0;
 
          //symtab
-         Process *p = o3_tc->getProcessPtr();
-         std::stringstream test(p->progName());
+         o3_tc->FunctionSymbols = VG_newFM(interval_tree_Cmp);
+         o3_tc->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
+         //symtab
+         Process *process = o3_tc->getProcessPtr();
+         std::stringstream test(process->progName());
          std::string segment;
          std::vector<std::string> seglist;
 
@@ -452,6 +457,17 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          if (!readSymTab(seglist[seglist.size()-1].c_str(),o3_tc)){
            warn("cannot read symtab!");
          }
+
+         UWord keyW, valW;
+         VG_initIterFM(o3_tc->FunctionsToIgnore);
+         while (VG_nextIterFM(o3_tc->FunctionsToIgnore, &keyW, &valW )) {
+            Block* bk = (Block*)keyW;
+            assert(valW == 0);
+            assert(bk);
+            std::cout << std::hex << bk->payload << " " <<
+                        bk->name << std::endl;
+         }
+         VG_doneIterFM(o3_tc->FunctionsToIgnore );
 
         // Setup quiesce event.
         this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);
@@ -1631,7 +1647,7 @@ FullO3CPU<Impl>::find_Block_containing(Addr vaddr){
    fake.req_szB = 1;
    UWord foundkey = 1;
    UWord foundval = 1;
-   Bool found = VG_lookupFM( interval_tree,
+   unsigned char found = VG_lookupFM( interval_tree,
                                &foundkey, &foundval, (UWord)&fake );
    if (!found) {
       return NULL;
