@@ -1477,7 +1477,8 @@ DefaultCommit<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst)
               }
           }
           else {
-            // all other lookups will defenitly result here!
+            // all other lookups will defenitly result here as the map is
+            // ordered on seqNum
             break;
           }
     }
@@ -1504,6 +1505,10 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   // sanitization
   if (head_inst->isMicroopInjected()) return;
   if (head_inst->isBoundsCheckMicroop()) return;
+
+  bool _is_user_stack = false;
+  if (RSPValue >= next_thread_stack_base &&
+        RSPValue <= stack_base)  _is_user_stack = true;
   // here commit the youngest entry of the ExeAliasBuffer to shadow memory
   // which is actually the CommitAliasTable
   for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
@@ -1515,14 +1520,16 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
         {
 
             // first check whether this is a valid stack alias or not
-            if (it->first.second <= stack_base &&
+            if (_is_user_stack &&
+                it->first.second <= stack_base &&
                 it->first.second > RSPValue)
             {
                 // updateStackAliasTable will handle this
                 //  break;
             }
-            else if (it->first.second <= RSPValue &&
-                it->first.second >= next_thread_stack_base)
+            else if ( _is_user_stack &&
+                      it->first.second <= RSPValue &&
+                      it->first.second >= next_thread_stack_base)
             {
               // we should not be here!
               // just erase, dont commit it

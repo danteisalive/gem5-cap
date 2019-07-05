@@ -136,7 +136,6 @@ class FullO3CPU : public BaseO3CPU
     BaseTLB *dtb;
 
     TheISA::LRUAliasCache* ExeAliasCache;
-    WordFM* interval_tree = NULL;  /* WordFM* Block* void */
     // 2-entry cache for find_Block_containing
     Block* fbc_cache0 = NULL;
     Block* fbc_cache1 = NULL;
@@ -265,7 +264,7 @@ class FullO3CPU : public BaseO3CPU
     /** Destructor. */
     ~FullO3CPU();
 
-    Block* find_Block_containing ( Addr a );
+    Block* find_Block_containing ( Addr a , ThreadID tid);
     /** Registers statistics. */
     void regStats() override;
 

@@ -1641,7 +1641,7 @@ LSQUnit<Impl>::SearchCapReg(ThreadID tid, uint64_t _addr)
 {
 
   TheISA::PointerID _pid = TheISA::PointerID(0);
-  Block* bk = cpu->find_Block_containing(_addr);
+  Block* bk = cpu->find_Block_containing(_addr,tid);
   if (bk){
     assert(bk->pid != 0);
     _pid = TheISA::PointerID(bk->pid);

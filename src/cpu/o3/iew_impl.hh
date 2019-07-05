@@ -1873,7 +1873,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         bk->pid       = (Addr)_pid_num;
         bk->seqNum    = inst->seqNum;
         unsigned char present =
-                      VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+                      VG_addToFM(tc->interval_tree, (UWord)bk, (UWord)0);
         assert(!present);
 
         tc->num_of_allocations++;
@@ -1900,7 +1900,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         fake.payload = _pid_base;
         fake.req_szB = 1;
         UWord oldKeyW;
-        unsigned char found = VG_delFromFM( cpu->interval_tree,
+        unsigned char found = VG_delFromFM( tc->interval_tree,
                                      &oldKeyW, NULL, (Addr)&fake );
         if (found){
             bk = (Block*)oldKeyW;
@@ -2024,7 +2024,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
          bk->pid       = (Addr)_pid_num;
          bk->seqNum    = inst->seqNum;
          unsigned char present =
-                      VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+                      VG_addToFM(tc->interval_tree, (UWord)bk, (UWord)0);
          assert(!present);
 
          tc->num_of_allocations++;
@@ -2063,7 +2063,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       fake.payload = old_base_addr;
       fake.req_szB = 1;
       UWord oldKeyW;
-      unsigned char found = VG_delFromFM(cpu->interval_tree,
+      unsigned char found = VG_delFromFM(tc->interval_tree,
                                    &oldKeyW, NULL, (Addr)&fake );
 
       if (found){
@@ -2145,7 +2145,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             bk->pid       = (Addr)_pid_num;
             bk->seqNum    = inst->seqNum;
             unsigned char present =
-                      VG_addToFM(cpu->interval_tree, (UWord)bk, (UWord)0);
+                      VG_addToFM(tc->interval_tree, (UWord)bk, (UWord)0);
             assert(!present);
 
             tc->num_of_allocations++;
@@ -2198,7 +2198,7 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
   // check if this is a base address or not
   TheISA::PointerID _pid = TheISA::PointerID(0);
-  Block* bk = cpu->find_Block_containing(dataRegContent);
+  Block* bk = cpu->find_Block_containing(dataRegContent,tid);
   if (bk && (bk->payload == dataRegContent)) { // just the base addresses
     assert(bk->pid != 0);
     _pid = TheISA::PointerID(bk->pid);

@@ -114,7 +114,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
         else fatal("Can't open symbols file");
     }
 
-    interval_tree = VG_newFM(interval_tree_Cmp);
+    threadContexts[0]->interval_tree = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionSymbols = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
     //symtab
@@ -685,6 +685,7 @@ AtomicSimpleCPU::tick()
                 if (threadContexts[0]->enableCapability && fault == NoFault){
                   if (curStaticInst->isFirstMicroop())
                   {
+
                     ThreadContext::SymbolCacheIter syms_it =
                       (threadContexts[0]->syms_cache).find(pcState.instAddr());
                     if (syms_it != (threadContexts[0]->syms_cache).end()){
@@ -844,7 +845,12 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
     if (_sym == TheISA::CheckType::AP_MALLOC_SIZE_COLLECT){
 
       if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+      {
+          std::cout << "PRE STATE: " << thread->collector_status <<
+            " " << pcState <<
+            std::endl;
          panic("AP_MALLOC_SIZE_COLLECT: Invalid Status!");
+      }
 
       thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI);
 
@@ -873,7 +879,8 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       bk->req_szB   = (SizeT)thread->ap_size;
       bk->pid       = (Addr)++thread->PID;
       bk->type      = 1; //malloc
-      unsigned char present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
+      unsigned char present =
+              VG_addToFM( _tc->interval_tree, (UWord)bk, (UWord)0);
       assert(!present);
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
@@ -886,7 +893,9 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
     else if (_sym == TheISA::CheckType::AP_CALLOC_SIZE_COLLECT){
 
       if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+      {
          panic("AP_CALLOC_SIZE_COLLECT: Invalid Status!");
+      }
 
       thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI) *
                         thread->readIntReg(X86ISA::INTREG_RSI);
@@ -920,15 +929,15 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
        bk->payload   = (Addr)thread->ap_base;
        bk->req_szB   = (SizeT)thread->ap_size;
        bk->pid       = (Addr)++thread->PID;
-       bk->type      = 2; //calloc
-       unsigned char present = VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
+       unsigned char present =
+                  VG_addToFM( _tc->interval_tree, (UWord)bk, (UWord)0);
 
 
        if (present){
          if (ATOMIC_CPU_COLLECTOR_DEBUG){
              UWord keyW, valW;
-             VG_initIterFM( interval_tree );
-             while (VG_nextIterFM( interval_tree, &keyW, &valW )) {
+             VG_initIterFM( _tc->interval_tree );
+             while (VG_nextIterFM( _tc->interval_tree, &keyW, &valW )) {
                 Block* bk = (Block*)keyW;
                 assert(valW == 0);
                 assert(bk);
@@ -937,7 +946,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
                             " Size: " << bk->req_szB <<" PID: " <<
                             bk->pid << std::endl;
               }
-             VG_doneIterFM( interval_tree );
+             VG_doneIterFM( _tc->interval_tree );
          }
          assert(!present);
        }
@@ -958,7 +967,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       fake.req_szB = 1;
       UWord foundkey = 1;
       UWord foundval = 1;
-      unsigned char present = VG_lookupFM( interval_tree,
+      unsigned char present = VG_lookupFM( _tc->interval_tree,
                                   &foundkey, &foundval, (UWord)&fake );
 
       Block* bk = NULL;
@@ -967,7 +976,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           fake.payload = base_addr;
           fake.req_szB = 1;
           UWord oldKeyW;
-          unsigned char found = VG_delFromFM( interval_tree,
+          unsigned char found = VG_delFromFM( _tc->interval_tree,
                                    &oldKeyW, NULL, (Addr)&fake );
           bk = (Block*)oldKeyW;
           assert(bk);
@@ -1036,14 +1045,14 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       fake.req_szB = 1;
       UWord foundkey = 1;
       UWord foundval = 1;
-      unsigned char present = VG_lookupFM( interval_tree,
+      unsigned char present = VG_lookupFM( _tc->interval_tree,
                                   &foundkey, &foundval, (UWord)&fake );
       if (present){
           Block fake;
           fake.payload = old_base_addr;
           fake.req_szB = 1;
           UWord oldKeyW;
-          unsigned char found = VG_delFromFM( interval_tree,
+          unsigned char found = VG_delFromFM( _tc->interval_tree,
                                    &oldKeyW, NULL, (Addr)&fake );
           Block* bk = (Block*)oldKeyW;
           assert(bk);
@@ -1103,17 +1112,16 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       bk->payload   = (Addr)thread->ap_base;
       bk->req_szB   = (SizeT)thread->ap_size;
       bk->pid       = (Addr)++thread->PID;
-      bk->type      = 3; //realloc
 
       unsigned char present =
-                VG_addToFM( interval_tree, (UWord)bk, (UWord)0);
+                VG_addToFM( _tc->interval_tree, (UWord)bk, (UWord)0);
 
 
       if (present){
         if (ATOMIC_CPU_COLLECTOR_DEBUG){
             UWord keyW, valW;
-            VG_initIterFM( interval_tree );
-            while (VG_nextIterFM( interval_tree, &keyW, &valW )) {
+            VG_initIterFM( _tc->interval_tree );
+            while (VG_nextIterFM( _tc->interval_tree, &keyW, &valW )) {
                Block* bk = (Block*)keyW;
                assert(valW == 0);
                assert(bk);
@@ -1122,7 +1130,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
                            " Size: " << bk->req_szB <<" PID: " <<
                            bk->pid << std::endl;
              }
-            VG_doneIterFM( interval_tree );
+            VG_doneIterFM( _tc->interval_tree );
         }
         assert(!present);
       }
@@ -1398,7 +1406,7 @@ Block* AtomicSimpleCPU::find_Block_containing ( Addr vaddr ){
    fake.req_szB = 1;
    UWord foundkey = 1;
    UWord foundval = 1;
-   unsigned char found = VG_lookupFM( interval_tree,
+   unsigned char found = VG_lookupFM( threadContexts[0]->interval_tree,
                                &foundkey, &foundval, (UWord)&fake );
    if (!found) {
       return NULL;

@@ -80,6 +80,7 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
   int         fd, ii, count;
   Elf64_Ehdr	*ehdr = NULL;
   std::map<int, Elf64_Word>  shs_flags;
+  uint64_t consts_pid = 0x1000000000000; //48 bits for the heap
   elf_version(EV_CURRENT);
 
   fd = open(file_name, O_RDONLY);
@@ -113,6 +114,22 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
     warn("didn't found a symbol table!");
     return false;
   }
+
+  std::map<std::string, int> functions_to_ignore;
+  std::string line;
+  std::string fileName = "ignore_funcs.sym";
+  std::ifstream myfile (fileName);
+  if (myfile.is_open()){
+      std::string func_name;
+      while ( std::getline (myfile,line) ){
+          std::istringstream iss(line);
+          iss >> func_name ;
+          functions_to_ignore[func_name] = 1;
+      }
+      myfile.close();
+  }
+  else
+      fatal("Can't open igonre_funcs.sym file");
 
   data = elf_getdata(scn, NULL);
   count = shdr.sh_size / shdr.sh_entsize;
@@ -163,10 +180,8 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
               }
 
               // find functions to ignore
-              auto it = tc->syms_cache.find((Addr)sym.st_value);
-              if (it != tc->syms_cache.end()){
-                  if (it->second == TheISA::CheckType::AP_IGONRE ||
-                      it->second == TheISA::CheckType::AP_FREE_CALL){
+              auto it = functions_to_ignore.find(s1);
+              if (it != functions_to_ignore.end()){
 
                     Block fake;
                     fake.payload = (Addr)sym.st_value;
@@ -186,9 +201,41 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
                       present = present;
                       //assert(!present);
                     }
-
-                  }
               }
+          }
+
+          else if ((ELF64_ST_TYPE(sym.st_info) == STT_COMMON ||
+                   ELF64_ST_TYPE(sym.st_info) == STT_OBJECT) &&
+                   (sym.st_size > 0))
+          {
+              Addr base = (Addr)sym.st_value;
+
+              Block fake;
+              fake.payload = (Addr)sym.st_value;
+              fake.req_szB = 1;
+              UWord foundkey = 1;
+              UWord foundval = 1;
+              unsigned char found = VG_lookupFM( tc->interval_tree,
+                                          &foundkey, &foundval, (UWord)&fake );
+              if (found) {
+              }
+              else {
+                Block* bk = new Block();
+                bk->payload   = (Addr)sym.st_value;
+                bk->req_szB   = (SizeT)sym.st_size;
+                bk->pid = ++consts_pid;
+                unsigned char present =
+                        VG_addToFM( tc->interval_tree, (UWord)bk, (UWord)0);
+
+                present = present;
+
+                Process *proc = tc->getProcessPtr();
+                Addr vpn = proc->pTable->pageAlign(base);
+                tc->ShadowMemory[vpn][base] = TheISA::PointerID(bk->pid);
+
+                //assert(!present);
+              }
+
           }
 
           // if (shs_flags[sym.st_shndx] & SHF_WRITE){

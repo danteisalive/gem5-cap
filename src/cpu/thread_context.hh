@@ -141,9 +141,9 @@ class ThreadContext
     COLLECTOR_STATUS                            Collector_Status;
     ExeAliasBuffer                              ExeAliasTableBuffer;
 
-    WordFM*                                     FunctionSymbols;
-    WordFM*                                     FunctionsToIgnore;
-
+    WordFM*                                     FunctionSymbols = NULL;
+    WordFM*                                     FunctionsToIgnore = NULL;
+    WordFM*                                     interval_tree = NULL;
     enum Status
     {
         /// Running.  Instructions should be executed only when

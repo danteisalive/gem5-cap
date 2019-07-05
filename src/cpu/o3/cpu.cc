@@ -208,7 +208,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
     }
 
     ExeAliasCache = new TheISA::LRUAliasCache(2, 1, 256);
-    interval_tree = VG_newFM(interval_tree_Cmp );
+
 
     // The stages also need their CPU pointer setup.  However this
     // must be done at the upper level CPU because they have pointers
@@ -406,6 +406,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         o3_tc->num_of_allocations = 0;
 
         o3_tc->FunctionSymbols = VG_newFM(interval_tree_Cmp );
+        o3_tc->interval_tree = VG_newFM(interval_tree_Cmp );
+        o3_tc->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
         DPRINTF(Capability, "SymbolFile[%i] process is %s\n",
                         tid, params->symbol_file);
 
@@ -441,8 +443,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          NumOfExecutedBoundsCheck = 0; numOfCommitedMemRefs = 0;
 
          //symtab
-         o3_tc->FunctionSymbols = VG_newFM(interval_tree_Cmp);
-         o3_tc->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
+
          //symtab
          Process *process = o3_tc->getProcessPtr();
          std::stringstream test(process->progName());
@@ -1622,7 +1623,7 @@ FullO3CPU<Impl>::updateFetchLVPT(
 
 template <class Impl>
 Block*
-FullO3CPU<Impl>::find_Block_containing(Addr vaddr){
+FullO3CPU<Impl>::find_Block_containing(Addr vaddr, ThreadID tid){
 
     if (likely(fbc_cache0
                   && fbc_cache0->payload <= vaddr
@@ -1647,7 +1648,7 @@ FullO3CPU<Impl>::find_Block_containing(Addr vaddr){
    fake.req_szB = 1;
    UWord foundkey = 1;
    UWord foundval = 1;
-   unsigned char found = VG_lookupFM( interval_tree,
+   unsigned char found = VG_lookupFM( tcBase(tid)->interval_tree,
                                &foundkey, &foundval, (UWord)&fake );
    if (!found) {
       return NULL;

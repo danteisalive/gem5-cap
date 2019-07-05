@@ -40,15 +40,12 @@
 #ifndef __ARCH_X86_UTILITY_HH__
 #define __ARCH_X86_UTILITY_HH__
 
-#include <fcntl.h>
-#include <gelf.h>
-#include <libelf.h>
-#include <unistd.h>
-
 #include "cpu/simple/WordFM.hh"
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
+#include "mem/page_table.hh"
 #include "sim/full_system.hh"
+#include "sim/process.hh"
 
 namespace X86ISA
 {
