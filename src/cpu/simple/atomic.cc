@@ -686,7 +686,7 @@ AtomicSimpleCPU::tick()
                   if (curStaticInst->isFirstMicroop())
                   {
 
-                    ThreadContext::SymbolCacheIter syms_it =
+                    auto syms_it =
                       (threadContexts[0]->syms_cache).find(pcState.instAddr());
                     if (syms_it != (threadContexts[0]->syms_cache).end()){
                       collector(threadContexts[0], pcState, syms_it->second);

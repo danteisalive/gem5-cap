@@ -1049,7 +1049,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
   if (cpu->dtb->hasAlias(vaddr, &hasAlias)){
      if (hasAlias){
        // check to see if there is a miss or hit for this access
-       if (!cpu->ExeAliasCache->initiateAccess(vaddr, tc)){
+       if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc)){
          // if this is miss return and wait
          // otherwise continue executing the load
          instFlags[AliasFetchComplete] = false;
@@ -1070,7 +1070,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
   else {
     // we need to check alias for this one
     // due to tlb miss or because valid bit is not set
-    if (!cpu->ExeAliasCache->initiateAccess(vaddr, tc)){
+    if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc)){
       instFlags[AliasFetchComplete] = false;
       return true;
     }

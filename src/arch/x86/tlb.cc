@@ -146,7 +146,8 @@ TLB::hasAlias(Addr vaddr, bool* hasAlias){
 
 
 bool
-TLB::lookupAndUpdateEntry(Addr vaddr, bool hasAlias){
+TLB::lookupAndUpdateEntry(Addr vaddr, bool hasAlias)
+{
   TlbEntry *entry = trie.lookup(vaddr);
 
   if (entry){
@@ -154,7 +155,7 @@ TLB::lookupAndUpdateEntry(Addr vaddr, bool hasAlias){
       entry->hasAlias = hasAlias;
   }
   else {
-    return false;
+    return false;  // tlb miss and unsuccessfull update
   }
 
   return true;

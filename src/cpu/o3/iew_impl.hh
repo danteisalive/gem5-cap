@@ -1796,25 +1796,7 @@ DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst, bool include_inst)
 {
     ThreadContext * tc = cpu->tcBase(inst->threadNumber);
     if (tc->enableCapability ){
-       // new code
-       for (auto exe_alias_buffer =
-            tc->ExeAliasTableBuffer.cbegin(), next_it = exe_alias_buffer;
-            exe_alias_buffer != tc->ExeAliasTableBuffer.cend();
-            exe_alias_buffer = next_it)
-       {
-          ++next_it;
-          if (include_inst &&
-             (exe_alias_buffer->first.first >= inst->seqNum))
-          {
-            tc->ExeAliasTableBuffer.erase(exe_alias_buffer);
-          }
-          else if (!include_inst &&
-                  (exe_alias_buffer->first.first > inst->seqNum))
-          {
-            tc->ExeAliasTableBuffer.erase(exe_alias_buffer);
-          }
-       }
-
+        cpu->ExeAliasCache->Squash(inst->seqNum,include_inst);
     }
 
 }
@@ -1907,58 +1889,12 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             assert(bk);
             assert(bk->pid != 0);
             _pid = TheISA::PointerID(bk->pid);
-            // update ShadowMemory
-            for (auto it_lv1 = tc->ShadowMemory.begin(),
-                          next_it_lv1 = it_lv1;
-                          it_lv1 != tc->ShadowMemory.end();
-                          it_lv1 = next_it_lv1)
-            {
-                ++next_it_lv1;
-                if (it_lv1->second.size() == 0)
-                {
-                    tc->ShadowMemory.erase(it_lv1);
-                }
-                else {
-                    for (auto it_lv2 = it_lv1->second.cbegin(),
-                             next_it_lv2 = it_lv2;
-                             it_lv2 != it_lv1->second.cend();
-                             it_lv2 = next_it_lv2)
-                    {
-                        ++next_it_lv2;
-                        if (it_lv2->second.getPID() == bk->pid)
-                        {
-                          it_lv1->second.erase(it_lv2);
-                        }
-                    }
-                }
-            }
-
             free(bk);
             tc->num_of_allocations--;
         }
 
-        // delete all aliases that match this pid from exe alias table
-        // commit alias table will be updates in its own collector
-        // this removal shoidl happen when returnin from Free function
-        // but as we dont know the pid at the return and we are not tracking
-        // anything during the free fucntion we can safelydo it here!
-        if (_pid != TheISA::PointerID(0)){
-            for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
-                 it != tc->ExeAliasTableBuffer.cend(); it = next_it)
-            {
-              ++next_it;
-              if (it->second.getPID() == _pid.getPID())
-              {
-                if (ENABLE_EXE_COLLECTOR_DEBUG){
-                  std::cout << "IEW: collector: " << "Free is called " <<
-                  "and is removing " << it->second << " at address " <<
-                  std::hex << it->first.second << std::dec <<
-                  std::endl;
-                }
-                tc->ExeAliasTableBuffer.erase(it);
-              }
-            }
-        }
+        if (_pid != TheISA::PointerID(0))
+          cpu->ExeAliasCache->Invalidate(tc, _pid);
 
         // RDI is not a pointer anymore
         tc->PointerTrackerTable[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
@@ -2071,52 +2007,13 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         assert(bk);
         assert(bk->pid != 0);
         _pid = TheISA::PointerID(bk->pid);
-          // update ShadowMemory
-        for (auto it_lv1 = tc->ShadowMemory.begin(),
-                        next_it_lv1 = it_lv1;
-                        it_lv1 != tc->ShadowMemory.end();
-                        it_lv1 = next_it_lv1)
-        {
-            ++next_it_lv1;
-            if (it_lv1->second.size() == 0)
-            {
-                tc->ShadowMemory.erase(it_lv1);
-            }
-            else {
-                for (auto it_lv2 = it_lv1->second.cbegin(),
-                           next_it_lv2 = it_lv2;
-                           it_lv2 != it_lv1->second.cend();
-                           it_lv2 = next_it_lv2)
-                {
-                      ++next_it_lv2;
-                      if (it_lv2->second.getPID() == bk->pid)
-                      {
-                        it_lv1->second.erase(it_lv2);
-                      }
-                }
-            }
-        }
         free(bk);
         tc->num_of_allocations--;
       }
 
-      if (_pid != TheISA::PointerID(0)){
-          for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
-               it != tc->ExeAliasTableBuffer.cend(); it = next_it)
-          {
-            ++next_it;
-            if (it->second.getPID() == _pid.getPID())
-            {
-              if (ENABLE_EXE_COLLECTOR_DEBUG){
-                std::cout << "IEW: collector: " << "Free is called " <<
-                "and is removing " << it->second << " at address " <<
-                std::hex << it->first.second << std::dec <<
-                std::endl;
-              }
-              tc->ExeAliasTableBuffer.erase(it);
-            }
-          }
-      }
+      if (_pid != TheISA::PointerID(0))
+        cpu->ExeAliasCache->Invalidate(tc, _pid);
+
 
     }
     else if (inst->isReallocBaseCollectorMicroop()){
@@ -2166,7 +2063,7 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 {
   #define ENABLE_EXE_ALIAS_TABLE_DEBUG 0
 
-  ThreadContext * tc = cpu->tcBase(tid);
+  //ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = inst->staticInst;
 
 
@@ -2204,35 +2101,11 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
     _pid = TheISA::PointerID(bk->pid);
 
   }
-        // finally if it's a base adress write it in the execute alias table
-  if (_pid != TheISA::PointerID(0))
-  {
-      if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
-      {
-        std::cout << "IEW: updateAliasTable" <<
-            inst->pcState() << " " <<
-            si->disassemble(inst->pcState().pc()) <<
-            " SEQNUM: " << inst->seqNum << std::endl <<
-            " src2: " << std::hex <<
-            inst->readIntRegOperand(inst->staticInst.get(),2) << std::dec <<
-            " PID: " << _pid <<
-            std::endl;
-      }
-      //put it into exe alias table and later in commit delete it
-      tc->ExeAliasTableBuffer[ThreadContext::AliasTableKey(
-                                    inst->seqNum,inst->effAddr)] = _pid;
 
-      if (ENABLE_EXE_ALIAS_TABLE_DEBUG)
-      {
-          std::cout << "IEW: updateAliasTable " <<
-                "ExeAliasTableSize: " << tc->ExeAliasTableBuffer.size() <<
-                std::endl;
-      }
-  }
-  else {
-      // update the shadow memory (where should we do this?)
-  }
+  // finally if it's a base adress write it in the execute alias table
+  //put it into exe alias table and later in commit delete it
 
+  cpu->ExeAliasCache->InsertStoreQueue(inst->seqNum, inst->effAddr, _pid);
 
 }
 

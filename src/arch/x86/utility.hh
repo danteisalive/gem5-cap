@@ -40,6 +40,13 @@
 #ifndef __ARCH_X86_UTILITY_HH__
 #define __ARCH_X86_UTILITY_HH__
 
+#include <fcntl.h>
+#include <gelf.h>
+#include <libelf.h>
+#include <unistd.h>
+
+#include <fstream>
+
 #include "cpu/simple/WordFM.hh"
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"

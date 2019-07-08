@@ -1302,8 +1302,12 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (tc->enableCapability){
-      updateStackAliasTable(tid, head_inst);
-      updateAliasTable(tid, head_inst);
+
+      if (head_inst->isStore())
+        updateAliasTable(tid, head_inst);
+
+      cpu->ExeAliasCache->RemoveStackAliases(
+                      cpu->readArchIntReg(X86ISA::INTREG_RSP,tid),tc);
 
     }
 
@@ -1342,10 +1346,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             tc->num_of_allocations << std::endl <<
             " ShadowMemory Size: " <<
             tc->ShadowMemory.size() <<  std::endl <<
-            " ExecuteAliasTable Size: " <<
-            tc->ExecuteAliasTable.size() << std::endl <<
-            " ExeAliasTableBuffer Size: " <<
-            tc->ExeAliasTableBuffer.size() << std::endl <<
+            " Alias Cache SQ Size: " <<
+            cpu->ExeAliasCache->GetSize() << std::endl <<
             std::endl;
 
             double accuracy =
@@ -1382,13 +1384,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             std::cout << std::dec << head_inst->seqNum << " " <<
                   std::hex << cpu->readArchIntReg(X86ISA::INTREG_RSP, tid) <<
                   std::endl;
-
-            //dump
-            for (auto& entry : tc->ExeAliasTableBuffer) {
-                std::cout << std::dec << entry.first.first << " " <<
-                          std::hex << entry.first.second << " " << std::dec <<
-                             entry.second << std::endl;
-            }
 
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
@@ -1434,59 +1429,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
 
 
-// delete all aliases which are in the range of newly freed frame
-// in updateAliasTable function we don not write stack aliases to
-// shadow memory as it will become so hard and very slow to handle them
-// for now we keep them in ExeAliasBuffer, eventually they will be
-// erased by the updateStackAliasTable as we can precisley track them
-// by updateStackAliasTable
-template <class Impl>
-void
-DefaultCommit<Impl>::updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst)
-{
-    ThreadContext * tc = cpu->tcBase(tid);
-
-    if (head_inst->isMicroopInjected()) return;
-    if (head_inst->isBoundsCheckMicroop()) return;
-
-    // delete all entrys with effAddr smaller than RSPValue
-    // make sure to check the seqNum and only delete those entrys
-    // with seqNum smaller than youngestSeqNum
-    // if we do everything right here, then we should not find any entry here!
-
-    uint64_t RSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
-    // new code
-    Addr stack_base = 0x7FFFFFFFF000ULL;
-    Addr max_stack_size = 8 * 1024 * 1024;
-    Addr next_thread_stack_base = stack_base - max_stack_size;
-    //check to make sure that this address is in stack valid address range
-    if (!(RSPValue >= next_thread_stack_base &&
-          RSPValue <= stack_base))  return;
-
-    for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
-                  it != tc->ExeAliasTableBuffer.cend();
-                  it = next_it)
-    {
-          ++next_it;
-          if (it->first.first <= head_inst->seqNum)
-          {
-              if (it->first.second <= RSPValue &&
-                  it->first.second >= next_thread_stack_base)
-              {
-                  tc->ExeAliasTableBuffer.erase(it);
-              }
-          }
-          else {
-            // all other lookups will defenitly result here as the map is
-            // ordered on seqNum
-            break;
-          }
-    }
-
-
-}
-
-
 // In this fucntion if
 template <class Impl>
 void
@@ -1498,63 +1440,34 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = head_inst->staticInst;
 
-  Addr stack_base = 0x7FFFFFFFF000ULL;
-  Addr max_stack_size = 8 * 1024 * 1024;
-  Addr next_thread_stack_base = stack_base - max_stack_size;
-  uint64_t RSPValue = cpu->readArchIntReg(X86ISA::INTREG_RSP, tid);
+  // exact replica of updateAliasTable in IEW
+  if (head_inst->isMicroopInjected()) return;
+  if (head_inst->isBoundsCheckMicroop()) return;
+  if (!trackAlias(head_inst)) return;   // dont care about AP functions
+
+  // datasize should be 4/8 bytes othersiwe it's not a base address
+  if (si->getDataSize() != 8) return; // only for 64 bits system
+       // return if store is not pointed to the DS or SS section
+  if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
+      si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+       //  to our knowledge:
+       // (base < 16) and base == 32 could be used for addresing.
+       // igonre stores which don't use these regs
+  RegIndex baseRegInx = si->getBase();
+  if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
+        (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
+
+  if (!head_inst->srcRegIdx(2).isIntReg()) return; // this is the dest reg
+  RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
+
+  if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
+
+
   // sanitization
   if (head_inst->isMicroopInjected()) return;
   if (head_inst->isBoundsCheckMicroop()) return;
 
-  bool _is_user_stack = false;
-  if (RSPValue >= next_thread_stack_base &&
-        RSPValue <= stack_base)  _is_user_stack = true;
-  // here commit the youngest entry of the ExeAliasBuffer to shadow memory
-  // which is actually the CommitAliasTable
-  for (auto it = tc->ExeAliasTableBuffer.cbegin(), next_it = it;
-                it != tc->ExeAliasTableBuffer.cend();
-                it = next_it)
-  {
-        ++next_it;
-        if (it->first.first <= head_inst->seqNum)
-        {
-
-            // first check whether this is a valid stack alias or not
-            if (_is_user_stack &&
-                it->first.second <= stack_base &&
-                it->first.second > RSPValue)
-            {
-                // updateStackAliasTable will handle this
-                //  break;
-            }
-            else if ( _is_user_stack &&
-                      it->first.second <= RSPValue &&
-                      it->first.second >= next_thread_stack_base)
-            {
-              // we should not be here!
-              // just erase, dont commit it
-                tc->ExeAliasTableBuffer.erase(it);
-              //  break;
-            }
-            else {
-              // this is not a stack alias therfore commit it to shadow memory
-              // and then erase it
-                Process *p = tc->getProcessPtr();
-                Addr vpn = p->pTable->pageAlign(it->first.second);
-                //auto page_pid_map = tc->ShadowMemory[vpn];
-                tc->ShadowMemory[vpn][it->first.second] = it->second;
-
-              //  tc->CommitAliasTable[it->first.second] = it->second;
-                tc->ExeAliasTableBuffer.erase(it);
-              //  break;
-            }
-
-        }
-        else {
-          // there is no more to commit
-          break;
-        }
-  }
+  cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, tc);
 
 
 }
@@ -1569,19 +1482,7 @@ DefaultCommit<Impl>::squashExecuteAliasTable(DynInstPtr &inst)
 
     ThreadContext * tc = cpu->tcBase(inst->threadNumber);
     if (tc->enableCapability ){
-       for (auto exe_alias_table =
-            tc->ExeAliasTableBuffer.cbegin(), next_it = exe_alias_table;
-           exe_alias_table != tc->ExeAliasTableBuffer.cend();
-           exe_alias_table = next_it)
-       {
-          ++next_it;
-          if (exe_alias_table->first.first == inst->seqNum)
-          {
-            //remove and break we cant have two equal seqNum
-            tc->ExeAliasTableBuffer.erase(exe_alias_table);
-            break;
-          }
-       }
+        cpu->ExeAliasCache->SquashEntry(inst->seqNum);
     }
 }
 
@@ -1807,6 +1708,30 @@ DefaultCommit<Impl>::oldestReady()
     } else {
         return InvalidThreadID;
     }
+}
+
+template <class Impl>
+bool
+DefaultCommit<Impl>::trackAlias(DynInstPtr& inst){
+
+    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
+
+    Block fake;
+    fake.payload = (Addr)inst->pcState().pc();
+    fake.req_szB = 1;
+    UWord foundkey = 1;
+    UWord foundval = 1;
+    unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+                                    &foundkey, &foundval, (UWord)&fake );
+    if (found)
+    {
+      return false;
+    }
+    else
+    {
+      return true;
+    }
+
 }
 
 

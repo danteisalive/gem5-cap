@@ -1229,8 +1229,7 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
 
 
         ThreadContext * tc = cpu->tcBase(tid);
-        ThreadContext::SymbolCacheIter syms_it =
-                                  (tc->syms_cache).find(thisPC.instAddr());
+        auto syms_it = (tc->syms_cache).find(thisPC.instAddr());
         if (syms_it != (tc->syms_cache).end()){
             si->injectMicroops(tc, thisPC, syms_it->second);
         }

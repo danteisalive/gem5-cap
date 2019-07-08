@@ -188,10 +188,11 @@ namespace X86ISA
             uint64_t t_access_nums;
             uint64_t t_num_replaced;
             PointerID pid{0};
+            uint64_t vaddr;
         public:
             CacheEntry():
                 tag(0),valid(false), dirty(false),
-                lruAge(1),t_access_nums(0), t_num_replaced(0)
+                lruAge(1),t_access_nums(0), t_num_replaced(0), vaddr(0)
             {}
 
     } ;

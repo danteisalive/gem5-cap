@@ -50,6 +50,7 @@
 #include "base/statistics.hh"
 #include "cpu/exetrace.hh"
 #include "cpu/inst_seq.hh"
+#include "cpu/simple/WordFM.hh"
 #include "cpu/timebuf.hh"
 #include "sim/probe/probe.hh"
 
@@ -260,6 +261,8 @@ class DefaultCommit
     void squashFromSquashAfter(ThreadID tid);
 
     void squashExecuteAliasTable(DynInstPtr &inst);
+
+    bool trackAlias(DynInstPtr& inst);
 
     /**
      * Handle squashing from instruction with SquashAfter set.

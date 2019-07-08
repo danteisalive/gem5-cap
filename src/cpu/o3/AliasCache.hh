@@ -59,9 +59,13 @@ namespace X86ISA
 
 class LRUAliasCache
 {
+    #define ENABLE_ALIAS_CACHE_DEBUG 0
+    typedef std::pair<uint64_t, uint64_t> AliasTableKey;
+    typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
 
     private:
         CacheEntry**                 AliasCache;
+        ExeAliasBuffer               ExeAliasTableBuffer;
         uint64_t                     NumWays;
         uint64_t                     NumSets;
         uint64_t                     CacheSize;
@@ -76,6 +80,11 @@ class LRUAliasCache
         uint64_t                     total_hits;
         uint64_t                     total_misses;
 
+        uint64_t                     RSPPrevValue;
+        Addr                         stack_base ;
+        Addr                         max_stack_size ;
+        Addr                         next_thread_stack_base;
+
     public:
         LRUAliasCache(uint64_t _num_ways,
                             uint64_t _cache_block_size,
@@ -83,13 +92,30 @@ class LRUAliasCache
 
         ~LRUAliasCache();
 
-        bool Access(Addr vaddr,
-                        ThreadContext* tc,
-                        PointerID* pid ) ;
+        bool Access(Addr vaddr, ThreadContext* tc, PointerID* pid ) ;
 
-        bool initiateAccess(Addr vaddr,ThreadContext* tc);
+        bool InitiateAccess(Addr vaddr,ThreadContext* tc);
+
+        bool Commit(Addr vaddr, ThreadContext* tc, PointerID& pid);
+        bool CommitStore(Addr vaddr,uint64_t storeSeqNum, ThreadContext* tc);
+        bool Invalidate(ThreadContext* tc, PointerID& pid);
+
+        bool RemoveStackAliases(Addr vaddr, ThreadContext* tc);
+
+        bool InsertStoreQueue(uint64_t seqNum, Addr effAddr, PointerID& pid);
+
+        bool Squash(uint64_t seqNum, bool include_inst);
+
+        bool AccessStoreQueue(Addr effAddr, TheISA::PointerID* pid);
+
+        bool SquashEntry(uint64_t squashed_num);
 
         void print_stats() ;
+        void dump ();
+
+        uint64_t GetSize(){
+           return ExeAliasTableBuffer.size();
+        }
 
 };
 }
