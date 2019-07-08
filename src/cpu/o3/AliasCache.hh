@@ -59,7 +59,6 @@ namespace X86ISA
 
 class LRUAliasCache
 {
-    #define ENABLE_ALIAS_CACHE_DEBUG 0
     typedef std::pair<uint64_t, uint64_t> AliasTableKey;
     typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
 

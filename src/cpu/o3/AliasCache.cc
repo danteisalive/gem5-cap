@@ -33,6 +33,7 @@
 namespace X86ISA
 {
 
+#define ENABLE_ALIAS_CACHE_DEBUG 0
 
 LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                             uint64_t _cache_block_size,
@@ -66,7 +67,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 }
 
                 stack_base = 0x7FFFFFFFF000ULL;
-                max_stack_size = 8 * 1024 * 1024;
+                max_stack_size = 32 * 1024 * 1024;
                 next_thread_stack_base = stack_base - max_stack_size;
                 RSPPrevValue = next_thread_stack_base;
 
@@ -602,7 +603,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
             {
               assert(AliasCache[setNum][wayNum].vaddr);
               if (AliasCache[setNum][wayNum].vaddr >= next_thread_stack_base &&
-                  AliasCache[setNum][wayNum].vaddr <= stack_addr)
+                  AliasCache[setNum][wayNum].vaddr < stack_addr)
               {
                   if (ENABLE_ALIAS_CACHE_DEBUG){
                      std::cout << "RemoveStackAliases: " <<
