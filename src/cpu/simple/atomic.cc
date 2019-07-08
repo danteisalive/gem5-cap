@@ -1161,7 +1161,7 @@ void AtomicSimpleCPU::updateAliasTable(ThreadContext * _tc,
     // eventually they will get removed from alias table
     // new code
     Addr stack_base = 0x7FFFFFFFF000ULL;
-    Addr max_stack_size = 8 * 1024 * 1024;
+    Addr max_stack_size = 32 * 1024 * 1024;
     Addr next_thread_stack_base = stack_base - max_stack_size;
     // as we check for NoFault, then defenitly atomic_vaddr is valid
     if ((curStaticInst->atomic_vaddr >= next_thread_stack_base &&
@@ -1236,7 +1236,7 @@ void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
     // first delete all the aliases with the updated rsp
     uint64_t RSPValue = thread->readIntReg(X86ISA::INTREG_RSP);
     Addr stack_base = 0x7FFFFFFFF000ULL;
-    Addr max_stack_size = 8 * 1024 * 1024;
+    Addr max_stack_size = 32 * 1024 * 1024;
     Addr next_thread_stack_base = stack_base - max_stack_size;
 
     // rsp val is between program stack

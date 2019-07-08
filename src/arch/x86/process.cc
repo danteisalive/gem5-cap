@@ -176,7 +176,7 @@ I386Process::I386Process(ProcessParams *params, ObjectFile *objFile,
     Addr brk_point = roundUp(objFile->dataBase() + objFile->dataSize() +
                              objFile->bssSize(), PageBytes);
     Addr stack_base = _gdtStart;
-    Addr max_stack_size = 8 * 1024 * 1024;
+    Addr max_stack_size = 32 * 1024 * 1024;
     Addr next_thread_stack_base = stack_base - max_stack_size;
     Addr mmap_end = 0xB7FFF000ULL;
 
