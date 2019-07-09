@@ -462,6 +462,99 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
     tc.pcState(pcState);
 
     // thread_num and cpu_id are deterministic from the config
+    //deserlizing the alias table
+    if (tc.enableCapability){
+      Process* p = tc.getProcessPtr();
+      std::string data;
+      std::string filename = "system.alias.physmem.smem";
+      std::string filepath = CheckpointIn::dir() + filename.c_str();
+      std::cout << filepath << std::endl;
+      uint32_t bytes_read;
+      // mmap memoryfile
+      gzFile compressed_mem = gzopen(filepath.c_str(), "rb");
+      if (compressed_mem == NULL)
+          fatal("Can't open alias table checkpoint file '%s'", filename);
+
+      data.resize(34*1000);
+      while (1){
+          bytes_read = gzread(compressed_mem, (void*) data.data(), 34*1000);
+          if (bytes_read > 0){
+            std::stringstream buffer;
+            std::string effAddr,pid;
+            buffer << data;
+
+            if (bytes_read % 34 == 0){
+                for (size_t i = 0; i < bytes_read/34; i++) {
+                  buffer >> effAddr; buffer >> pid;
+                  uint64_t effAddr_val = std::strtoull(effAddr.c_str(),0,16);
+                  uint64_t pid_val = std::strtoull(pid.c_str(),0,16);
+                  Addr vpn = p->pTable->pageAlign(effAddr_val);
+                  tc.ShadowMemory[vpn][effAddr_val] =
+                                              TheISA::PointerID(pid_val);
+                }
+            }
+            else{
+              panic("Invalid number of entrys in alias table Checkpoint file");
+            }
+
+          }
+          else if (bytes_read == 0){
+            break;
+          }
+          else {
+            panic("Alias table Checkpoint file (bytes_read < 0)");
+          }
+      }
+
+    }
+
+    if (tc.enableCapability){
+
+      std::string data;
+      std::string filename = "system.capability.physmem.smem";
+      std::string filepath = CheckpointIn::dir() + filename.c_str();
+      uint32_t bytes_read;
+      // mmap memoryfile
+      gzFile compressed_mem = gzopen(filepath.c_str(), "rb");
+      if (compressed_mem == NULL)
+          fatal("Can't open capability checkpoint file '%s'", filename);
+
+      data.resize(51*1000);  // 3 * 16 + 3
+      while (1){
+          bytes_read = gzread(compressed_mem, (void*) data.data(), 51*1000);
+          if (bytes_read > 0){
+              std::stringstream buffer;
+              std::string payload,pid,size;
+              buffer << data;
+              if (bytes_read % 51 == 0){
+                  for (size_t i = 0; i < bytes_read/51; i++) {
+                    buffer >> payload; buffer >> size; buffer >> pid;
+                    uint64_t payload_val = std::strtoull(payload.c_str(),0,16);
+                    uint64_t size_val = std::strtoull(size.c_str(),0,16);
+                    uint64_t pid_val = std::strtoull(pid.c_str(),0,16);
+                    Block* bk = new Block();
+                    bk->payload   = (Addr)payload_val;
+                    bk->req_szB   = (SizeT)size_val;
+                    bk->pid       = (Addr)pid_val;
+                    unsigned char present =
+                            VG_addToFM(tc.interval_tree, (UWord)bk, (UWord)0);
+                    assert(!present);
+                  }
+              }
+              else{
+              panic("Invalid number of entrys in capability Checkpoint file");
+              }
+          }
+          else if (bytes_read == 0){
+            break;
+          }
+          else {
+            panic("Capability Checkpoint file (bytes_read < 0)");
+          }
+      }
+
+    }
+
 }
 
 void

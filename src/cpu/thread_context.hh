@@ -58,6 +58,8 @@
 #include "config/the_isa.hh"
 #include "cpu/reg_class.hh"
 #include "cpu/simple/WordFM.hh"
+#include "mem/page_table.hh"
+#include "sim/process.hh"
 
 // @todo: Figure out a more architecture independent way to obtain the ITB and
 // DTB pointers.

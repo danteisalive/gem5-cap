@@ -879,7 +879,6 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       bk->payload   = (Addr)thread->ap_base;
       bk->req_szB   = (SizeT)thread->ap_size;
       bk->pid       = (Addr)++thread->PID;
-      bk->type      = 1; //malloc
       unsigned char present =
               VG_addToFM( _tc->interval_tree, (UWord)bk, (UWord)0);
       assert(!present);
@@ -1334,7 +1333,6 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
           if (it_lv2 != it_lv1->second.end()){
              Block bk;
              bk.pid = it_lv2->second.getPID();
-             bk.type = 0;
              PIDLogs[pcState.pc()].push_back(bk);
 
              // find the function which loaded a pointer
