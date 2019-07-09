@@ -69,7 +69,6 @@ ThreadState::serialize(CheckpointOut &cp) const
     SERIALIZE_ENUM(_status);
     // thread_num and cpu_id are deterministic from the config
     SERIALIZE_SCALAR(funcExeInst);
-
     if (!FullSystem)
         return;
 
@@ -88,7 +87,7 @@ ThreadState::unserialize(CheckpointIn &cp)
     UNSERIALIZE_ENUM(_status);
     // thread_num and cpu_id are deterministic from the config
     UNSERIALIZE_SCALAR(funcExeInst);
-
+    //CheckpointIn::baseFilename
     if (!FullSystem)
         return;
 

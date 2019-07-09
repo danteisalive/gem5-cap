@@ -153,6 +153,8 @@ ThreadContext::quiesceTick(Tick resume)
 void
 serialize(ThreadContext &tc, CheckpointOut &cp)
 {
+
+
     using namespace TheISA;
 
     FloatRegBits floatRegs[NumFloatRegs];
@@ -183,6 +185,246 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
     tc.pcState().serialize(cp);
 
     // thread_num and cpu_id are deterministic from the config
+
+    int num_of_alias_entrys = 0;
+    // serialize alias table
+    if (tc.enableCapability){
+        std::string data = "";
+        int pass_size = 0;
+        std::string filename = "system.alias.physmem.smem";
+        std::string filepath = CheckpointIn::dir() + filename.c_str();
+        gzFile compressed_alias = gzopen(filepath.c_str(), "wb");
+        if (compressed_alias == NULL)
+            fatal("Can't open alias table checkpoint file '%s'\n",
+                  filename);
+        std::cout << filepath << std::endl;
+        // gzwrite fails if (int)len < 0 (gzwrite returns int)
+        pass_size = 0;
+        for (auto& entry1: tc.ShadowMemory){
+          if (pass_size == 10){
+              if (data.size() > 0){
+                  std::ostringstream buffer(data);
+                  if (gzwrite(compressed_alias, buffer.str().c_str(),
+                                                buffer.str().size()) !=
+                                                (int) buffer.str().size()) {
+                  fatal("Write failed on alias table checkpoint file '%s'\n",
+                                          filename);
+                  }
+                  //std::cout << buffer.str() << std::endl;
+              }
+
+              data = ""; // zero out
+              pass_size = 0;
+          }
+          else {
+              for (auto& entry2 : entry1.second){
+                // check to see if this pid is free or not in AtomicSimpleCPU
+
+                auto it = std::find(tc.freedPIDVector.begin(),
+                                    tc.freedPIDVector.end(),
+                                    entry2.second.getPID());
+                //cant find this pid in freedPIDVector threfore write it
+                if (it == tc.freedPIDVector.end())
+                {
+                  num_of_alias_entrys++;
+                  std::ostringstream temp1, temp2;
+                  temp1 << std::hex << std::setw(16) <<
+                           std::setfill('0') << entry2.first;
+                  temp2 << std::hex << std::setw(16) <<
+                           std::setfill('0') << entry2.second.getPID();
+                  data += temp1.str() + std::string(" ") +
+                          temp2.str() + std::string(" ");
+                }
+              }
+              pass_size++;
+          }
+        }
+        // writing last bytes
+        if (data.size() > 0){
+            std::ostringstream buffer(data);
+            if (gzwrite(compressed_alias, buffer.str().c_str(),
+                                          buffer.str().size()) !=
+                                          (int) buffer.str().size()) {
+                fatal("Write failed on alias table checkpoint file '%s'\n",
+                                    filename);
+            }
+            //std::cout << buffer.str() << std::endl;
+        }
+
+        // close the compressed stream and check that the exit status
+        // is zero
+        if (gzclose(compressed_alias))
+              fatal("Close failed on alias table checkpoint file '%s'\n",
+                    filename);
+    }
+    //sanity check for gziped alias table
+    if (tc.enableCapability){
+
+      std::string data;
+      std::string filename = "system.alias.physmem.smem";
+      std::string filepath = CheckpointIn::dir() + filename.c_str();
+      uint32_t bytes_read;
+      // mmap memoryfile
+      gzFile compressed_mem = gzopen(filepath.c_str(), "rb");
+      if (compressed_mem == NULL)
+          fatal("Can't open alias table checkpoint file '%s'", filename);
+
+      data.resize(34*1000);
+      while (1){
+          bytes_read = gzread(compressed_mem, (void*) data.data(), 34*1000);
+          if (bytes_read > 0){
+            std::stringstream buffer;
+            std::string effAddr,pid;
+            buffer << data;
+
+            if (bytes_read % 34 == 0){
+                for (size_t i = 0; i < bytes_read/34; i++) {
+                  num_of_alias_entrys--;
+                  buffer >> effAddr; buffer >> pid;
+                  // std::cout << std::hex <<
+                  //           std::strtoull(effAddr.c_str(),0,16) << " " <<
+                  //           std::dec << std::strtoull(pid.c_str(),0,16) <<
+                  //           std::endl;
+                }
+            }
+            else{
+              panic("Invalid number of entrys in alias table Checkpoint file");
+            }
+
+          }
+          else if (bytes_read == 0){
+            break;
+          }
+          else {
+            panic("Alias table Checkpoint file (bytes_read < 0)");
+          }
+      }
+
+    }
+
+    panic_if(num_of_alias_entrys != 0, "Sanity check for alias table failed!");
+
+    int num_of_cap_entrys = 0;
+    //serialize interval_tree
+    if (tc.enableCapability){
+        std::string data = "";
+        int pass_size = 0;
+        std::string filename = "system.capability.physmem.smem";
+        std::string filepath = CheckpointIn::dir() + filename.c_str();
+        gzFile compressed_alias = gzopen(filepath.c_str(), "wb");
+        if (compressed_alias == NULL)
+            fatal("Can't open capability checkpoint file '%s'\n",
+                  filename);
+        pass_size = 0;
+        UWord keyW, valW;
+
+        VG_initIterFM(tc.interval_tree);
+        while (VG_nextIterFM(tc.interval_tree, &keyW, &valW )) {
+           Block* bk = (Block*)keyW;
+           assert(valW == 0);
+           assert(bk);
+           //dump
+           if (pass_size == 1000){
+               if (data.size() > 0){
+                   std::ostringstream buffer(data);
+                   if (gzwrite(compressed_alias, buffer.str().c_str(),
+                                                 buffer.str().size()) !=
+                                                 (int) buffer.str().size())
+                   {
+                     fatal("Write failed on capability checkpoint file '%s'\n",
+                                           filename);
+                   }
+                   //std::cout << buffer.str() << std::endl;
+               }
+
+               data = ""; // zero out
+               pass_size = 0;
+           }
+           //collect
+           else {
+               num_of_cap_entrys++;
+               std::ostringstream temp1, temp2, temp3;
+               temp1 << std::hex << std::setw(16) <<
+                        std::setfill('0') << bk->payload;
+               temp2 << std::hex << std::setw(16) <<
+                        std::setfill('0') << bk->req_szB;
+               temp3 << std::hex << std::setw(16) <<
+                        std::setfill('0') << bk->pid;
+               data +=  temp1.str() + std::string(" ") +
+                        temp2.str() + std::string(" ") +
+                        temp3.str() + std::string(" ");
+               pass_size++;
+           }
+        }
+        VG_doneIterFM(tc.interval_tree);
+
+        // dump remaining pids
+        // writing last bytes
+        if (data.size() > 0){
+            std::ostringstream buffer(data);
+            if (gzwrite(compressed_alias, buffer.str().c_str(),
+                                          buffer.str().size()) !=
+                                          (int) buffer.str().size()) {
+                fatal("Write failed on capability checkpoint file '%s'\n",
+                                    filename);
+            }
+            //std::cout << buffer.str() << std::endl;
+        }
+
+        // close the compressed stream and check that the exit status
+        // is zero
+        if (gzclose(compressed_alias))
+              fatal("Close failed on capability checkpoint file '%s'\n",
+                    filename);
+    }
+    //sanity check for gziped interval tree
+    if (tc.enableCapability){
+
+      std::string data;
+      std::string filename = "system.capability.physmem.smem";
+      std::string filepath = CheckpointIn::dir() + filename.c_str();
+      uint32_t bytes_read;
+      // mmap memoryfile
+      gzFile compressed_mem = gzopen(filepath.c_str(), "rb");
+      if (compressed_mem == NULL)
+          fatal("Can't open capability checkpoint file '%s'", filename);
+
+      data.resize(51*1000);  // 3 * 16 + 3
+      while (1){
+          bytes_read = gzread(compressed_mem, (void*) data.data(), 51*1000);
+          if (bytes_read > 0){
+              std::stringstream buffer;
+              std::string payload,pid,size;
+              buffer << data;
+              if (bytes_read % 51 == 0){
+                  for (size_t i = 0; i < bytes_read/51; i++) {
+                    num_of_cap_entrys--;
+                    buffer >> payload; buffer >> size; buffer >> pid;
+                    // std::cout << std::hex <<
+                    //        std::strtoull(payload.c_str(),0,16) << " " <<
+                    //        std::dec << std::strtoull(size.c_str(),0,16) <<
+                    //        " " <<
+                    //        std::dec << std::strtoull(pid.c_str(),0,16) <<
+                    //        " " <<
+                    //        std::endl;
+                  }
+              }
+              else{
+              panic("Invalid number of entrys in capability Checkpoint file");
+              }
+          }
+          else if (bytes_read == 0){
+            break;
+          }
+          else {
+            panic("Capability Checkpoint file (bytes_read < 0)");
+          }
+      }
+
+    }
+
+    panic_if(num_of_cap_entrys != 0, "Sanity check for interval_tree failed!");
+
 }
 
 void

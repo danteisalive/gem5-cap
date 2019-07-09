@@ -44,6 +44,10 @@
 #ifndef __CPU_THREAD_CONTEXT_HH__
 #define __CPU_THREAD_CONTEXT_HH__
 
+#include <zlib.h>
+
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <tuple>
@@ -136,11 +140,11 @@ class ThreadContext
     ShadowMemoryAliasTable                      ShadowMemory;
     TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
-    //ExeAliasBuffer                              ExeAliasTableBuffer;
 
     WordFM*                                     FunctionSymbols = NULL;
     WordFM*                                     FunctionsToIgnore = NULL;
     WordFM*                                     interval_tree = NULL;
+    std::vector<uint64_t>                       freedPIDVector;
     enum Status
     {
         /// Running.  Instructions should be executed only when

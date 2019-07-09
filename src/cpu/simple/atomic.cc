@@ -117,6 +117,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     threadContexts[0]->interval_tree = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionSymbols = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
+
     //symtab
     Process *process = threadContexts[0]->getProcessPtr();
     std::stringstream test(process->progName());
@@ -982,7 +983,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           assert(bk);
           assert(bk->pid != 0);
           assert(found);
-          freedPIDVector.push_back(bk->pid);
+          _tc->freedPIDVector.push_back(bk->pid);
 
           if (ENABLE_LOGGING){ // delete all aliases related to this PID
 
@@ -1057,7 +1058,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           Block* bk = (Block*)oldKeyW;
           assert(bk);
           assert(found);
-          freedPIDVector.push_back(bk->pid);
+          _tc->freedPIDVector.push_back(bk->pid);
 
           if (ENABLE_LOGGING){ // delete all aliases related to this PID
 
