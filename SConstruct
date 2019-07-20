@@ -582,7 +582,7 @@ if len(protoc_version) < 2 or protoc_version[0] != 'libprotoc':
 else:
     # Based on the availability of the compress stream wrappers,
     # require 2.1.0
-    min_protoc_version = '2.1.0'
+    min_protoc_version = '3.7.2'
     if compareVersions(protoc_version[1], min_protoc_version) < 0:
         print(termcap.Yellow + termcap.Bold +
             'Warning: protoc version', min_protoc_version,

@@ -596,7 +596,7 @@ void
 AtomicSimpleCPU::tick()
 {
 
-    #define ENABLE_LOGGING 1
+    #define ENABLE_LOGGING 0
     DPRINTF(SimpleCPU, "Tick\n");
 
     // Change thread if multi-threaded
@@ -679,9 +679,9 @@ AtomicSimpleCPU::tick()
                 SimpleExecContext& t_info = *threadInfo[0];
                 SimpleThread* thread = t_info.thread;
 
-                if (threadContexts[0]->enableCapability && fault == NoFault){
-                  trackAlias(pcState);
-                }
+              // if (threadContexts[0]->enableCapability && fault == NoFault){
+              //   trackAlias(pcState);
+              // }
 
                 if (threadContexts[0]->enableCapability && fault == NoFault){
                   if (curStaticInst->isFirstMicroop())
@@ -695,16 +695,17 @@ AtomicSimpleCPU::tick()
                   }
                 }
 
-                if (threadContexts[0]->enableCapability && fault == NoFault){
-                    if (curStaticInst->isStore() &&
-                        curStaticInst->getDataSize() == 8)
-                    {
-                       if (ENABLE_LOGGING)
-                          updateAliasTableWithStack(threadContexts[0],pcState);
-                       else
-                          updateAliasTable(threadContexts[0],pcState);
-                    }
-                }
+            // if (threadContexts[0]->enableCapability && fault == NoFault){
+              //     if (curStaticInst->isStore() &&
+              //         curStaticInst->getDataSize() == 8)
+              //     {
+              //        if (ENABLE_LOGGING)
+            //           updateAliasTableWithStack(threadContexts[0],pcState);
+              //        else
+              //           updateAliasTable(threadContexts[0],pcState);
+              //     }
+              // }
+
 
                 if (ENABLE_LOGGING)
                   if (threadContexts[0]->enableCapability && fault == NoFault){
@@ -719,24 +720,11 @@ AtomicSimpleCPU::tick()
                   if (((uint64_t)t_info.numInsts.value() ==
                       max_insts_any_thread - 1) &&
                       curStaticInst->isLastMicroop()){
-                    // for (auto it = PIDLogs.cbegin(); it != PIDLogs.cend();
-                    //      ++it)
-                    // {
-                    //   std::cout << std::hex << it->first << " : ";
-                    //   for (size_t i = 0; i < it->second.size(); i++) {
-                    //     std::cout << std::dec << it->second[i].pid <<
-                    //     //"(" << it->second[i].type << ")" <<
-                    //     " -> ";
-                    //   }
-                    //   std::cout << std::endl;
-                    // }
 
                     for (auto& elem : debug_function_calls){
                         std::cout << elem.first << ": " <<
                                      elem.second << std::endl;
                     }
-
-
                   }
                 }
                 // dump stats
@@ -982,7 +970,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           assert(bk);
           assert(bk->pid != 0);
           assert(found);
-          _tc->freedPIDVector.push_back(bk->pid);
+        //  _tc->freedPIDVector.push_back(bk->pid);
 
           if (ENABLE_LOGGING){ // delete all aliases related to this PID
 
@@ -1057,7 +1045,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           Block* bk = (Block*)oldKeyW;
           assert(bk);
           assert(found);
-          _tc->freedPIDVector.push_back(bk->pid);
+          //_tc->freedPIDVector.push_back(bk->pid);
 
           if (ENABLE_LOGGING){ // delete all aliases related to this PID
 
@@ -1358,8 +1346,15 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
 void AtomicSimpleCPU::trackAlias(PCState &pcState){
 
     uint64_t pc = pcState.pc();
+    // to use when we have function names
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
+
+
+    // if (pc >=0x580  && pc <=0x5a9 ) thread->stop_tracking = false;
+    // else                            thread->stop_tracking = true;
+
+
 
     Block fake;
     fake.payload = (Addr)pc;
