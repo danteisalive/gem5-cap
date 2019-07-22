@@ -78,6 +78,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
                 TheISA::PCState &pcState,
                 TheISA::CheckType _sym);
 
+    void WarmupAliasTable(ThreadContext * _tc, TheISA::PCState &pcState);
     void updateAliasTable(ThreadContext * _tc, TheISA::PCState &pcState);
     void updateAliasTableWithStack(ThreadContext * _tc,
                                    TheISA::PCState &pcState);

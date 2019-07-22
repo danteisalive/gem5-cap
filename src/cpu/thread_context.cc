@@ -306,7 +306,7 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
 
     int num_of_cap_entrys = 0;
     //serialize interval_tree
-    if (tc.enableCapability){
+    if (tc.enableCapability && tc.InSlice){
         std::string data = "";
         int pass_size = 0;
         std::string filename = "system.capability.physmem.smem";
@@ -378,7 +378,7 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
                     filename);
     }
     //sanity check for gziped interval tree
-    if (tc.enableCapability){
+    if (tc.enableCapability && tc.InSlice){
 
       std::string data;
       std::string filename = "system.capability.physmem.smem";
@@ -424,6 +424,12 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
     }
 
     panic_if(num_of_cap_entrys != 0, "Sanity check for interval_tree failed!");
+
+
+    if (tc.InSlice)
+      tc.ShadowMemory.clear();
+
+    tc.InSlice = !tc.InSlice;
 
 }
 
@@ -507,7 +513,7 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
             panic("Alias table Checkpoint file (bytes_read < 0)");
           }
       }
-      std::cout << "In total read " << alias_read << " capabilities!" <<
+      std::cout << "In total read " << alias_read << " aliases!" <<
                 std::endl;
     }
 

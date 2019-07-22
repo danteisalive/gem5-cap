@@ -147,6 +147,7 @@ class ThreadContext
     WordFM*                                     FunctionsToIgnore = NULL;
     WordFM*                                     interval_tree = NULL;
     std::vector<uint64_t>                       freedPIDVector;
+    bool                                        InSlice;
     enum Status
     {
         /// Running.  Instructions should be executed only when

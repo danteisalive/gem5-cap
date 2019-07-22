@@ -117,7 +117,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     threadContexts[0]->interval_tree = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionSymbols = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
-
+    threadContexts[0]->InSlice = false;
     //symtab
     Process *process = threadContexts[0]->getProcessPtr();
     std::stringstream test(process->progName());
@@ -679,9 +679,9 @@ AtomicSimpleCPU::tick()
                 SimpleExecContext& t_info = *threadInfo[0];
                 SimpleThread* thread = t_info.thread;
 
-              // if (threadContexts[0]->enableCapability && fault == NoFault){
-              //   trackAlias(pcState);
-              // }
+              if (threadContexts[0]->enableCapability && fault == NoFault){
+                trackAlias(pcState);
+              }
 
                 if (threadContexts[0]->enableCapability && fault == NoFault){
                   if (curStaticInst->isFirstMicroop())
@@ -696,15 +696,24 @@ AtomicSimpleCPU::tick()
                 }
 
             // if (threadContexts[0]->enableCapability && fault == NoFault){
-              //     if (curStaticInst->isStore() &&
-              //         curStaticInst->getDataSize() == 8)
-              //     {
-              //        if (ENABLE_LOGGING)
+            //       if (curStaticInst->isStore() &&
+            //           curStaticInst->getDataSize() == 8)
+            //       {
+            //          if (ENABLE_LOGGING)
             //           updateAliasTableWithStack(threadContexts[0],pcState);
-              //        else
-              //           updateAliasTable(threadContexts[0],pcState);
-              //     }
-              // }
+            //          else
+            //             updateAliasTable(threadContexts[0],pcState);
+            //       }
+            //   }
+
+              if (threadContexts[0]->enableCapability && fault == NoFault){
+                    if (curStaticInst->isLoad() &&
+                        curStaticInst->getDataSize() == 8 &&
+                        threadContexts[0]->InSlice)
+                    {
+                        WarmupAliasTable(threadContexts[0],pcState);
+                    }
+                }
 
 
                 if (ENABLE_LOGGING)
@@ -1202,7 +1211,78 @@ void AtomicSimpleCPU::updateAliasTable(ThreadContext * _tc,
 
 }
 
+void AtomicSimpleCPU::WarmupAliasTable(ThreadContext * _tc,
+                         PCState &pcState)
+{
+    #define ATOMIC_WARMUP_ALIAS_TABLE 0
+    SimpleExecContext& t_info = *threadInfo[0];
+    SimpleThread* thread = t_info.thread;
 
+    if (thread->stop_tracking) return;
+
+    // if segnemt reg is SS then return because we c dont care about stack
+    // aliases in this mode. in fact stis microops are discarded
+    if (curStaticInst->getSegment() == TheISA::SEGMENT_REG_SS) return;
+
+    // ignore all stack aliases as they are temporary
+    // we dont need to store them
+    // eventually they will get removed from alias table
+    // new code
+    assert(curStaticInst->atomic_vaddr != 0);
+    Addr stack_base = 0x7FFFFFFFF000ULL;
+    Addr max_stack_size = 32 * 1024 * 1024;
+    Addr next_thread_stack_base = stack_base - max_stack_size;
+    // as we check for NoFault, then defenitly atomic_vaddr is valid
+    if ((curStaticInst->atomic_vaddr >= next_thread_stack_base &&
+          curStaticInst->atomic_vaddr <= stack_base))
+          return; // this is a stack address, return
+
+    // make sure the addr is between heap range
+
+    if (!curStaticInst->destRegIdx(0).isIntReg()) return;
+
+    Addr vaddr = thread->readIntReg(curStaticInst->destRegIdx(0).index());
+    // first find the page vpn and store into the page cluster
+    Block* bk = find_Block_containing(vaddr);
+
+
+    Process* p = threadContexts[0]->getProcessPtr();
+
+    Addr vpn = p->pTable->pageAlign(curStaticInst->atomic_vaddr);
+
+    // if found: update the ShadowMemory
+    if (bk && (bk->payload == vaddr)) { // just the base addresses
+      assert(bk->pid != 0);
+      threadContexts[0]->ShadowMemory[vpn][curStaticInst->atomic_vaddr] =
+                                                                      bk->pid;
+      if (ATOMIC_WARMUP_ALIAS_TABLE) {
+        std::cout << curStaticInst->disassemble(pcState.pc()) << " " <<
+                   std::hex <<
+                   thread->readIntReg(curStaticInst->getMemOpDataRegIndex()) <<
+                   std::hex << " (" << bk->payload << "," <<
+                   bk->payload + bk->req_szB << ") = " <<
+                   std::dec << "PID: " << bk->pid <<
+                   std::endl;
+      }
+    }
+    else {
+      // if not found in the capability cache, then check if the alias is
+      // overwritten
+      auto it_lv1 = threadContexts[0]->ShadowMemory.find(vpn);
+      if (it_lv1 != threadContexts[0]->ShadowMemory.end()){
+         auto it_lv2 = it_lv1->second.find(curStaticInst->atomic_vaddr);
+         if (it_lv2 != it_lv1->second.end()){
+            it_lv1->second.erase(it_lv2);
+         }
+         if (it_lv1->second.empty()){
+           threadContexts[0]->ShadowMemory.erase(it_lv1);
+         }
+      }
+
+    }
+
+
+}
 // this function is slow and gatters unnecesaary information and only should
 // be used with getLog function in debuging mode
 void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
@@ -1359,11 +1439,11 @@ void AtomicSimpleCPU::trackAlias(PCState &pcState){
                                     &foundkey, &foundval, (UWord)&fake );
     if (found)
     {
-      thread->stop_tracking = true;
+      thread->stop_tracking = false;
     }
     else
     {
-      thread->stop_tracking = false;
+      thread->stop_tracking = true;
     }
 
 }
