@@ -129,7 +129,7 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
       myfile.close();
   }
   else
-      fatal("Can't open igonre_funcs.sym file");
+      warn("Can't open igonre_funcs.sym file");
 
   data = elf_getdata(scn, NULL);
   count = shdr.sh_size / shdr.sh_entsize;

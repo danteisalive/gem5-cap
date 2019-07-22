@@ -134,15 +134,15 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     }
 
     UWord keyW, valW;
-    VG_initIterFM(threadContexts[0]->FunctionsToIgnore);
+    VG_initIterFM(threadContexts[0]->FunctionSymbols);
     while (
-        VG_nextIterFM(threadContexts[0]->FunctionsToIgnore, &keyW, &valW )) {
+        VG_nextIterFM(threadContexts[0]->FunctionSymbols, &keyW, &valW )) {
        Block* bk = (Block*)keyW;
        assert(valW == 0);
        assert(bk);
        std::cout << std::hex << bk->payload << " " << bk->name << std::endl;
     }
-    VG_doneIterFM( threadContexts[0]->FunctionsToIgnore );
+    VG_doneIterFM( threadContexts[0]->FunctionSymbols );
 }
 
 
@@ -1350,18 +1350,12 @@ void AtomicSimpleCPU::trackAlias(PCState &pcState){
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
 
-
-    // if (pc >=0x580  && pc <=0x5a9 ) thread->stop_tracking = false;
-    // else                            thread->stop_tracking = true;
-
-
-
     Block fake;
     fake.payload = (Addr)pc;
     fake.req_szB = 1;
     UWord foundkey = 1;
     UWord foundval = 1;
-    unsigned char found = VG_lookupFM( threadContexts[0]->FunctionsToIgnore,
+    unsigned char found = VG_lookupFM( threadContexts[0]->FunctionSymbols,
                                     &foundkey, &foundval, (UWord)&fake );
     if (found)
     {

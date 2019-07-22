@@ -460,15 +460,15 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          }
 
          UWord keyW, valW;
-         VG_initIterFM(o3_tc->FunctionsToIgnore);
-         while (VG_nextIterFM(o3_tc->FunctionsToIgnore, &keyW, &valW )) {
+         VG_initIterFM(o3_tc->FunctionSymbols);
+         while (VG_nextIterFM(o3_tc->FunctionSymbols, &keyW, &valW )) {
             Block* bk = (Block*)keyW;
             assert(valW == 0);
             assert(bk);
             std::cout << std::hex << bk->payload << " " <<
                         bk->name << std::endl;
          }
-         VG_doneIterFM(o3_tc->FunctionsToIgnore );
+         VG_doneIterFM(o3_tc->FunctionSymbols );
 
         // Setup quiesce event.
         this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);

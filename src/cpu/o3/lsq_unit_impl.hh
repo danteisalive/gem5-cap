@@ -1674,15 +1674,15 @@ LSQUnit<Impl>::trackAlias(DynInstPtr inst){
     fake.req_szB = 1;
     UWord foundkey = 1;
     UWord foundval = 1;
-    unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+    unsigned char found = VG_lookupFM(tc->FunctionSymbols,
                                     &foundkey, &foundval, (UWord)&fake );
     if (found)
     {
-      return false;
+      return true;
     }
     else
     {
-      return true;
+      return false;
     }
 
 }

@@ -1721,20 +1721,77 @@ DefaultCommit<Impl>::trackAlias(DynInstPtr& inst){
     fake.req_szB = 1;
     UWord foundkey = 1;
     UWord foundval = 1;
-    unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+    unsigned char found = VG_lookupFM(tc->FunctionSymbols,
                                     &foundkey, &foundval, (UWord)&fake );
     if (found)
     {
-      return false;
+      return true;
     }
     else
     {
-      return true;
+      return false;
     }
 
 }
 
+// In this fucntion if
+template <class Impl>
+void
+DefaultCommit<Impl>::warmupAliasTable(ThreadID tid, DynInstPtr &head_inst)
+{
 
+      #define ENABLE_WARMUP_DEBUG 0
+     ThreadContext * tc = cpu->tcBase(tid);
+     const StaticInstPtr si = head_inst->staticInst;
+
+     if (!trackAlias(head_inst)) return ;
+     if (head_inst->isMicroopInjected()) return ;
+     if (head_inst->isBoundsCheckMicroop()) return ;
+
+     // datasize should be 8 bytes othersiwe it's not a base address
+     if (si->getDataSize() != 8) return ;
+
+     assert(head_inst->isLoad());
+
+     if (!head_inst->destRegIdx(0).isIntReg()) return ;
+
+     int  dest = si->getMemOpDataRegIndex();
+     if (dest > X86ISA::NUM_INTREGS + 15)
+        return ;
+
+     uint64_t  dataRegContent =
+                         head_inst->readDestReg(head_inst->staticInst.get(),0);
+
+     // check if this is a base address or not
+     TheISA::PointerID _pid = TheISA::PointerID(0);
+     Block* bk = cpu->find_Block_containing(dataRegContent,tid);
+     if (bk && (bk->payload == dataRegContent)) { // just the base addresses
+       assert(bk->pid != 0);
+       _pid = TheISA::PointerID(bk->pid);
+
+     }
+
+     //as this is ShadowMemory and at commit we just put it there!
+     // hopefully we will all of these in warmup phase
+     if (_pid != TheISA::PointerID(0)){
+
+         uint64_t wb_addr = head_inst->effAddr;
+         Process *p = tc->getProcessPtr();
+         Addr wb_vpn = p->pTable->pageAlign(wb_addr);
+         auto it_lv1 = tc->ShadowMemory.find(wb_vpn);
+         if (it_lv1 != tc->ShadowMemory.end() &&
+             it_lv1->second.size() != 0)
+         {
+             auto it_lv2 = it_lv1->second.find(wb_addr);
+             if (it_lv2 != it_lv1->second.end())
+             {
+               tc->ShadowMemory[wb_vpn][wb_addr] = _pid;
+             }
+         }
+
+     }
+
+}
 
 
 #endif//__CPU_O3_COMMIT_IMPL_HH__

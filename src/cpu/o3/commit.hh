@@ -263,6 +263,7 @@ class DefaultCommit
     void squashExecuteAliasTable(DynInstPtr &inst);
 
     bool trackAlias(DynInstPtr& inst);
+    void warmupAliasTable(ThreadID tid, DynInstPtr &head_inst);
 
     /**
      * Handle squashing from instruction with SquashAfter set.

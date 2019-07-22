@@ -464,6 +464,7 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
     // thread_num and cpu_id are deterministic from the config
     //deserlizing the alias table
     if (tc.enableCapability){
+      int alias_read = 0;
       Process* p = tc.getProcessPtr();
       std::string data;
       std::string filename = "system.alias.physmem.smem";
@@ -491,6 +492,7 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
                   Addr vpn = p->pTable->pageAlign(effAddr_val);
                   tc.ShadowMemory[vpn][effAddr_val] =
                                               TheISA::PointerID(pid_val);
+                  alias_read++;
                 }
             }
             else{
@@ -505,11 +507,13 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
             panic("Alias table Checkpoint file (bytes_read < 0)");
           }
       }
-
+      std::cout << "In total read " << alias_read << " capabilities!" <<
+                std::endl;
     }
 
     if (tc.enableCapability){
 
+      int capabilities_read = 0;
       std::string data;
       std::string filename = "system.capability.physmem.smem";
       std::string filepath = CheckpointIn::dir() + filename.c_str();
@@ -539,6 +543,7 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
                     unsigned char present =
                             VG_addToFM(tc.interval_tree, (UWord)bk, (UWord)0);
                     assert(!present);
+                    capabilities_read++;
                   }
               }
               else{
@@ -553,7 +558,10 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
           }
       }
 
+      std::cout << "In total read " << capabilities_read << " capabilities!" <<
+                std::endl;
     }
+
 
 }
 
