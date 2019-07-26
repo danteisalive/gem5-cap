@@ -91,6 +91,9 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     data_read_req = std::make_shared<Request>();
     data_write_req = std::make_shared<Request>();
 
+
+    numOfMemRefs = 0;
+    numOfHeapAccesses = 0;
     threadContexts[0]->enableCapability = p->enable_capability;
     threadContexts[0]->symbolsFile = p->symbol_file;
     threadContexts[0]->Collector_Status = ThreadContext::NONE;
@@ -118,6 +121,10 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     threadContexts[0]->FunctionSymbols = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->InSlice = false;
+
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
+        threadContexts[0]->PointerTracker[i] = 0;
+    }
     //symtab
     Process *process = threadContexts[0]->getProcessPtr();
     std::stringstream test(process->progName());
@@ -683,7 +690,7 @@ AtomicSimpleCPU::tick()
                 trackAlias(pcState);
               }
 
-                if (threadContexts[0]->enableCapability && fault == NoFault){
+              if (threadContexts[0]->enableCapability && fault == NoFault){
                   if (curStaticInst->isFirstMicroop())
                   {
 
@@ -693,18 +700,36 @@ AtomicSimpleCPU::tick()
                       collector(threadContexts[0], pcState, syms_it->second);
                     }
                   }
-                }
+              }
 
-            // if (threadContexts[0]->enableCapability && fault == NoFault){
-            //       if (curStaticInst->isStore() &&
-            //           curStaticInst->getDataSize() == 8)
-            //       {
-            //          if (ENABLE_LOGGING)
-            //           updateAliasTableWithStack(threadContexts[0],pcState);
-            //          else
-            //             updateAliasTable(threadContexts[0],pcState);
-            //       }
-            //   }
+              // if (threadContexts[0]->enableCapability && fault == NoFault){
+              //     UpdatePointerTracker(threadContexts[0],pcState);
+              // }
+
+              // if (threadContexts[0]->enableCapability && fault == NoFault
+              //     ){
+              //   UpdatePointerTrackerSpeculative(threadContexts[0],pcState);
+              //   ComparePointerTrackerSpeculative(threadContexts[0],pcState);
+              // }
+
+              // if (threadContexts[0]->enableCapability && fault == NoFault){
+              //       if (curStaticInst->isStore() &&
+              //           curStaticInst->getDataSize() == 8)
+              //       {
+              //         if (ENABLE_LOGGING)
+              //          updateAliasTableWithStack(threadContexts[0],pcState);
+              //         else
+              //            updateAliasTable(threadContexts[0],pcState);
+              //       }
+              //   }
+              if (threadContexts[0]->enableCapability &&
+                  fault == NoFault &&
+                  (curStaticInst->isLoad() || curStaticInst->isStore())
+                  )
+              {
+                  AccessCapabilityCache(threadContexts[0], pcState);
+              }
+
 
               if (threadContexts[0]->enableCapability && fault == NoFault){
                     if (curStaticInst->isLoad() &&
@@ -744,9 +769,11 @@ AtomicSimpleCPU::tick()
                 {
                     std::cout << std::dec << t_info.numInsts.value() << " " <<
                               t_info.thread->num_of_allocations << " " <<
-                              threadContexts[0]->ShadowMemory.size() <<
-                              std::endl;
-
+                              threadContexts[0]->ShadowMemory.size() << " " <<
+                              numOfMemRefs << " " << numOfHeapAccesses << " ";
+                              ;
+                    threadContexts[0]->LRUPidCache.LRUPIDCachePrintStats();
+                    numOfMemRefs = 0; numOfHeapAccesses = 0;
                 }
 
                 if (fault == NoFault) {
@@ -885,6 +912,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
                   " " << curStaticInst->disassemble(pcState.pc()) <<
                   " Base: " << std::hex << thread->ap_base << std::endl;
       }
+      _tc->PointerTracker[X86ISA::INTREG_RAX] = bk->pid;
 
     }
     else if (_sym == TheISA::CheckType::AP_CALLOC_SIZE_COLLECT){
@@ -1136,6 +1164,30 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
 }
 
 
+void AtomicSimpleCPU::AccessCapabilityCache(ThreadContext * tc,
+                         PCState &pcState)
+{
+  SimpleExecContext& t_info = *threadInfo[0];
+  SimpleThread* thread = t_info.thread;
+
+  if (thread->stop_tracking) return;
+
+  assert(curStaticInst->atomic_vaddr != 0);
+  // first find the page vpn and store into the page cluster
+  Block* bk = find_Block_containing(curStaticInst->atomic_vaddr);
+
+  numOfMemRefs++;
+  // if found this is a heap MemRef
+  if (bk) {
+    assert(bk->pid != 0);
+    numOfHeapAccesses++;
+    //access the capability cache
+    tc->LRUPidCache.LRUPIDCache_Access(bk->pid);
+  }
+
+
+}
+
 void AtomicSimpleCPU::updateAliasTable(ThreadContext * _tc,
                          PCState &pcState)
 {
@@ -1178,7 +1230,7 @@ void AtomicSimpleCPU::updateAliasTable(ThreadContext * _tc,
     Addr vpn = p->pTable->pageAlign(curStaticInst->atomic_vaddr);
 
     // if found: update the ShadowMemory
-    if (bk && (bk->payload == vaddr)) { // just the base addresses
+    if (bk) { // just the base addresses
       assert(bk->pid != 0);
       threadContexts[0]->ShadowMemory[vpn][curStaticInst->atomic_vaddr] =
                                                                       bk->pid;
@@ -1219,23 +1271,11 @@ void AtomicSimpleCPU::WarmupAliasTable(ThreadContext * _tc,
     SimpleThread* thread = t_info.thread;
 
     if (thread->stop_tracking) return;
-
-    // if segnemt reg is SS then return because we c dont care about stack
-    // aliases in this mode. in fact stis microops are discarded
-    if (curStaticInst->getSegment() == TheISA::SEGMENT_REG_SS) return;
-
     // ignore all stack aliases as they are temporary
     // we dont need to store them
     // eventually they will get removed from alias table
     // new code
     assert(curStaticInst->atomic_vaddr != 0);
-    Addr stack_base = 0x7FFFFFFFF000ULL;
-    Addr max_stack_size = 32 * 1024 * 1024;
-    Addr next_thread_stack_base = stack_base - max_stack_size;
-    // as we check for NoFault, then defenitly atomic_vaddr is valid
-    if ((curStaticInst->atomic_vaddr >= next_thread_stack_base &&
-          curStaticInst->atomic_vaddr <= stack_base))
-          return; // this is a stack address, return
 
     // make sure the addr is between heap range
 
@@ -1251,7 +1291,7 @@ void AtomicSimpleCPU::WarmupAliasTable(ThreadContext * _tc,
     Addr vpn = p->pTable->pageAlign(curStaticInst->atomic_vaddr);
 
     // if found: update the ShadowMemory
-    if (bk && (bk->payload == vaddr)) { // just the base addresses
+    if (bk) { // just the base addresses
       assert(bk->pid != 0);
       threadContexts[0]->ShadowMemory[vpn][curStaticInst->atomic_vaddr] =
                                                                       bk->pid;
@@ -1486,4 +1526,277 @@ Block* AtomicSimpleCPU::find_Block_containing ( Addr vaddr ){
    assert(res != &fake);
 
    return res;
+}
+
+
+void AtomicSimpleCPU::UpdatePointerTracker(ThreadContext * tc,
+                         PCState &pcState)
+{
+    SimpleExecContext& t_info = *threadInfo[0];
+    SimpleThread* thread = t_info.thread;
+
+    if (curStaticInst->isLoad() && curStaticInst->getDataSize() == 8)
+    {
+        // pointer refill
+        for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+            if (curStaticInst->destRegIdx(i).isIntReg())
+            {
+                uint64_t dataRegContent =
+                    thread->readIntReg(curStaticInst->destRegIdx(i).index());
+                Block* dest_bk = find_Block_containing(dataRegContent);
+                if (dest_bk){
+
+                    std::cout << pcState;
+                    std::cout <<
+                      curStaticInst->disassemble(pcState.pc()) << std::endl;
+                    std::cout <<
+                      "Pointer Refill:" << curStaticInst->destRegIdx(i) <<
+                      " {PID(" << dest_bk->pid << ")}" << std::endl;
+                }
+            }
+        }
+
+    }
+    else if (curStaticInst->isStore() && curStaticInst->getDataSize() == 8)
+    {
+        // pointer spill
+        if (curStaticInst->getDataSize() == 8) {
+            for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
+                if (curStaticInst->srcRegIdx(i).isIntReg() &&
+                    curStaticInst->srcRegIdx(i).index() ==
+                                curStaticInst->getMemOpDataRegIndex()
+                    )
+                {
+                    uint64_t dataRegContent =
+                      thread->readIntReg(curStaticInst->srcRegIdx(i).index());
+                    Block* src_bk = find_Block_containing(dataRegContent);
+                    if (src_bk){
+                        std::cout << pcState;
+                        std::cout <<
+                        curStaticInst->disassemble(pcState.pc()) << std::endl;
+                        std::cout <<
+                        "Pointer Spill:" << curStaticInst->srcRegIdx(i) <<
+                        " {PID(" << src_bk->pid << ")}" << std::endl;
+                    }
+                }
+
+            }
+        }
+
+    }
+    else if (curStaticInst->getDataSize() == 8) {
+
+        for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+          if (curStaticInst->destRegIdx(i).isIntReg())
+          {
+              uint64_t dataRegContent =
+                    thread->readIntReg(curStaticInst->destRegIdx(i).index());
+              Block* dest_bk = find_Block_containing(dataRegContent);
+              if (dest_bk){
+
+                  std::cout << pcState;
+                  std::cout <<
+                      curStaticInst->disassemble(pcState.pc()) << std::endl;
+
+                  for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
+                    if (curStaticInst->srcRegIdx(i).isIntReg())
+                    {
+                      Block* bk_src = find_Block_containing(dataRegContent);
+                      if (bk_src){
+                        std::cout <<
+                                "Src: " << curStaticInst->srcRegIdx(i) <<
+                                " {PID(" << dest_bk->pid << ")}" << std::endl;
+                      }
+                      else
+                      {
+                        std::cout << "Src: " << curStaticInst->srcRegIdx(i) <<
+                                      " {PID(0)}" << std::endl;
+                      }
+                    }
+                  }
+
+                  std::cout << "Dest:" << curStaticInst->destRegIdx(i) <<
+                                " {PID(" << dest_bk->pid << ")}" << std::endl;
+
+              }
+          }
+        }
+
+    }
+
+
+    if (curStaticInst->isMemRef()){
+        // heap access
+        Block* bk = find_Block_containing(curStaticInst->atomic_vaddr);
+        // if found: update the ShadowMemory
+        if (bk) { // just the base addresses
+          assert(bk->pid != 0);
+          if (bk){
+              std::cout << pcState;
+              std::cout <<
+                curStaticInst->disassemble(pcState.pc()) << std::endl;
+              std::cout << "Heap Access:" << std::hex <<
+                            curStaticInst->atomic_vaddr << std::dec <<
+                            " {PID(" << bk->pid << ")}" << std::endl;
+          }
+        }
+    }
+
+}
+
+//then call this
+void AtomicSimpleCPU::ComparePointerTrackerSpeculative(ThreadContext * tc,
+                         PCState &pcState)
+{
+  SimpleExecContext& t_info = *threadInfo[0];
+  SimpleThread* thread = t_info.thread;
+
+  if (thread->stop_tracking) return;
+
+  for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+      if (curStaticInst->destRegIdx(i).isIntReg() &&
+          curStaticInst->destRegIdx(i).index() < TheISA::NumIntArchRegs)
+      {
+          uint64_t dataRegContent =
+                  thread->readIntReg(curStaticInst->destRegIdx(i).index());
+          Block* dest_bk = find_Block_containing(dataRegContent);
+          if (dest_bk){
+              if (tc->PointerTracker[curStaticInst->destRegIdx(i).index()] !=
+                  dest_bk->pid)
+              {
+                std::cout << "warning! misspath found!\n";
+                std::cout << pcState;
+                std::cout <<
+                    curStaticInst->disassemble(pcState.pc()) << std::endl;
+              }
+
+          }
+          else {
+            if (tc->PointerTracker[curStaticInst->destRegIdx(i).index()] != 0)
+            {
+              std::cout << "warning! misspath found!\n";
+              std::cout << pcState;
+              std::cout <<
+                  curStaticInst->disassemble(pcState.pc()) << std::endl;
+            }
+          }
+      }
+  }
+
+}
+
+// first call this
+void AtomicSimpleCPU::UpdatePointerTrackerSpeculative(ThreadContext * tc,
+                         PCState &pcState)
+{
+  SimpleExecContext& t_info = *threadInfo[0];
+  SimpleThread* thread = t_info.thread;
+
+  if (thread->stop_tracking) return;
+  //transfer capabilities
+  if (curStaticInst->isMallocBaseCollectorMicroop()){
+      uint64_t dataRegContent =
+              thread->readIntReg(curStaticInst->destRegIdx(0).index());
+      Block* dest_bk = find_Block_containing(dataRegContent);
+      if (dest_bk){
+          tc->PointerTracker[X86ISA::INTREG_RAX] = dest_bk->pid;
+      }
+  }
+  else if (curStaticInst->isLoad() && curStaticInst->getDataSize() == 8)
+  {
+      // pointer refill
+      for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+          if (curStaticInst->destRegIdx(i).isIntReg())
+          {
+              uint64_t dataRegContent =
+                    thread->readIntReg(curStaticInst->destRegIdx(i).index());
+              Block* dest_bk = find_Block_containing(dataRegContent);
+              if (dest_bk){
+                tc->PointerTracker[curStaticInst->destRegIdx(i).index()] =
+                dest_bk->pid;
+              }
+          }
+      }
+
+  }
+  else if (curStaticInst->isLoad() && curStaticInst->getDataSize() != 8)
+  {
+      // pointer refill
+      for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+          if (curStaticInst->destRegIdx(i).isIntReg())
+          {
+              if (curStaticInst->destRegIdx(i).index() < TheISA::NumIntRegs){
+                tc->PointerTracker[curStaticInst->destRegIdx(i).index()] = 0;
+              }
+          }
+      }
+
+  }
+  else if (curStaticInst->getDataSize() == 8) {
+
+      uint64_t pid = 0;
+      for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
+        if (curStaticInst->srcRegIdx(i).isIntReg())
+        {
+          if (curStaticInst->srcRegIdx(i).index() < TheISA::NumIntRegs){
+            if (tc->PointerTracker[curStaticInst->srcRegIdx(i).index()] != 0){
+              pid = tc->PointerTracker[curStaticInst->srcRegIdx(i).index()];
+               break;
+            }
+          }
+        }
+      }
+
+      for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+        if (curStaticInst->destRegIdx(i).isIntReg())
+        {
+          if (curStaticInst->destRegIdx(i).index() < TheISA::NumIntRegs){
+            tc->PointerTracker[curStaticInst->destRegIdx(i).index()] = pid;
+          }
+        }
+      }
+
+  }
+  else if (curStaticInst->getDataSize() != 8) {
+      for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+        if (curStaticInst->destRegIdx(i).isIntReg())
+        {
+          if (curStaticInst->destRegIdx(i).index() < TheISA::NumIntRegs){
+            tc->PointerTracker[curStaticInst->destRegIdx(i).index()] = 0;
+          }
+        }
+      }
+
+  }
+
+  // zero out all interface regs for the next macroopp
+  if (curStaticInst->isLastMicroop()){
+    for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
+      tc->PointerTracker[i] = 0;
+    }
+  }
+
+  // bool dumped = false;
+  // for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
+  //   if (tc->PointerTracker[i]){
+  //     dumped = true;
+  //     break;
+  //   }
+  // }
+
+  // if (dumped)
+  // {
+  //   std::cout << "***************************************************\n";
+  //   std::cout << pcState;
+  //   std::cout << curStaticInst->disassemble(pcState.pc()) << std::endl;
+  //   std::cout << "***************************************************\n";
+  //   for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
+  //     if (tc->PointerTracker[i]){
+  //       std::cout << IntRegIndexStr(i) << " = " <<
+  //                      tc->PointerTracker[i] << std::endl;
+  //     }
+  //   }
+  //   std::cout << "****************************************************\n";
+  // }
+
 }

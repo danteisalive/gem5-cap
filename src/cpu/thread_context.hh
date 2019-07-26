@@ -138,6 +138,7 @@ class ThreadContext
     TheISA::PointerID                           PID = TheISA::PointerID(0);
     TheISA::PointerID
                              PointerTrackerTable[TheISA::NumIntRegsToTrack];
+    uint64_t                 PointerTracker[TheISA::NumIntRegs];
   //  ExeAliasTable                               ExecuteAliasTable;
     ShadowMemoryAliasTable                      ShadowMemory;
     TheISA::LRUPIDCache                         LRUPidCache{64};

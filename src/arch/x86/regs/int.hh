@@ -174,7 +174,7 @@ namespace X86ISA
             case 13: return "R13";
             case 14: return "R14";
             case 15: return "R15";
-            case 16: return "t0";
+            case 16: return "R16";
             case 17: return "t1";
             case 18: return "t2";
             case 19: return "t3";

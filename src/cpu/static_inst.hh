@@ -254,6 +254,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// See srcRegIdx().
     RegId _srcRegIdx[MaxInstSrcRegs];
 
+    uint64_t _srcRegPid[MaxInstSrcRegs] = {0};
+    uint64_t _destRegPid[MaxInstDestRegs] = {0};
+
     /**
      * Base mnemonic (e.g., "add").  Used by generateDisassembly()
      * methods.  Also useful to readily identify instructions from

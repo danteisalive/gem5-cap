@@ -568,7 +568,28 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
                 std::endl;
     }
 
-
+    for (int i = 0; i < TheISA::NumIntRegs; i++)
+    {
+       uint64_t data = intRegs[i];
+       Block fake;
+       fake.payload = data;
+       fake.req_szB = 1;
+       UWord foundkey = 1;
+       UWord foundval = 1;
+       unsigned char found = VG_lookupFM( tc.interval_tree,
+                                   &foundkey, &foundval, (UWord)&fake );
+       if (found)
+       {
+          Block* res = (Block*)foundkey;
+          tc.PointerTrackerTable[i] = TheISA::PointerID(res->pid);
+          std::cout << TheISA::PointerID(res->pid) << std::endl;
+       }
+       else
+       {
+          tc.PointerTrackerTable[i] = TheISA::PointerID(0);
+          std::cout << TheISA::PointerID(0) << std::endl;
+       }
+    }
 }
 
 void

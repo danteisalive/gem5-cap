@@ -82,6 +82,16 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     void updateAliasTable(ThreadContext * _tc, TheISA::PCState &pcState);
     void updateAliasTableWithStack(ThreadContext * _tc,
                                    TheISA::PCState &pcState);
+    void ComparePointerTrackerSpeculative(ThreadContext * tc,
+                                    TheISA::PCState &pcState);
+    void UpdatePointerTrackerSpeculative(ThreadContext * tc,
+                                    TheISA::PCState &pcState);
+    void UpdatePointerTracker(ThreadContext * _tc,
+                                   TheISA::PCState &pcState);
+
+    void AccessCapabilityCache(ThreadContext * tc,
+                             TheISA::PCState &pcState);
+
     void trackAlias(TheISA::PCState &pcState);
     Block* find_Block_containing ( Addr a );
     void getLog(ThreadContext * _tc, TheISA::PCState &pcState);
@@ -90,6 +100,8 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     std::map<Addr, std::vector<Block>> PIDLogs;
     std::map<std::string, Addr> debug_function_calls;
     uint64_t max_insts_any_thread;
+    uint64_t numOfMemRefs;
+    uint64_t numOfHeapAccesses;
 
     // 2-entry cache for find_Block_containing
     Block* fbc_cache0 = NULL;
