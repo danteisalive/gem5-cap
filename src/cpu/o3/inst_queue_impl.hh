@@ -437,6 +437,7 @@ InstructionQueue<Impl>::resetState()
     listOrder.clear();
     deferredMemInsts.clear();
     deferredCapInsts.clear();
+    deferredAliasInsts.clear();
     blockedMemInsts.clear();
     retryMemInsts.clear();
     wbOutstanding = 0;
@@ -803,6 +804,10 @@ InstructionQueue<Impl>::scheduleReadyInsts()
         addReadyMemInst(mem_inst);
     }
 
+    while (mem_inst = getBlockedMemAliasInstToExecute()) {
+        addReadyMemInst(mem_inst);
+    }
+
     // Have iterator to head of the list
     // While I haven't exceeded bandwidth or reached the end of the list,
     // Try to get a FU that can do what this op needs.
@@ -947,7 +952,7 @@ InstructionQueue<Impl>::scheduleReadyInsts()
     // translation changes then the deferredMemInsts condition should be removed
     // from the code below.
     if (total_issued || !retryMemInsts.empty() || !deferredMemInsts.empty() ||
-        !deferredCapInsts.empty()) {
+        !deferredCapInsts.empty() || !deferredAliasInsts.empty()) {
         cpu->activityThisCycle();
     } else {
         DPRINTF(IQ, "Not able to schedule any instructions.\n");
@@ -1160,6 +1165,12 @@ InstructionQueue<Impl>::deferCapInst(DynInstPtr &deferred_inst)
     deferredCapInsts.push_back(deferred_inst);
 }
 
+template <class Impl>
+void
+InstructionQueue<Impl>::deferAliasInst(DynInstPtr &deferred_inst)
+{
+    deferredAliasInsts.push_back(deferred_inst);
+}
 
 template <class Impl>
 void
@@ -1204,15 +1215,30 @@ InstructionQueue<Impl>::getBlockedCapInstToExecute()
 {
     for (ListIt it = deferredCapInsts.begin(); it != deferredCapInsts.end();
          ++it) {
-        if ((*it)->isAliasFetchComplete() ||
-            (*it)->isCapabilityCheckCompleted() ||
+        if ((*it)->isCapabilityCheckCompleted() ||
             (*it)->isSquashed())
         {
             DynInstPtr mem_inst = *it;
             deferredCapInsts.erase(it);
-            //std::cout << "removed from queue " <<
-            //mem_inst->staticInst->disassemble(mem_inst->pcState().pc()) <<
-            //mem_inst->seqNum << std::endl;
+            return mem_inst;
+        }
+    }
+    return nullptr;
+}
+
+
+template <class Impl>
+typename Impl::DynInstPtr
+InstructionQueue<Impl>::getBlockedMemAliasInstToExecute()
+{
+    for (ListIt it = deferredAliasInsts.begin();
+        it != deferredAliasInsts.end();
+         ++it) {
+        if ((*it)->isAliasFetchComplete() ||
+            (*it)->isSquashed())
+        {
+            DynInstPtr mem_inst = *it;
+            deferredAliasInsts.erase(it);
             return mem_inst;
         }
     }

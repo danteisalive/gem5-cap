@@ -284,6 +284,7 @@ class DefaultFetch
      */
     bool lookupAndUpdateNextPC(DynInstPtr &inst, TheISA::PCState &pc);
 
+    bool TrackAlias(ThreadContext * tc, TheISA::PCState &thisPC);
 
     void lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
                             ThreadID tid,

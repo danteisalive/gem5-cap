@@ -1251,7 +1251,26 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
 
 }
 
+template<class Impl>
+bool
+DefaultFetch<Impl>::TrackAlias(ThreadContext * tc, TheISA::PCState &thisPC) {
 
+    Block fake;
+    fake.payload = (Addr)thisPC.pc();
+    fake.req_szB = 1;
+    UWord foundkey = 1;
+    UWord foundval = 1;
+    unsigned char found = VG_lookupFM(tc->FunctionSymbols,
+                                    &foundkey, &foundval, (UWord)&fake );
+    if (found)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+}
 
 
 template<class Impl>
@@ -1443,6 +1462,12 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             DynInstPtr instruction =
                 buildInst(tid, staticInst, curMacroop,
                           thisPC, nextPC, true);
+
+            if (tc->enableCapability &&
+                TrackAlias(tc, thisPC))
+            {
+                cpu->PointerDepGraph.insert(instruction);
+            }
 
             ppFetch->notify(instruction);
             numInst++;

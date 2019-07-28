@@ -83,13 +83,9 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
     bool LRUAliasCache::Access(Addr vaddr, ThreadContext* tc,PointerID* pid )
     {
 
-            //TODO: stats
-            total_accesses = total_accesses + 1;
-
             // first look into the SQ
             bool SQHit = AccessStoreQueue(vaddr,pid);
             if (SQHit){
-              total_hits++;
               return true;
             }
 
@@ -110,7 +106,6 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                     AliasCache[thisIsTheSet][wayNum].tag == thisIsTheTag)
                 {
 
-                    total_hits++;
                     assert(AliasCache[thisIsTheSet][wayNum].vaddr);
                     assert(AliasCache[thisIsTheSet][wayNum].vaddr == vaddr);
                     AliasCache[thisIsTheSet][wayNum].valid = true;
@@ -129,7 +124,6 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
             }
             // if we are here then it means a miss
             // find the candiate for replamcement
-            total_misses++;
             size_t candidateWay = 0;
             size_t candiateLruAge = 0;
             for (int i = 0; i < NumWays; i++) {
@@ -212,8 +206,6 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
             }
             else {
             // there is no alias in this page threfore just send back PID(0)
-                total_misses--; // this was acutually a hit
-                total_hits++;
                 *pid = PointerID(0);
             }
 
@@ -222,6 +214,9 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
     }
 
+    // just initiates the access, in the case of miss
+    // replacement hapeens after miss is handled
+    // if it's a hit, there is no stall and InitiateAccess is complete
     bool LRUAliasCache::InitiateAccess(Addr vaddr, ThreadContext* tc){
 
         //TODO: stats
@@ -249,22 +244,12 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         for (size_t wayNum = 0; wayNum < NumWays; wayNum++) {
 
             if (AliasCache[thisIsTheSet][wayNum].valid &&
-                          AliasCache[thisIsTheSet][wayNum].tag == thisIsTheTag)
+                AliasCache[thisIsTheSet][wayNum].tag == thisIsTheTag)
             {
 
                 total_hits++;
                 assert(AliasCache[thisIsTheSet][wayNum].vaddr);
                 assert(AliasCache[thisIsTheSet][wayNum].vaddr == vaddr);
-                AliasCache[thisIsTheSet][wayNum].valid = true;
-                *pid = AliasCache[thisIsTheSet][wayNum].pid;
-
-                // increase the lru age
-                for (size_t i = 0; i < NumWays; i++)
-                {
-                      AliasCache[thisIsTheSet][i].lruAge++;
-                }
-                AliasCache[thisIsTheSet][wayNum].lruAge = 0;
-
                 return true;
 
             }
@@ -274,93 +259,6 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         // if we are here then it means a miss
         // find the candiate for replamcement
         total_misses++;
-        size_t candidateWay = 0;
-        size_t candiateLruAge = 0;
-        for (int i = 0; i < NumWays; i++) {
-            if (!AliasCache[thisIsTheSet][i].valid)
-            {
-                candidateWay = i;
-                break;
-            }
-            else if (AliasCache[thisIsTheSet][i].lruAge > candiateLruAge)
-            {
-                candiateLruAge = AliasCache[thisIsTheSet][i].lruAge;
-                candidateWay = i;
-            }
-        }
-
-        for (size_t i = 0; i < NumWays; i++) {
-            AliasCache[thisIsTheSet][i].lruAge++;
-        }
-
-        // new read it from shadow_memory
-        // if the page does not have any pid then it's defenitly a
-        // PID(0). In this case just send it back and do not update
-        // alias cache as it will just polute the cache and deacrese the
-        // hit rate. If there is a page for it update the cache in any case
-        Process *p = tc->getProcessPtr();
-        Addr vpn = p->pTable->pageAlign(vaddr); // find the vpn
-
-        auto it_lv1 = tc->ShadowMemory.find(vpn);
-        if (it_lv1 != tc->ShadowMemory.end() && it_lv1->second.size() != 0)
-        {
-              // if the replamcement candidate is dirty we need to writeback it
-              //before replacing it with new one
-              if (AliasCache[thisIsTheSet][candidateWay].valid &&
-                          AliasCache[thisIsTheSet][candidateWay].dirty)
-              {
-                  uint64_t wb_addr =
-                              AliasCache[thisIsTheSet][candidateWay].vaddr;
-                  Process *p = tc->getProcessPtr();
-                  Addr wb_vpn = p->pTable->pageAlign(wb_addr);
-                  // in this case writeback
-                  PointerID wb_pid =
-                            AliasCache[thisIsTheSet][candidateWay].pid;
-
-                  if (AliasCache[thisIsTheSet][candidateWay].pid.getPID() != 0)
-                  {
-                      tc->ShadowMemory[wb_vpn][wb_addr] = wb_pid;
-                  }
-                  else {
-                      // if the pid == 0 we writeback if we can find the entry
-                      // in the ShadowMemory
-                      auto it_lv1 = tc->ShadowMemory.find(wb_vpn);
-                      if (it_lv1 != tc->ShadowMemory.end())
-                      {
-                          auto it_lv2 = it_lv1->second.find(wb_addr);
-                          if (it_lv2 != it_lv1->second.end())
-                          {
-                              tc->ShadowMemory[wb_vpn][wb_addr] = wb_pid;
-                          }
-                      }
-                  }
-              }
-
-              // the page is there and not empty
-              auto it_lv2 = it_lv1->second.find(vaddr);
-              if (it_lv2 != it_lv1->second.end()){
-                  AliasCache[thisIsTheSet][candidateWay].pid = it_lv2->second;
-                  *pid = it_lv2->second;
-              }
-              else {
-                  AliasCache[thisIsTheSet][candidateWay].pid = PointerID(0);
-                  *pid = PointerID(0);
-              }
-
-              AliasCache[thisIsTheSet][candidateWay].valid = true;
-              // here we read a fresh copy from ShadowMemory
-              AliasCache[thisIsTheSet][candidateWay].dirty = false;
-              AliasCache[thisIsTheSet][candidateWay].tag = thisIsTheTag;
-              AliasCache[thisIsTheSet][candidateWay].lruAge = 0;
-              AliasCache[thisIsTheSet][candidateWay].vaddr = vaddr;
-        }
-        else {
-             // there is no alias in this page threfore just send back PID(0)
-             total_misses--; // this was acutually a hit
-             total_hits++;
-             *pid = PointerID(0);
-        }
-
         return false;
 
 
@@ -405,7 +303,6 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         //TODO: stats
 
         //TODO: stats
-        total_accesses = total_accesses + 1;
         Addr thisIsTheTag = vaddr >> (ShiftAmount); //tag of the VA
 
         //Extract the set from the VA
@@ -421,8 +318,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
             if (AliasCache[thisIsTheSet][wayNum].valid &&
                 AliasCache[thisIsTheSet][wayNum].tag == thisIsTheTag)
             {
-                // found it!
-                total_hits++;
+
                 assert(AliasCache[thisIsTheSet][wayNum].vaddr);
                 // just update the entry and return!
                 AliasCache[thisIsTheSet][wayNum].tag   = thisIsTheTag;
@@ -445,7 +341,6 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         }
         // if we are here then it means a miss
         // find the candiate for replamcement
-        total_misses++;
         size_t candidateWay = 0;
         size_t candiateLruAge = 0;
         for (int i = 0; i < NumWays; i++) {

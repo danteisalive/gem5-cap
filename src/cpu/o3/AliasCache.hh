@@ -74,17 +74,18 @@ class LRUAliasCache
         uint64_t                     BitsPerSet;
         uint64_t                     ShiftAmount;
 
-        //TODO: move these to gem5 stats
-        uint64_t                     total_accesses;
-        uint64_t                     total_hits;
-        uint64_t                     total_misses;
-
         uint64_t                     RSPPrevValue;
         Addr                         stack_base ;
         Addr                         max_stack_size ;
         Addr                         next_thread_stack_base;
 
     public:
+
+        //TODO: move these to gem5 stats
+        uint64_t                     total_accesses;
+        uint64_t                     total_hits;
+        uint64_t                     total_misses;
+
         LRUAliasCache(uint64_t _num_ways,
                             uint64_t _cache_block_size,
                             uint64_t _cache_size);

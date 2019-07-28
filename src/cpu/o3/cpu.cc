@@ -265,7 +265,6 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
     rename.setScoreboard(&scoreboard);
     iew.setScoreboard(&scoreboard);
-
     // Setup the rename map for whichever stages need it.
     for (ThreadID tid = 0; tid < numThreads; tid++) {
         isa[tid] = params->isa[tid];
@@ -435,6 +434,9 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         for (int i = 0; i < TheISA::NumIntRegsToTrack; i++)
            o3_tc->PointerTrackerTable[i] = TheISA::PointerID(0);
+
+
+
 
          NumOfAliasTableAccess = 0;
          FalsePredict = 0; PnA0 = 0; P0An=0; PmAn = 0; heapAccesses = 0;

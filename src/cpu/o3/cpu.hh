@@ -65,6 +65,7 @@
 #include "cpu/o3/AliasCache.hh"
 #include "cpu/o3/comm.hh"
 #include "cpu/o3/cpu_policy.hh"
+#include "cpu/o3/pointer_dep_graph.hh"
 #include "cpu/o3/scoreboard.hh"
 #include "cpu/o3/thread_state.hh"
 #include "cpu/simple/WordFM.hh"
@@ -141,6 +142,8 @@ class FullO3CPU : public BaseO3CPU
     Block* fbc_cache1 = NULL;
     /** Overall CPU status. */
     Status _status;
+
+    PointerDependencyGraph<DynInstPtr> PointerDepGraph;
 
   private:
 

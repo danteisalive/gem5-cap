@@ -683,9 +683,8 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
      ThreadContext * tc = cpu->tcBase(tid);
 
      // only check for mememory refrence instuctions
-     if (inst->isMemRef()){
-       checkAccuracy(inst->threadNumber,inst);
-     }
+     checkAccuracy(inst->threadNumber,inst);
+
      // now the address is resolved and check the PID cache
      if (tc->enableCapability &&
         inst->isBoundsCheckMicroop() &&
@@ -729,13 +728,16 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
     }
 
     if (tc->enableCapability &&
-       !inst->isAliasFetchComplete() &&
+       !inst->isBoundsCheckMicroop() &&
        load_fault == NoFault)
     {
-          std::cout << "need to queue " <<
-            inst->staticInst->disassemble(inst->pcState().pc()) <<
-            inst->seqNum <<  std::endl;
-         return load_fault;
+        if (!inst->isAliasFetchComplete())
+        {
+            // std::cout << "Need to get queued: " <<
+            //           inst->staticInst->disassemble(inst->pcState().pc()) <<
+            //           " [" << inst->seqNum << "]" <<  std::endl;
+           return load_fault;
+        }
     }
 
     if (inst->isTranslationDelayed() &&
@@ -801,10 +803,8 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
     Fault store_fault = store_inst->initiateAcc();
 
-    // only check for mememory refrence instuctions
-    if (store_inst->isMemRef()){
-      checkAccuracy(store_inst->threadNumber,store_inst);
-    }
+    checkAccuracy(store_inst->threadNumber,store_inst);
+
 
     if (store_inst->isTranslationDelayed() &&
         store_fault == NoFault)
@@ -1491,19 +1491,6 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
     cpu->NumOfAliasTableAccess++;
 
-    // update the tlb entry for this page alias
-    // move this to alias cache
-    // totaly inefficent but correct!
-    // Process *p = tc->getProcessPtr();
-    // Addr vpn = p->pTable->pageAlign(inst->effAddr); // find the vpn
-    // auto it_lv1 = tc->ShadowMemory.find(vpn);
-    // if (it_lv1 != tc->ShadowMemory.end() && it_lv1->second.size() != 0)
-    // {
-    //     cpu->dtb->lookupAndUpdateEntry(inst->effAddr,true);
-    // }
-    // else {
-    //     cpu->dtb->lookupAndUpdateEntry(inst->effAddr,false);
-    // }
     // threrefore we need to go to AliasCache
     TheISA::PointerID pid = TheISA::PointerID(0);
     cpu->ExeAliasCache->Access(inst->effAddr, tc, &pid);
@@ -1602,7 +1589,7 @@ LSQUnit<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
     // this is defeniltly a memory access (any kind)
 
         cpu->numOfMemRefs++;
-        if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
+        // if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
 
           // src reg is not rsp which is always for stack
             TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
@@ -1634,10 +1621,10 @@ LSQUnit<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
               }
 
             }
-         }
-         else {
-           cpu->truePredection++;
-         }
+         // }
+         // else {
+         //   cpu->truePredection++;
+         // }
 
 }
 

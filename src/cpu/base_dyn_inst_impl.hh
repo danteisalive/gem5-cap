@@ -66,8 +66,6 @@ BaseDynInst<Impl>::BaseDynInst(const StaticInstPtr &_staticInst,
   : staticInst(_staticInst), cpu(cpu), traceData(NULL), macroop(_macroop)
 {
     seqNum = seq_num;
-    capFetchCycle = 0;
-    aliasFetchCycle = 0;
     pc = _pc;
     predPC = _predPC;
 
@@ -79,8 +77,6 @@ BaseDynInst<Impl>::BaseDynInst(const StaticInstPtr &_staticInst,
                                const StaticInstPtr &_macroop)
     : staticInst(_staticInst), traceData(NULL), macroop(_macroop)
 {
-    capFetchCycle = 0;
-    aliasFetchCycle = 0;
     seqNum = 0;
     initVars();
 }
@@ -89,8 +85,6 @@ template <class Impl>
 void
 BaseDynInst<Impl>::initVars()
 {
-    capFetchCycle = 0;
-    aliasFetchCycle = 0;
     memData = NULL;
     effAddr = 0;
     physEffAddrLow = 0;
@@ -103,6 +97,11 @@ BaseDynInst<Impl>::initVars()
     instFlags.reset();
     instFlags[RecordResult] = true;
     instFlags[Predicate] = true;
+
+    capFetchCycle = 0;
+    aliasFetchStartCycle = 0;
+    instFlags[AliasFetchComplete] = false;
+    instFlags[AliasFetchStarted] = false;
 
     lqIdx = -1;
     sqIdx = -1;

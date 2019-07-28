@@ -114,6 +114,7 @@ TLB::insert(Addr vpn, const TlbEntry &entry)
     newEntry->vaddr = vpn;
     newEntry->trieHandle =
     trie.insert(vpn, TlbEntryTrie::MaxBits - entry.logBytes, newEntry);
+
     return newEntry;
 }
 
@@ -127,38 +128,39 @@ TLB::lookup(Addr va, bool update_lru)
 }
 
 
-// valid and hasAlias are undated in the mispredictedPID function After
-// the tlb miss is handeled
+// valid and hasAlias are updated After the tlb miss is handeled in the
+// TLB::insert
+// returns True: TLB hit False: TLB miss
 bool
 TLB::hasAlias(Addr vaddr, bool* hasAlias){
   TlbEntry *entry = trie.lookup(vaddr);
   if (entry){
       if (entry->valid){
         *hasAlias = entry->hasAlias;
-        return true; // we cannot say whther there is an alias or not
       }
-      else{
-        return false;
-      }
+      return true; //the entry is valid and therfore no tlb miss for this load
   }
-  return false; // no entry and this will be a miss
+  return false; // no entry and this will be a tlb miss
 }
 
 
+
+// this function is used by stores to update the hasAlias flag
 bool
-TLB::lookupAndUpdateEntry(Addr vaddr, bool hasAlias)
+TLB::lookupAndUpdateEntry(Addr vpn, bool hasAlias)
 {
-  TlbEntry *entry = trie.lookup(vaddr);
+  TlbEntry *Entry = trie.lookup(vpn);
 
-  if (entry){
-      entry->valid = true;
-      entry->hasAlias = hasAlias;
+  if (Entry)
+    {
+      Entry->valid = true;
+      Entry->hasAlias = hasAlias;
+      return true;
+    }
+  else
+  {
+    return false;
   }
-  else {
-    return false;  // tlb miss and unsuccessfull update
-  }
-
-  return true;
 }
 
 void
@@ -415,6 +417,20 @@ TLB::translate(const RequestPtr &req,
                                 p->pTable->pid(), alignedVaddr, pte->paddr,
                                 pte->flags & EmulationPageTable::Uncacheable,
                                 pte->flags & EmulationPageTable::ReadOnly));
+
+                        if (tc->enableCapability)
+                        {
+                            auto it = tc->ShadowMemory.find(alignedVaddr);
+                            if (it != tc->ShadowMemory.end() &&
+                                it->second.size() != 0)
+                            {
+                              lookupAndUpdateEntry(alignedVaddr, true);
+                            }
+                            else{
+                              lookupAndUpdateEntry(alignedVaddr, false);
+                            }
+                        }
+
                     }
                     DPRINTF(TLB, "Miss was serviced.\n");
                 }
@@ -557,6 +573,7 @@ TLB::unserialize(CheckpointIn &cp)
         newEntry->unserializeSection(cp, csprintf("Entry%d", x));
         newEntry->trieHandle = trie.insert(newEntry->vaddr,
             TlbEntryTrie::MaxBits - newEntry->logBytes, newEntry);
+
     }
 }
 

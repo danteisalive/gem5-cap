@@ -45,19 +45,18 @@
 
 #include "cpu/o3/comm.hh"
 
+
 /** Node in a linked list. */
 template <class DynInstPtr>
 class PointerDependencyEntry
 {
   public:
     PointerDependencyEntry()
-        : inst(NULL), next(NULL)
+        : inst(NULL)
     { }
 
     DynInstPtr inst;
-    //Might want to include data about what arch. register the
-    //dependence is waiting on.
-    PointerDependencyEntry<DynInstPtr> *next;
+    TheISA::PointerID pid{0};
 };
 
 /** Array of linked list that maintains the dependencies between
@@ -78,12 +77,17 @@ class PointerDependencyGraph
     /** Default construction.  Must call resize() prior to use. */
     PointerDependencyGraph()
         : numEntries(0), memAllocCounter(0), nodesTraversed(0), nodesRemoved(0)
-    { }
+    {
+        for (int i = 0; i < TheISA::NumIntRegs; ++i) {
+            dependGraph[i].clear();
+            ArcRegsPid[i] = TheISA::PointerID(0);
+        }
+    }
 
     ~PointerDependencyGraph();
 
     /** Resize the dependency graph to have num_entries registers. */
-    void resize(int num_entries);
+    // void resize(int num_entries);
 
     /** Clears all of the linked lists. */
     void reset();
@@ -91,33 +95,10 @@ class PointerDependencyGraph
     /** Inserts an instruction to be dependent on the given index. */
     void insert(DynInstPtr &new_inst);
 
-    /** Sets the producing instruction of a given register. */
-    void setInst(PhysRegIndex idx, DynInstPtr &new_inst)
-    { dependGraph[idx].inst = new_inst; }
-
-    bool hasProducer(PhysRegIndex idx){
-      if (dependGraph[idx].inst)
-          return true;
-      else
-          return false;
-    }
-
-    /** Clears the producing instruction. */
-    void clearInst(PhysRegIndex idx)
-    {dependGraph[idx].inst = NULL;}
 
     void doSquash(uint64_t squashedSeqNum);
     /** Removes an instruction from a single linked list. */
-    void remove(PhysRegIndex idx, DynInstPtr &inst_to_remove);
-
-    /** Removes and returns the newest dependent of a specific register. */
-    DynInstPtr pop(PhysRegIndex idx);
-
-    /** Checks if the entire dependency graph is empty. */
-    bool empty() const;
-
-    /** Checks if there are any dependents on a specific register. */
-    bool empty(PhysRegIndex idx) const { return !dependGraph[idx].next; }
+    void doCommit(DynInstPtr inst);
 
     /** Debugging function to dump out the dependency graph.
      */
@@ -130,7 +111,9 @@ class PointerDependencyGraph
      *  instructions in flight that are dependent upon r34 will be
      *  in the linked list of dependGraph[34].
      */
-    PointerDepEntry *dependGraph;
+
+    std::array<std::deque<PointerDepEntry>, TheISA::NumIntRegs> dependGraph;
+    std::array<TheISA::PointerID, TheISA::NumIntRegs> ArcRegsPid;
 
     /** Number of linked lists; identical to the number of registers. */
     int numEntries;
@@ -147,42 +130,17 @@ class PointerDependencyGraph
 
 template <class DynInstPtr>
 PointerDependencyGraph<DynInstPtr>::~PointerDependencyGraph()
-{
-    delete [] dependGraph;
-}
+{}
 
-template <class DynInstPtr>
-void
-PointerDependencyGraph<DynInstPtr>::resize(int num_entries)
-{
-    numEntries = num_entries;
-    dependGraph = new PointerDepEntry[numEntries];
-}
 
 template <class DynInstPtr>
 void
 PointerDependencyGraph<DynInstPtr>::reset()
 {
-    // Clear the dependency graph
-    PointerDepEntry *curr;
-    PointerDepEntry *prev;
 
-    for (int i = 0; i < numEntries; ++i) {
-        curr = dependGraph[i].next;
-
-        while (curr) {
-            prev = curr;
-            curr = prev->next;
-            prev->inst = NULL;
-
-            delete prev;
-        }
-
-        if (dependGraph[i].inst) {
-            dependGraph[i].inst = NULL;
-        }
-
-        dependGraph[i].next = NULL;
+    for (int i = 0; i < TheISA::NumIntRegs; ++i) {
+        dependGraph[i].clear();
+        ArcRegsPid[i] = TheISA::PointerID(0);
     }
 }
 
@@ -193,111 +151,90 @@ PointerDependencyGraph<DynInstPtr>::insert(DynInstPtr &inst)
 
     #define ENABLE_DEP_GRAPH_INSERT 0
 
-      if (ENABLE_DEP_GRAPH_INSERT)
-      {
-          std::cout << "-------------START--------------\n";
-          std::cout << inst->pcState() << " " <<
-                      inst->staticInst->disassemble(inst->pcState().pc()) <<
-                      " " << inst->seqNum << std::endl;
-          for (size_t i = 0; i < inst->numSrcRegs(); i++) {
-              std::cout << std::dec <<
-                        "Arch Src: " << i << " :: " <<
-                        inst->staticInst->srcRegIdx(i) <<
-                        " Phy Src: "  << i << " :: " <<
-                        inst->renamedSrcRegIdx(i)->flatIndex() <<
-                           std::endl;
+    //transfer capabilities
+    if (inst->isMallocBaseCollectorMicroop()){
+        // here we generate a new PID and insert it into rax
+    }
+    // this can be a potential pointer refill
+    else if (inst->isLoad() && inst->staticInst->getDataSize() == 8)
+    {
+        // get the predicted PID for this load
+        TheISA::PointerID pid = inst->macroop->getMacroopPid();
+        // insert an entry for the destination reg
+
+
+    }
+    else if (inst->isLoad() && inst->staticInst->getDataSize() != 8)
+    {
+        // this is defenitly not a pointer refill
+        // set the dest regs as PID(0)
+
+    }
+    else if (inst->staticInst->getDataSize() == 8) {
+
+        //uint64_t pid = 0;
+        for (size_t i = 0; i < inst->staticInst->numSrcRegs(); i++) {
+          if (inst->staticInst->srcRegIdx(i).isIntReg() &&
+              (inst->staticInst->srcRegIdx(i).index() < TheISA::NumIntRegs))
+          {
+              // if one of the sources is not pid(0), assign it to pid
+              // and break;
           }
-          for (size_t i = 0; i < inst->numDestRegs(); i++) {
-              std::cout << std::dec <<
-                           "Arch Dest: " << i << " :: " <<
-                           inst->staticInst->destRegIdx(i) <<
-                           " Phy Dest: "  << i << " :: " <<
-                           inst->renamedDestRegIdx(i)->flatIndex() <<
-                           std::endl;
+        }
+
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+          if (inst->staticInst->destRegIdx(i).isIntReg() &&
+              (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+          {
+             // assign pid to all of the dest regs
           }
-          std::cout << std::endl;
-      }
-
-
-      if (inst->isMallocBaseCollectorMicroop()){
-          // dest0 => dest
-          int idx = inst->renamedDestRegIdx(0)->flatIndex();
-          setInst(idx, inst);
-      }
-      else if (inst->isLoad()){
-        // for one kind of load:
-        // src0 => -----
-        // src1 => Base
-        // src2 => -----
-        // Dest => dest
-        // put the dest always as the producer if the datasize equals to 8
-        // and it's a integer register
-        if (inst->staticInst->getDataSize() == 8 &&
-            inst->renamedDestRegIdx(0)->isIntPhysReg())
-        {
-          panic_if(inst->numDestRegs() > 1, "Load: numDestRegs > 1");
-          int idx = inst->renamedDestRegIdx(0)->flatIndex();
-          setInst(idx, inst);
         }
 
-        for (size_t i = 0; i < inst->numSrcRegs(); i++) {
-            if (inst->renamedSrcRegIdx(i)->isIntPhysReg()){
-                int idx = inst->renamedSrcRegIdx(i)->flatIndex();
-                if (hasProducer(idx)){
-                // add this inst to consumer list of the respective producer
-                    PointerDepEntry *new_entry = new PointerDepEntry;
-                    new_entry->next = dependGraph[idx].next;
-                    new_entry->inst = inst;
-                    // Then actually add it to the chain.
-                    dependGraph[idx].next = new_entry;
-                }
-            }
-        }
+    }
+    // defenitly this is not a pointer transefer
+    // zero out all the dest regs
+    else if (inst->staticInst->getDataSize() != 8) {
 
-      }
-      else if (inst->isStore()){
-        // for load:
-        // src0 => -----
-        // src1 => Base
-        // src2 => src
-        // src3 => -----
-        // floating point stores and any kind of stores which are
-        // integer type, they can be any type of write
-        // for example they can write aliases, wrtie to heap or stack
-        // but they never can be a producer as they dont have a dest reg
-        for (size_t i = 0; i < inst->numSrcRegs(); i++) {
-            if (inst->renamedSrcRegIdx(i)->isIntPhysReg()){
-                int idx = inst->renamedSrcRegIdx(i)->flatIndex();
-                if (hasProducer(idx)){
-                // add this inst to consumer list of the respective producer
-                    PointerDepEntry *new_entry = new PointerDepEntry;
-                    new_entry->next = dependGraph[idx].next;
-                    new_entry->inst = inst;
-                    // Then actually add it to the chain.
-                    dependGraph[idx].next = new_entry;
-                }
-            }
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+          if (inst->staticInst->destRegIdx(i).isIntReg() &&
+              (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+          {
+              // zero out all dest regs
+          }
         }
+    }
 
+    // zero out all interface regs for the next macroopp
+    if (inst->isLastMicroop()){
+      for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
+          //zero out all dest regs
       }
-      else {
-        // for all other integer instructions just go through all the
-        // src regs and add them to the consumers if they have any producer
-        for (size_t i = 0; i < inst->numSrcRegs(); i++) {
-            if (inst->renamedSrcRegIdx(i)->isIntPhysReg()){
-                int idx = inst->renamedSrcRegIdx(i)->flatIndex();
-                if (hasProducer(idx)){
-              // add this inst to consumer list of the respective producer
-                    PointerDepEntry *new_entry = new PointerDepEntry;
-                    new_entry->next = dependGraph[idx].next;
-                    new_entry->inst = inst;
-                    // Then actually add it to the chain.
-                    dependGraph[idx].next = new_entry;
-                }
-            }
-        }
+    }
 
-      }
+    // bool dumped = false;
+    // for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
+    //   if (tc->PointerTracker[i]){
+    //     dumped = true;
+    //     break;
+    //   }
+    // }
+
+    // if (dumped)
+    // {
+    //   std::cout << "**********************************************\n";
+    //   std::cout << pcState;
+    //   std::cout << curStaticInst->disassemble(pcState.pc()) << std::endl;
+    //   std::cout << "*********************************************\n";
+    //   for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
+    //     if (tc->PointerTracker[i]){
+    //       std::cout << IntRegIndexStr(i) << " = " <<
+    //       tc->PointerTracker[i] << std::endl;
+    //     }
+    //   }
+    //   std::cout << "*********************************************\n";
+    // }
+
+
 
       if (ENABLE_DEP_GRAPH_INSERT)
       {
@@ -312,9 +249,9 @@ template <class DynInstPtr>
 void
 PointerDependencyGraph<DynInstPtr>::doSquash(uint64_t squashedSeqNum){
 
-    #define POINTER_DEP_GRAPH_DEBUG 0
+    #define POINTER_DEP_GRAPH_SQUASH_DEBUG 0
 
-    if (POINTER_DEP_GRAPH_DEBUG)
+    if (POINTER_DEP_GRAPH_SQUASH_DEBUG)
     {
         std::cout <<"--------START----------\n";
         std::cout << std::dec << "Squashing until sequence number " <<
@@ -322,80 +259,26 @@ PointerDependencyGraph<DynInstPtr>::doSquash(uint64_t squashedSeqNum){
         std::cout << "Before Squashing:\n";
         dump();
     }
-    // Clear the dependency graph
-    PointerDepEntry *curr;
-    PointerDepEntry *prev;
+
     // if the producer seqNum is greater than squashedSeqNum then
     // remove it and all of the consumers as they are all will be squashed
-    for (size_t i = 0; i < numEntries; i++) {
-        if (dependGraph[i].inst)
+
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
+
+        // Erase all even numbers (C++11 and later)
+        for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); )
         {
-            // if the producer should get squashed too
-            if (dependGraph[i].inst->seqNum > squashedSeqNum)
-            {
-                // first remove all consumers
-                curr = dependGraph[i].next;
-                while (curr) {
-                    prev = curr;
-                    curr = prev->next;
-                    if (POINTER_DEP_GRAPH_DEBUG)
-                      cprintf("Squashed: %s [sn:%lli]\n",
-                            prev->inst->pcState(), prev->inst->seqNum);
-                    prev->inst = NULL;
-
-                    delete prev;
-                }
-
-                if (POINTER_DEP_GRAPH_DEBUG)
-                  cprintf("Squashed: %s [sn:%lli]\n",
-                        dependGraph[i].inst->pcState(),
-                        dependGraph[i].inst->seqNum);
-
-                dependGraph[i].inst = NULL;
-                dependGraph[i].next = NULL;
+            if (it->inst->seqNum > squashedSeqNum) {
+                it->inst = NULL;
+                it = dependGraph[i].erase(it);
+            } else {
+                ++it;
             }
-            // if only the consumers should get squashed
-            else {
-                PointerDepEntry *c_node = dependGraph[i].next;
-                while (c_node){
-                    // find the first consumer that its seqNum is greater than
-                    // squashedSeqNum
-                    if (c_node->inst->seqNum > squashedSeqNum)
-                    {
-                        curr = c_node->next;
-                        while (curr) {
-                            prev = curr;
-                            curr = prev->next;
+        }
 
-                            if (POINTER_DEP_GRAPH_DEBUG)
-                              cprintf("Squashed: %s [sn:%lli]\n",
-                                    prev->inst->pcState(), prev->inst->seqNum);
-
-                            prev->inst = NULL;
-
-                            delete prev;
-                        }
-
-                        if (POINTER_DEP_GRAPH_DEBUG)
-                          cprintf("Squashed: %s [sn:%lli]\n",
-                                c_node->inst->pcState(), c_node->inst->seqNum);
-
-                        c_node->inst = NULL;
-                        c_node->next = NULL;
-                        delete c_node;
-
-                        break;
-                    }
-                    else {
-                      c_node = c_node->next;
-                    }
-                }
-            } // if the producer seqNum is less than squashedSeqNum
-
-        }  // if there is a producer for this idx
     } // for loop
 
-    if (POINTER_DEP_GRAPH_DEBUG)
+    if (POINTER_DEP_GRAPH_SQUASH_DEBUG)
     {
         std::cout << "After Squashing\n";
         dump();
@@ -405,110 +288,63 @@ PointerDependencyGraph<DynInstPtr>::doSquash(uint64_t squashedSeqNum){
 
 template <class DynInstPtr>
 void
-PointerDependencyGraph<DynInstPtr>::remove(PhysRegIndex idx,
-                                    DynInstPtr &inst_to_remove)
-{
-    PointerDepEntry *prev = &dependGraph[idx];
-    PointerDepEntry *curr = dependGraph[idx].next;
+PointerDependencyGraph<DynInstPtr>::doCommit(DynInstPtr inst){
 
-    // Make sure curr isn't NULL.  Because this instruction is being
-    // removed from a dependency list, it must have been placed there at
-    // an earlier time.  The dependency chain should not be empty,
-    // unless the instruction dependent upon it is already ready.
-    if (curr == NULL) {
-        return;
+    #define POINTER_DEP_GRAPH_COMMIT_DEBUG 0
+
+    if (POINTER_DEP_GRAPH_COMMIT_DEBUG)
+    {
+        std::cout <<"--------START----------\n";
+        std::cout << std::dec << "Commiting: [" <<
+                  inst->seqNum << "]"<< std::endl;
+        std::cout << "Before Commit:\n";
+        dump();
     }
 
-    nodesRemoved++;
+    // for all the dest regs for this inst, commit it
+    // assert if the inst is not in the dependGraph
+    for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+      if (inst->staticInst->destRegIdx(i).isIntReg() &&
+          (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+      {
+         // the inst should be at the end of the queue
+         panic_if(dependGraph[i].back().inst->seqNum != inst->seqNum,
+                  "Dangling inst in PointerDependGraph");
+         ArcRegsPid[i] = dependGraph[i].back().pid;
+         dependGraph[i].back().inst = NULL;
+         dependGraph[i].pop_back();
 
-    // Find the instruction to remove within the dependency linked list.
-    while (curr->inst != inst_to_remove) {
-        prev = curr;
-        curr = curr->next;
-        nodesTraversed++;
+      }
     }
 
-
-
-    // Now remove this instruction from the list.
-    prev->next = curr->next;
-
-
-    // Could push this off to the destructor of DependencyEntry
-    curr->inst = NULL;
-
-    delete curr;
-}
-
-template <class DynInstPtr>
-DynInstPtr
-PointerDependencyGraph<DynInstPtr>::pop(PhysRegIndex idx)
-{
-    PointerDepEntry *node;
-    node = dependGraph[idx].next;
-    DynInstPtr inst = NULL;
-    if (node) {
-        inst = node->inst;
-        dependGraph[idx].next = node->next;
-        node->inst = NULL;
-        memAllocCounter--;
-        delete node;
+    if (POINTER_DEP_GRAPH_COMMIT_DEBUG)
+    {
+        std::cout << "After Commit\n";
+        dump();
+        std::cout << "--------END----------\n";
     }
-    return inst;
-}
-
-template <class DynInstPtr>
-bool
-PointerDependencyGraph<DynInstPtr>::empty() const
-{
-    for (int i = 0; i < numEntries; ++i) {
-        if (!empty(i))
-            return false;
-    }
-    return true;
 }
 
 template <class DynInstPtr>
 void
 PointerDependencyGraph<DynInstPtr>::dump()
 {
-    PointerDepEntry *curr;
 
-    for (int i = 0; i < numEntries; ++i)
-    {
-        curr = &dependGraph[i];
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
 
-        if (curr->inst) {
-            cprintf("dependGraph[%i]: producer: %s [sn:%lli] consumer: ",
-                    i, curr->inst->pcState(), curr->inst->seqNum);
-            if (curr->next != NULL){
-                while (curr->next != NULL) {
-                    curr = curr->next;
-                    cprintf("%s [sn:%lli] ",
-                          curr->inst->pcState(), curr->inst->seqNum);
-                }
-
-            }
-            cprintf("\n");
-
+        std::cout << "PointerDependGraph[" << i << "]: ";
+        // Erase all even numbers (C++11 and later)
+        for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); )
+        {
+          assert(it->inst); // shouldnt be a null inst
+          std::cout << it->inst->pcState() <<
+                      " [sn:" <<  it->inst->seqNum << "] ";
         }
-        else {
-            if (curr->next != NULL){
-              cprintf("dependGraph[%i]: No producer. consumer: ", i);
-              while (curr->next != NULL) {
-                    curr = curr->next;
 
-                    cprintf("%s [sn:%lli] ",
-                            curr->inst->pcState(), curr->inst->seqNum);
-              }
-              cprintf("\n");
-            }
+        std::cout << std::endl;
 
-       }
+    } // for loop
 
-
-    }
-    //cprintf("memAllocCounter: %i\n", memAllocCounter);
 }
 
 #endif // __CPU_O3_DEP_GRAPH_HH__

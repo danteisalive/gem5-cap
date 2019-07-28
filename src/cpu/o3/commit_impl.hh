@@ -1362,7 +1362,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " P0An: " << cpu->P0An <<
             " PnA0: " << cpu->FalsePredict - cpu->P0An - cpu->PmAn <<
             " PmAn: " << cpu->PmAn <<std::endl <<
-            " Number Of Mem Refs: " << cpu->numOfMemRefs <<
+            " Number Of Mem Refs: " << cpu->numOfMemRefs <<std::endl <<
             // " Heap Access: " << cpu->heapAccesses <
             " True Predections: " << cpu->truePredection <<
             " PnA0: " << cpu->HeapPnA0 <<
@@ -1374,7 +1374,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " NumOfExecutedBoundsCheck: " <<
             cpu->NumOfExecutedBoundsCheck <<std::endl <<
             " NumOfCommitedBoundsCheck: " <<
-            cpu->NumOfCommitedBoundsCheck <<
+            cpu->NumOfCommitedBoundsCheck <<std::endl <<
             " numOfCommitedMemRefs: " <<
             cpu->numOfCommitedMemRefs <<
             std::endl;
@@ -1401,7 +1401,9 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
       if (head_inst->staticInst->uop_pid != TheISA::PointerID(0))
         cpu->NumOfCommitedBoundsCheck++;
     }
-    if (head_inst->isMemRef() && !head_inst->isBoundsCheckMicroop())
+
+    if ((head_inst->isLoad() || head_inst->isStore())  &&
+        !head_inst->isBoundsCheckMicroop())
         cpu->numOfCommitedMemRefs++;
     // Update the commit rename map
     for (int i = 0; i < head_inst->numDestRegs(); i++) {
@@ -1468,6 +1470,12 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   if (head_inst->isBoundsCheckMicroop()) return;
 
   cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, tc);
+
+  Process *p = tc->getProcessPtr();
+  Addr vpn = p->pTable->pageAlign(head_inst->effAddr);
+  if (!cpu->dtb->lookupAndUpdateEntry(vpn, true)){
+    warn("No Entry found for commited store!\n");
+  }
 
 
 }
@@ -1734,64 +1742,6 @@ DefaultCommit<Impl>::trackAlias(DynInstPtr& inst){
 
 }
 
-// In this fucntion if
-template <class Impl>
-void
-DefaultCommit<Impl>::warmupAliasTable(ThreadID tid, DynInstPtr &head_inst)
-{
-
-      #define ENABLE_WARMUP_DEBUG 0
-     ThreadContext * tc = cpu->tcBase(tid);
-     const StaticInstPtr si = head_inst->staticInst;
-
-     if (!trackAlias(head_inst)) return ;
-     if (head_inst->isMicroopInjected()) return ;
-     if (head_inst->isBoundsCheckMicroop()) return ;
-
-     // datasize should be 8 bytes othersiwe it's not a base address
-     if (si->getDataSize() != 8) return ;
-
-     assert(head_inst->isLoad());
-
-     if (!head_inst->destRegIdx(0).isIntReg()) return ;
-
-     int  dest = si->getMemOpDataRegIndex();
-     if (dest > X86ISA::NUM_INTREGS + 15)
-        return ;
-
-     uint64_t  dataRegContent =
-                         head_inst->readDestReg(head_inst->staticInst.get(),0);
-
-     // check if this is a base address or not
-     TheISA::PointerID _pid = TheISA::PointerID(0);
-     Block* bk = cpu->find_Block_containing(dataRegContent,tid);
-     if (bk && (bk->payload == dataRegContent)) { // just the base addresses
-       assert(bk->pid != 0);
-       _pid = TheISA::PointerID(bk->pid);
-
-     }
-
-     //as this is ShadowMemory and at commit we just put it there!
-     // hopefully we will all of these in warmup phase
-     if (_pid != TheISA::PointerID(0)){
-
-         uint64_t wb_addr = head_inst->effAddr;
-         Process *p = tc->getProcessPtr();
-         Addr wb_vpn = p->pTable->pageAlign(wb_addr);
-         auto it_lv1 = tc->ShadowMemory.find(wb_vpn);
-         if (it_lv1 != tc->ShadowMemory.end() &&
-             it_lv1->second.size() != 0)
-         {
-             auto it_lv2 = it_lv1->second.find(wb_addr);
-             if (it_lv2 != it_lv1->second.end())
-             {
-               tc->ShadowMemory[wb_vpn][wb_addr] = _pid;
-             }
-         }
-
-     }
-
-}
 
 
 #endif//__CPU_O3_COMMIT_IMPL_HH__
