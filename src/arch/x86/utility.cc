@@ -208,7 +208,7 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
                    ELF64_ST_TYPE(sym.st_info) == STT_OBJECT) &&
                    (sym.st_size > 0))
           {
-              Addr base = (Addr)sym.st_value;
+              //Addr base = (Addr)sym.st_value;
 
               Block fake;
               fake.payload = (Addr)sym.st_value;
