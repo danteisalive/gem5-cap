@@ -722,13 +722,13 @@ AtomicSimpleCPU::tick()
               //            updateAliasTable(threadContexts[0],pcState);
               //       }
               //   }
-              if (threadContexts[0]->enableCapability &&
-                  fault == NoFault &&
-                  (curStaticInst->isLoad() || curStaticInst->isStore())
-                  )
-              {
-                  AccessCapabilityCache(threadContexts[0], pcState);
-              }
+              // if (threadContexts[0]->enableCapability &&
+              //     fault == NoFault &&
+              //     (curStaticInst->isLoad() || curStaticInst->isStore())
+              //     )
+              // {
+              //     AccessCapabilityCache(threadContexts[0], pcState);
+              // }
 
 
               if (threadContexts[0]->enableCapability && fault == NoFault){
@@ -769,11 +769,10 @@ AtomicSimpleCPU::tick()
                 {
                     std::cout << std::dec << t_info.numInsts.value() << " " <<
                               t_info.thread->num_of_allocations << " " <<
-                              threadContexts[0]->ShadowMemory.size() << " " <<
-                              numOfMemRefs << " " << numOfHeapAccesses << " ";
-                              ;
-                    threadContexts[0]->LRUPidCache.LRUPIDCachePrintStats();
-                    numOfMemRefs = 0; numOfHeapAccesses = 0;
+                              threadContexts[0]->ShadowMemory.size() << " \n";
+                          // numOfMemRefs << " " << numOfHeapAccesses << " ";
+                    // threadContexts[0]->LRUPidCache.LRUPIDCachePrintStats();
+                     numOfMemRefs = 0; numOfHeapAccesses = 0;
                 }
 
                 if (fault == NoFault) {

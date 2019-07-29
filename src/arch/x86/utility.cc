@@ -229,9 +229,9 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
 
                 present = present;
 
-                Process *proc = tc->getProcessPtr();
-                Addr vpn = proc->pTable->pageAlign(base);
-                tc->ShadowMemory[vpn][base] = TheISA::PointerID(bk->pid);
+                // Process *proc = tc->getProcessPtr();
+                // Addr vpn = proc->pTable->pageAlign(base);
+                // tc->ShadowMemory[vpn][base] = TheISA::PointerID(bk->pid);
 
                 //assert(!present);
               }
