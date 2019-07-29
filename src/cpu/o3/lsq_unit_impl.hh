@@ -736,6 +736,8 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
             // std::cout << "Need to get queued: " <<
             //           inst->staticInst->disassemble(inst->pcState().pc()) <<
             //           " [" << inst->seqNum << "]" <<  std::endl;
+           DPRINTF(LSQUnit, "Alias Fetch is not completed: %s, [sn:%lli]\n",
+                    inst->pcState(), inst->seqNum);
            return load_fault;
         }
     }

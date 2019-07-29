@@ -1218,6 +1218,15 @@ InstructionQueue<Impl>::getBlockedCapInstToExecute()
         if ((*it)->isCapabilityCheckCompleted() ||
             (*it)->isSquashed())
         {
+            if ((*it)->isCapabilityCheckCompleted() &&
+                !(*it)->isSquashed()){
+              DPRINTF(IQ, "CapacityFetchComplete: %s, [sn:%lli]\n",
+                (*it)->pcState(), (*it)->seqNum);
+              }
+            else {
+              DPRINTF(IQ, "CapabilitySquashed: %s, [sn:%lli]\n",
+                (*it)->pcState(), (*it)->seqNum);
+            }
             DynInstPtr mem_inst = *it;
             deferredCapInsts.erase(it);
             return mem_inst;
@@ -1235,8 +1244,16 @@ InstructionQueue<Impl>::getBlockedMemAliasInstToExecute()
         it != deferredAliasInsts.end();
          ++it) {
         if ((*it)->isAliasFetchComplete() ||
-            (*it)->isSquashed())
+            !(*it)->isSquashed())
         {
+          if ((*it)->isAliasFetchComplete()){
+            DPRINTF(IQ, "AliasLoadFetchComplete: %s, [sn:%lli]\n",
+              (*it)->pcState(), (*it)->seqNum);
+            }
+          else {
+            DPRINTF(IQ, "AliasLoadSquashed: %s, [sn:%lli]\n",
+              (*it)->pcState(), (*it)->seqNum);
+          }
             DynInstPtr mem_inst = *it;
             deferredAliasInsts.erase(it);
             return mem_inst;

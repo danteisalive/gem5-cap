@@ -1332,7 +1332,7 @@ DefaultIEW<Impl>::executeInsts()
                     if (!inst->isCapabilityChecked())
                     {
                         DPRINTF(IEW, "Execute: Delayed capability check, "
-                              "deferring inst due to capability$ miss.\n");
+                              "Deferring inst due to capability$ miss.\n");
                         instQueue.deferCapInst(inst);
                         continue;
                     }
@@ -1345,11 +1345,8 @@ DefaultIEW<Impl>::executeInsts()
                     if (!inst->isAliasFetchComplete())
                     {
                         DPRINTF(IEW, "Execute: Delayed alias check, "
-                                  "deferring inst due to alias$ miss.\n");
-
-                // std::cout << "Added to queue: " <<
-                //   inst->staticInst->disassemble(inst->pcState().pc()) <<
-                //   " [" << inst->seqNum << "]" << std::endl;
+                        "Deferring inst due to alias$ miss.: %s, [sn:%lli]\n",
+                        inst->pcState(), inst->seqNum);
 
                         instQueue.deferAliasInst(inst);
                         continue;
