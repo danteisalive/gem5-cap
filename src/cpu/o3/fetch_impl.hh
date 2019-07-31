@@ -786,23 +786,10 @@ DefaultFetch<Impl>::doSquash(const TheISA::PCState &newPC,
     if (squashInst && squashInst->pcState().instAddr() == newPC.instAddr())
       {
         macroop[tid] = squashInst->macroop;
-        // if (squashDueToMispredictedPID) {
-        //     std::cout << "old macroop!" << std::endl;
-        //     squashInst->macroop->filterInst(cpu->tcBase(tid),pc[tid]);
-        // }
-
       }
     else
         {
           macroop[tid] = NULL;
-          // if (squashDueToMispredictedPID) {
-          //     std::cout << "new macroop!" << std::endl;
-          //     if (squashInst)
-          //       squashInst->macroop->filterInst(cpu->tcBase(tid),pc[tid]);
-          //     else
-          //     std::cout << "squashInst is NULL!" << std::endl;
-          // }
-
         }
 
     decoder[tid]->reset();
@@ -852,6 +839,8 @@ DefaultFetch<Impl>::squashFromDecode(const TheISA::PCState &newPC,
     DPRINTF(Fetch, "[tid:%i]: Squashing from decode.\n", tid);
 
     doSquash(newPC, squashInst, tid, false);
+
+    cpu->PointerDepGraph.doSquash(seq_num);
     //panic_if(1, "squashFromDecode");
     // Tell the CPU to remove any instructions that are in flight between
     // fetch and decode.
@@ -923,7 +912,7 @@ DefaultFetch<Impl>::squash(const TheISA::PCState &newPC,
     DPRINTF(Fetch, "[tid:%u]: Squash from commit.\n", tid);
 
     doSquash(newPC, squashInst, tid, squashDueToMispredictedPID);
-
+    cpu->PointerDepGraph.doSquash(seq_num);
     // Tell the CPU to remove any instructions that are not in the ROB.
     cpu->removeInstsNotInROB(tid);
 }
@@ -1466,6 +1455,11 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (tc->enableCapability &&
                 TrackAlias(tc, thisPC))
             {
+                if (instruction->isMallocBaseCollectorMicroop()){
+                    instruction->dyn_pid = TheISA::PointerID(
+                                        cpu->readArchIntReg(X86ISA::INTREG_R16,
+                                        instruction->threadNumber));
+                }
                 cpu->PointerDepGraph.insert(instruction);
             }
 

@@ -52,9 +52,12 @@ class PointerDependencyEntry
 {
   public:
     PointerDependencyEntry()
-        : inst(NULL)
+        : inst(NULL), pid(TheISA::PointerID(0))
     { }
 
+    PointerDependencyEntry(DynInstPtr _inst, TheISA::PointerID _pid)
+        : inst(_inst), pid(_pid)
+    { }
     DynInstPtr inst;
     TheISA::PointerID pid{0};
 };
@@ -80,7 +83,8 @@ class PointerDependencyGraph
     {
         for (int i = 0; i < TheISA::NumIntRegs; ++i) {
             dependGraph[i].clear();
-            ArcRegsPid[i] = TheISA::PointerID(0);
+            FetchArchRegsPid[i] = TheISA::PointerID(0);
+            CommitArchRegsPid[i] = TheISA::PointerID(0);
         }
     }
 
@@ -113,7 +117,8 @@ class PointerDependencyGraph
      */
 
     std::array<std::deque<PointerDepEntry>, TheISA::NumIntRegs> dependGraph;
-    std::array<TheISA::PointerID, TheISA::NumIntRegs> ArcRegsPid;
+    std::array<TheISA::PointerID, TheISA::NumIntRegs> CommitArchRegsPid;
+    std::array<TheISA::PointerID, TheISA::NumIntRegs> FetchArchRegsPid;
 
     /** Number of linked lists; identical to the number of registers. */
     int numEntries;
@@ -140,7 +145,8 @@ PointerDependencyGraph<DynInstPtr>::reset()
 
     for (int i = 0; i < TheISA::NumIntRegs; ++i) {
         dependGraph[i].clear();
-        ArcRegsPid[i] = TheISA::PointerID(0);
+        FetchArchRegsPid[i] = TheISA::PointerID(0);
+        CommitArchRegsPid[i] = TheISA::PointerID(0);
     }
 }
 
@@ -151,34 +157,66 @@ PointerDependencyGraph<DynInstPtr>::insert(DynInstPtr &inst)
 
     #define ENABLE_DEP_GRAPH_INSERT 0
 
+    if (inst->isBoundsCheckMicroop()) return;
+
     //transfer capabilities
-    if (inst->isMallocBaseCollectorMicroop()){
+    if (inst->isMallocBaseCollectorMicroop())
+    {
         // here we generate a new PID and insert it into rax
+        dependGraph[X86ISA::INTREG_RAX].push_front(
+                                        PointerDepEntry(inst, inst->dyn_pid));
+        FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
+
+        //dump();
     }
     // this can be a potential pointer refill
     else if (inst->isLoad() && inst->staticInst->getDataSize() == 8)
     {
         // get the predicted PID for this load
-        TheISA::PointerID pid = inst->macroop->getMacroopPid();
+        TheISA::PointerID _pid = inst->macroop->getMacroopPid();
         // insert an entry for the destination reg
-
-
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+            if (inst->staticInst->destRegIdx(i).isIntReg() &&
+                (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+            {
+                int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+                dependGraph[dest_reg_idx].push_front(
+                                              PointerDepEntry(inst, _pid));
+                FetchArchRegsPid[dest_reg_idx] = _pid;
+            }
+        }
     }
     else if (inst->isLoad() && inst->staticInst->getDataSize() != 8)
     {
         // this is defenitly not a pointer refill
         // set the dest regs as PID(0)
-
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+            if (inst->staticInst->destRegIdx(i).isIntReg() &&
+               (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+            {
+                int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+                dependGraph[dest_reg_idx].push_front(
+                                              PointerDepEntry(inst, _pid));
+                FetchArchRegsPid[dest_reg_idx] = _pid;
+            }
+        }
     }
     else if (inst->staticInst->getDataSize() == 8) {
 
-        //uint64_t pid = 0;
+        TheISA::PointerID _pid{0} ;
         for (size_t i = 0; i < inst->staticInst->numSrcRegs(); i++) {
           if (inst->staticInst->srcRegIdx(i).isIntReg() &&
               (inst->staticInst->srcRegIdx(i).index() < TheISA::NumIntRegs))
           {
               // if one of the sources is not pid(0), assign it to pid
               // and break;
+              int src_reg_idx = inst->staticInst->srcRegIdx(i).index();
+              if (FetchArchRegsPid[src_reg_idx] != TheISA::PointerID(0))
+              {
+                _pid = FetchArchRegsPid[src_reg_idx];
+                break;
+              }
           }
         }
 
@@ -187,6 +225,10 @@ PointerDependencyGraph<DynInstPtr>::insert(DynInstPtr &inst)
               (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
           {
              // assign pid to all of the dest regs
+             int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+             dependGraph[dest_reg_idx].push_front(
+                                        PointerDepEntry(inst, _pid));
+             FetchArchRegsPid[dest_reg_idx] = _pid;
           }
         }
 
@@ -195,44 +237,29 @@ PointerDependencyGraph<DynInstPtr>::insert(DynInstPtr &inst)
     // zero out all the dest regs
     else if (inst->staticInst->getDataSize() != 8) {
 
+        TheISA::PointerID _pid = TheISA::PointerID(0);
         for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
           if (inst->staticInst->destRegIdx(i).isIntReg() &&
               (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
           {
               // zero out all dest regs
+              int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+              dependGraph[dest_reg_idx].push_front(
+                                        PointerDepEntry(inst, _pid));
+              FetchArchRegsPid[dest_reg_idx] = _pid;
           }
         }
     }
 
     // zero out all interface regs for the next macroopp
     if (inst->isLastMicroop()){
+      TheISA::PointerID _pid = TheISA::PointerID(0);
       for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
           //zero out all dest regs
+          FetchArchRegsPid[i] = _pid;
       }
+      //dump();
     }
-
-    // bool dumped = false;
-    // for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
-    //   if (tc->PointerTracker[i]){
-    //     dumped = true;
-    //     break;
-    //   }
-    // }
-
-    // if (dumped)
-    // {
-    //   std::cout << "**********************************************\n";
-    //   std::cout << pcState;
-    //   std::cout << curStaticInst->disassemble(pcState.pc()) << std::endl;
-    //   std::cout << "*********************************************\n";
-    //   for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
-    //     if (tc->PointerTracker[i]){
-    //       std::cout << IntRegIndexStr(i) << " = " <<
-    //       tc->PointerTracker[i] << std::endl;
-    //     }
-    //   }
-    //   std::cout << "*********************************************\n";
-    // }
 
 
 
@@ -292,6 +319,8 @@ PointerDependencyGraph<DynInstPtr>::doCommit(DynInstPtr inst){
 
     #define POINTER_DEP_GRAPH_COMMIT_DEBUG 0
 
+    if (inst->isBoundsCheckMicroop()) return; // we do not save these
+
     if (POINTER_DEP_GRAPH_COMMIT_DEBUG)
     {
         std::cout <<"--------START----------\n";
@@ -308,11 +337,14 @@ PointerDependencyGraph<DynInstPtr>::doCommit(DynInstPtr inst){
           (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
       {
          // the inst should be at the end of the queue
-         panic_if(dependGraph[i].back().inst->seqNum != inst->seqNum,
+         int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+         panic_if(dependGraph[dest_reg_idx].back().inst->seqNum !=
+                  inst->seqNum,
                   "Dangling inst in PointerDependGraph");
-         ArcRegsPid[i] = dependGraph[i].back().pid;
-         dependGraph[i].back().inst = NULL;
-         dependGraph[i].pop_back();
+         CommitArchRegsPid[dest_reg_idx] =
+                          dependGraph[dest_reg_idx].back().pid;
+         dependGraph[dest_reg_idx].back().inst = NULL;
+         dependGraph[dest_reg_idx].pop_back();
 
       }
     }
@@ -332,13 +364,15 @@ PointerDependencyGraph<DynInstPtr>::dump()
 
     for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
 
-        std::cout << "PointerDependGraph[" << i << "]: ";
+        std::cout << "PointerDependGraph[" << i << "][" <<
+        FetchArchRegsPid[i] << "][" << CommitArchRegsPid[i] << "]: ";
         // Erase all even numbers (C++11 and later)
-        for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); )
+        for (auto it = dependGraph[i].begin();
+             it != dependGraph[i].end(); it++)
         {
           assert(it->inst); // shouldnt be a null inst
           std::cout << it->inst->pcState() <<
-                      " [sn:" <<  it->inst->seqNum << "] ";
+                      " [sn:" <<  it->inst->seqNum << "]" << it->pid << " ";
         }
 
         std::cout << std::endl;

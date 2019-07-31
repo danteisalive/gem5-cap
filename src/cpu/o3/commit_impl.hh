@@ -1411,6 +1411,13 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                                  head_inst->renamedDestRegIdx(i));
     }
 
+
+    if (tc->enableCapability &&
+        TrackAlias(head_inst))
+    {
+        cpu->PointerDepGraph.doCommit(head_inst);
+    }
+
     // Finally clear the head ROB entry.
     rob->retireHead(tid);
 
@@ -1445,7 +1452,7 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   // exact replica of updateAliasTable in IEW
   if (head_inst->isMicroopInjected()) return;
   if (head_inst->isBoundsCheckMicroop()) return;
-  if (!trackAlias(head_inst)) return;   // dont care about AP functions
+  if (!TrackAlias(head_inst)) return;   // dont care about AP functions
 
   // datasize should be 4/8 bytes othersiwe it's not a base address
   if (si->getDataSize() != 8) return; // only for 64 bits system
@@ -1720,7 +1727,7 @@ DefaultCommit<Impl>::oldestReady()
 
 template <class Impl>
 bool
-DefaultCommit<Impl>::trackAlias(DynInstPtr& inst){
+DefaultCommit<Impl>::TrackAlias(DynInstPtr& inst){
 
     ThreadContext * tc = cpu->tcBase(inst->threadNumber);
 

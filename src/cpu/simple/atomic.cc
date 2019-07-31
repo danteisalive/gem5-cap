@@ -706,11 +706,11 @@ AtomicSimpleCPU::tick()
               //     UpdatePointerTracker(threadContexts[0],pcState);
               // }
 
-              // if (threadContexts[0]->enableCapability && fault == NoFault
-              //     ){
-              //   UpdatePointerTrackerSpeculative(threadContexts[0],pcState);
-              //   ComparePointerTrackerSpeculative(threadContexts[0],pcState);
-              // }
+              if (threadContexts[0]->enableCapability && fault == NoFault
+                  ){
+                UpdatePointerTrackerSpeculative(threadContexts[0],pcState);
+                ComparePointerTrackerSpeculative(threadContexts[0],pcState);
+              }
 
               // if (threadContexts[0]->enableCapability && fault == NoFault){
               //       if (curStaticInst->isStore() &&
@@ -1712,7 +1712,7 @@ void AtomicSimpleCPU::UpdatePointerTrackerSpeculative(ThreadContext * tc,
               Block* dest_bk = find_Block_containing(dataRegContent);
               if (dest_bk){
                 tc->PointerTracker[curStaticInst->destRegIdx(i).index()] =
-                dest_bk->pid;
+                  dest_bk->pid;
               }
           }
       }

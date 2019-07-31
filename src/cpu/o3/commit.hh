@@ -262,7 +262,7 @@ class DefaultCommit
 
     void squashExecuteAliasTable(DynInstPtr &inst);
 
-    bool trackAlias(DynInstPtr& inst);
+    bool TrackAlias(DynInstPtr& inst);
 
 
     /**
