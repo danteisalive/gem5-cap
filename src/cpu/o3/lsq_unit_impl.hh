@@ -688,14 +688,15 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
      // now the address is resolved and check the PID cache
      if (tc->enableCapability &&
         inst->isBoundsCheckMicroop() &&
-        !inst->isCapabilityChecked()){
+        !inst->isCapabilityChecked())
+     {
         // first find the correct PID
         setBoundsCheckPID(inst->threadNumber,inst);
         // if the it's not PID(0) then go to the PID cache
-        if (inst->staticInst->uop_pid != TheISA::PointerID(0))
+        if (inst->dyn_pid != TheISA::PointerID(0))
         {
-          bool hit = tc->LRUPidCache.LRUPIDCache_Access(
-                                          inst->staticInst->uop_pid.getPID());
+          bool hit =
+              tc->LRUPidCache.LRUPIDCache_Access(inst->dyn_pid.getPID());
 
           inst->capFetchCycle = cpu->curCycle();
 
@@ -1586,47 +1587,35 @@ LSQUnit<Impl>::checkAccuracy(ThreadID tid, DynInstPtr &inst)
     //for bounds check microops we have a different function
     if (inst->isBoundsCheckMicroop()) return;
 
-    const StaticInstPtr si = inst->staticInst;
     //let's see whether this is a heap access or not
     // this is defeniltly a memory access (any kind)
 
-        cpu->numOfMemRefs++;
-        // if (inst->staticInst->getBase() != X86ISA::INTREG_RSP){
+    cpu->numOfMemRefs++;
 
-          // src reg is not rsp which is always for stack
-            TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
-            if (_pid != TheISA::PointerID(0)){ // heap access?
-              cpu->heapAccesses++;
-              if (inst->staticInst->uop_pid == _pid){
-                // correct guess
-                cpu->truePredection++;
-                inst->staticInst->checked = true;
-              }
-              else {
-                // this is heap access and we have miss prediction
-                 cpu->HeapPnAm++;
-                 inst->staticInst->uop_pid = _pid;
-                 inst->staticInst->checked = true;
-              }
-            }
-            else {
-              // this is not a heap but we need to make sure that
-              // we did not accidentaly assign a PID to it
-              if (inst->staticInst->uop_pid == TheISA::PointerID(0)){
-                cpu->truePredection++;
-                inst->staticInst->checked = true;
-              }
-              else {
-                cpu->HeapPnA0++;
-                inst->staticInst->uop_pid = TheISA::PointerID(0);
-                inst->staticInst->checked = true;
-              }
 
-            }
-         // }
-         // else {
-         //   cpu->truePredection++;
-         // }
+    TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
+    if (_pid != TheISA::PointerID(0)){ // heap access?
+        cpu->heapAccesses++;
+        if (inst->dyn_pid == _pid){
+          // correct guess
+        //  cpu->truePredection++;
+        }
+        else {
+          // this is heap access and we have miss prediction
+        //  cpu->HeapPnAm++;
+        }
+    }
+    else {
+        // this is not a heap but we need to make sure that
+        // we did not accidentaly assign a PID to it
+        if (inst->dyn_pid == TheISA::PointerID(0)){
+            //cpu->truePredection++;
+        }
+        else {
+            //cpu->HeapPnA0++;
+        }
+
+    }
 
 }
 
@@ -1643,11 +1632,10 @@ LSQUnit<Impl>::setBoundsCheckPID(ThreadID tid, DynInstPtr &inst)
     // injected microops should be always true;
     // we never update the bounds check pid in fetch stage! threrefore
     // we dont need to set the microop "check" signal
-    const StaticInstPtr si = inst->staticInst;
+    //const StaticInstPtr si = inst->staticInst;
     TheISA::PointerID _pid = SearchCapReg(tid, inst->effAddr);
     //std::cout <<inst->effAddr << " " << _pid << std::endl;
-    si->uop_pid = _pid;
-
+    inst->dyn_pid = _pid;
 
 }
 

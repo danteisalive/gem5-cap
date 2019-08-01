@@ -107,7 +107,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     int8_t _numVecDestRegs;
     int8_t _numVecElemDestRegs;
     /** @} */
-    bool _isInjected;
+    bool isInjected;
 
   public:
     //bool isSquashedAfterInjection;
@@ -242,8 +242,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// The binary machine instruction.
     ExtMachInst machInst;
 
-    TheISA::PointerID uop_pid{0};
-    bool checked;
+    //TheISA::PointerID static_pid{0};
+    //bool checked;
     Addr atomic_vaddr; // this address is used in atomic mode
     //bool capabilityCacheMiss;
 
@@ -265,7 +265,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
      */
     const char *mnemonic;
 
-    TheISA::PointerID pid{0};
+  //  TheISA::PointerID pid{0};
 
 
     /**
@@ -290,7 +290,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
           _numFPDestRegs(0), _numIntDestRegs(0), _numCCDestRegs(0),
           _numVecDestRegs(0), _numVecElemDestRegs(0), machInst(_machInst),
           mnemonic(_mnemonic), cachedDisassembly(0)
-    { _isInjected = false; checked = false; atomic_vaddr = 0;}
+    { isInjected = false; /*checked = false;*/ atomic_vaddr = 0;}
 
   public:
     virtual ~StaticInst();
@@ -325,7 +325,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
                                 TheISA::PCState &nextPC,
                                 TheISA::CheckType _sym
                                );
-    bool hasInjection(){ return _isInjected; }
+    bool hasInjection(){ return isInjected; }
 
     virtual void undoInjecttion();
 

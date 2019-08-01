@@ -45,322 +45,48 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
       #define ENABLE_POINTER_TRACKER_DEBUG 0
       // this is probably a a little late but still can be effective
       if (!filterInst(tc,nextPC)) return;
+      if (isInjected)             return;
       // its like we are executing microps here
       for (size_t i = 0; i < numMicroops; i++) {
-          const StaticInstPtr si = microops[i];
 
-          // is this an integer microop?
-          // continue because threre is no change to any int reg
-          if (!si->isInteger()) continue;
-          if (si->isMicroopInjected()) continue;
-          // is the data size 4/8?
-          // if true, then zero out all dest regs and continue
-          //as a PID is never less than 4 bytes
-          if (si->getDataSize() < 4) {
-              for (int i = 0; i < si->numDestRegs(); i++) {
-                  // is dest int ?
-                  if (!si->destRegIdx(i).isIntReg()) continue;
-                  int dest = si->destRegIdx(i).index();
-                  if (dest < TheISA::NumIntRegsToTrack){
-                      tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
-                  }
-
-              }
-              continue;
-          }
-
-          // //let's see whether this is a heap access or not
-          // This should be done before chaning pointer track table state
-          //  to our knowledge:
-          // (base >=0 && base < 16) and base == 32 could be used for
-          //  addresing.
-          // if the base reg is RSP then it's not a heap access
-
-           if (si->isLoad() && !si->checked)
+           if (microops[i]->isLoad())
            {
-                int base = si->getBase();
-                if ((base != INTREG_RSP) &&
-                    ((base < X86ISA::NUM_INTREGS) ||
-                     (base == X86ISA::NUM_INTREGS + 7)))
+                int base = microops[i]->getBase();
+                if ((base < X86ISA::NumIntRegs))
                 {
-                    if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
-                    {
-                       si->uop_pid = tc->PointerTrackerTable[base];
-                       if (ENABLE_POINTER_TRACKER_DEBUG)
-                       {std::cout << "LD NEED AN INJECTION: " <<
-                            si->uop_pid << " " <<
-                            nextPC <<
-                            std::endl;}
-                    }
+
 
                 }
            }
-           else if (si->isStore() && !si->checked)
+           else if (microops[i]->isStore())
            {
-
-               int base = si->getBase();
-               if ((base != INTREG_RSP) &&
-                   ((base < X86ISA::NUM_INTREGS) ||
-                    (base == X86ISA::NUM_INTREGS + 7)))
+               int base = microops[i]->getBase();
+               if ((base < X86ISA::NumIntRegs))
                {
-                   if (tc->PointerTrackerTable[base] != TheISA::PointerID(0))
-                   {
-                      si->uop_pid = tc->PointerTrackerTable[base];
-                      if (ENABLE_POINTER_TRACKER_DEBUG){
-                        std::cout << "ST NEED AN INJECTION: " <<
-                             si->uop_pid << " " <<
-                             nextPC <<
-                             std::endl;
-                      }
-                   }
 
                }
            }
 
-
-           // actual pointer tracker logic
-          if ((si->getName().compare("and") == 0)){
-
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg()  &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                  int src1 = si->srcRegIdx(0).index();
-                  int src2 = si->srcRegIdx(1).index();
-                  int dest = si->destRegIdx(0).index();
-
-                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
-                      (src1 > X86ISA::NUM_INTREGS + 15) ||
-                      (src2 > X86ISA::NUM_INTREGS + 15))
-                        continue;
-
-                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
-                  TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
-
-                  if (src1 == src2)
-                  {
-                    tc->PointerTrackerTable[dest] = _pid_src1;
-                  }
-                  else
-                  {
-                    if ( _pid_src1 != TheISA::PointerID(0) &&
-                         _pid_src2 == TheISA::PointerID(0))
-                    {
-                         tc->PointerTrackerTable[dest] = _pid_src1;
-                    }
-                    else if ( _pid_src1 == TheISA::PointerID(0) &&
-                              _pid_src2 != TheISA::PointerID(0))
-                    {
-                         tc->PointerTrackerTable[dest] = _pid_src2;
-                    }
-                    else
-                    {
-                         tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
-                    }
-                  }
-               }
-          }
-          else if ((si->getName().compare("xor") == 0)){
-            if (si->destRegIdx(0).isIntReg() &&
-                si->srcRegIdx(0).isIntReg()  &&
-                si->srcRegIdx(1).isIntReg())
-            {
-                int src1 = si->srcRegIdx(0).index();
-                int src2 = si->srcRegIdx(1).index();
-                int dest = si->destRegIdx(0).index();
-
-                if ((dest > X86ISA::NUM_INTREGS + 15) ||
-                    (src1 > X86ISA::NUM_INTREGS + 15) ||
-                    (src2 > X86ISA::NUM_INTREGS + 15))
-                      continue;
-
-                tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
-            }
-
-          }
-          else if ((si->getName().compare("sub") == 0) ||
-                   (si->getName().compare("sbb") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg()  &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                  int src1 = si->srcRegIdx(0).index();
-                  int src2 = si->srcRegIdx(1).index();
-                  int dest = si->destRegIdx(0).index();
-
-                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
-                      (src1 > X86ISA::NUM_INTREGS + 15) ||
-                      (src2 > X86ISA::NUM_INTREGS + 15))
-                        continue;
-
-                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
-                  TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
-
-                  if (_pid_src1 != TheISA::PointerID(0) &&
-                      _pid_src2 != TheISA::PointerID(0))
-                  {
-                      tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
-                  }
-                  else if (_pid_src1 != TheISA::PointerID(0))
-                  {
-                      tc->PointerTrackerTable[dest] = _pid_src1;
-                  }
-                  else if (_pid_src2 != TheISA::PointerID(0))
-                  {
-                      tc->PointerTrackerTable[dest] = _pid_src2;
-                  }
-            }
-          }
-          else if ((si->getName().compare("add") == 0) ||
-                   (si->getName().compare("adc") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg()  &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                  int src1 = si->srcRegIdx(0).index();
-                  int src2 = si->srcRegIdx(1).index();
-                  int dest = si->destRegIdx(0).index();
-
-                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
-                     (src1 > X86ISA::NUM_INTREGS + 15) ||
-                     (src2 > X86ISA::NUM_INTREGS + 15))
-                        continue;
-
-                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
-                  TheISA::PointerID _pid_src2 = tc->PointerTrackerTable[src2];
-
-
-                  if (_pid_src1 != TheISA::PointerID(0) &&
-                      _pid_src2 != TheISA::PointerID(0))
-                  {
-                      tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
-                  }
-                  else if (_pid_src1 != TheISA::PointerID(0))
-                  {
-                      tc->PointerTrackerTable[dest] = _pid_src1;
-                  }
-                  else if (_pid_src2 != TheISA::PointerID(0)){
-                      tc->PointerTrackerTable[dest] = _pid_src2;
-                  }
-              }
-          }
-          else if ((si->getName().compare("andi") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(0).isIntReg())
-              {
-                  int src1 = si->srcRegIdx(0).index();
-                  int dest = si->destRegIdx(0).index();
-
-                  if ((dest > X86ISA::NUM_INTREGS + 15) ||
-                     (src1 > X86ISA::NUM_INTREGS + 15))
-                        continue;
-
-                  TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
-                  tc->PointerTrackerTable[dest] = _pid_src1;
-              }
-          }
-
-          else if ((si->getName().compare("addi") == 0) ||
-                  (si->getName().compare("adci") == 0) ||
-                  (si->getName().compare("subi") == 0) ||
-                  (si->getName().compare("sbbi") == 0)
-                  )
-          {
-            if (si->destRegIdx(0).isIntReg() &&
-                si->srcRegIdx(0).isIntReg())
-            {
-                int src1 = si->srcRegIdx(0).index();
-                int dest = si->destRegIdx(0).index();
-
-                if ((dest > X86ISA::NUM_INTREGS + 15) ||
-                    (src1 > X86ISA::NUM_INTREGS + 15))
-                      continue;
-
-                TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
-                tc->PointerTrackerTable[dest] = _pid_src1;
-            }
-          }
-
-          else if ((si->getName().compare("mov") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg() &&
-                  si->srcRegIdx(1).isIntReg())
-              {
-                int src1 = si->srcRegIdx(1).index();
-                int dest = si->destRegIdx(0).index();
-                if ((dest > X86ISA::NUM_INTREGS + 15) ||
-                   (src1 > X86ISA::NUM_INTREGS + 15))
-                      continue;
-
-                TheISA::PointerID _pid_src1 = tc->PointerTrackerTable[src1];
-                tc->PointerTrackerTable[dest] = _pid_src1;
-              }
-
-          }
-
-          else if ((si->getName().compare("ld") == 0) ||
-                   (si->getName().compare("ldis") == 0))
-          {
-              if (si->destRegIdx(0).isIntReg()){
-
-                  int  dest = si->getMemOpDataRegIndex();
-                  if (dest > X86ISA::NUM_INTREGS + 15)
-                      continue;
-                  // only DS and SS can load a pointer
-                  if (!(si->getSegment() == X86ISA::SEGMENT_REG_DS ||
-                        si->getSegment() == X86ISA::SEGMENT_REG_SS))
-                      continue;
-
-                tc->PointerTrackerTable[dest] = macroop_pid;
-
-              }
-          }
-          else {
-            // if non of the above instructions are encountred then we
-            // need to zero out the Destination regs of the inst
-            //because we assume other instructions never do any kind of
-            // pointer arithmatic or load
-            // by this point we know this is an integer instruction and
-            // datasize is 4/8
-            // just zero out dest regs
-            for (int i = 0; i < si->numDestRegs(); i++) {
-                // is dest int ?
-                if (!si->destRegIdx(i).isIntReg()) continue;
-                int dest = si->destRegIdx(i).index();
-                if (dest < X86ISA::NUM_INTREGS + 16){
-                    tc->PointerTrackerTable[dest] = TheISA::PointerID(0);
-                }
-
-            }
-
-
-          }
-
-          if (si->isLastMicroop()){
-              for (int i = 16; i < TheISA::NumIntRegsToTrack; ++i)
-              {
-                  tc->PointerTrackerTable[i] = TheISA::PointerID(0);
-              }
-          }
 
        }
-
-
 
 }
 
 
 bool MacroopBase::injectCheckMicroops(){
 
-  if ((numMicroops > 0) && (!_isInjected))
+  if ((numMicroops > 0) && (!isInjected))
   {
 
       for (int j = 0; j < numMicroops; ++j)
-      {   // TODO: should we use isControl?
-          if ((microops[j]->getName().compare("br") == 0))
+      {   // do not inject into macroops which have control microops
+          // TODO: function pointers have these kind of microops
+          if (microops[j]->isControl() ||
+              microops[j]->isDirectCtrl() ||
+              microops[j]->isIndirectCtrl() ||
+              microops[j]->isCondCtrl() ||
+              microops[j]->isUncondCtrl() ||
+              microops[j]->isMicroBranch())
           {
               return false;
           }
@@ -369,15 +95,21 @@ bool MacroopBase::injectCheckMicroops(){
       int i;
       for (i = 0; i < numMicroops; ++i)
       {
-          if ((microops[i]->getName().compare("ld") == 0) &&
-              microops[i]->uop_pid != TheISA::PointerID(0))
+
+          // for all the load and stores inject check microop,
+          if (microops[i]->isLoad() || microops[i]->isStore())
           {
-              return true;
-          }
-          else if ((microops[i]->getName().compare("st") == 0) &&
-              microops[i]->uop_pid != TheISA::PointerID(0))
-          {
-              return true;
+              //rule #1: all load and stores are integer microops!
+              assert(microops[i]->isInteger());
+              // we can filter explicit load/stores to stack
+              // there are some implicit stack loads/stores which we don't want
+              if (microops[i]->getBase() == X86ISA::INTREG_RSP)
+              {
+                continue;
+              }
+              else {
+                return true;
+              }
           }
       }
 
@@ -391,9 +123,9 @@ bool MacroopBase::injectCheckMicroops(){
 }
 
 void MacroopBase::undoInjecttion(){
-    if (numMicroops > 0 &&  _isInjected){
+    if (numMicroops > 0 &&  isInjected){
 
-        _isInjected = false;
+        isInjected = false;
 
         panic_if(numOfOriginalMicroops >= numMicroops,
                 "numOfOriginalMicroops >= numMicroops");
@@ -422,14 +154,15 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
 
     // if there is a bounds check microop then no need to inject again
     // as in the IEW we will igonore it if it wasnt necessary
-    if (numMicroops > 0 && !_isInjected)
+    panic_if(isInjected, "Injecting to an injected macroop!");
+
+    if (numMicroops > 0 && !isInjected)
     {
 
         // remember to set and clear last micro of original microops
         for (int idx = 0; idx < numMicroops; ++idx)
         {
-            if ((microops[idx]->getName().compare("st") == 0) &&
-                microops[idx]->uop_pid != TheISA::PointerID(0))
+            if (microops[idx]->isLoad())
             {
 
               microops[0]->clearFirstMicroop();
@@ -477,12 +210,11 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
               delete [] microops;
               microops = microopTemp;
               numMicroops = numMicroops + 1;
-              _isInjected = true;
+              isInjected = true;
               break;
             }
 
-            else if ((microops[idx]->getName().compare("ld") == 0) &&
-                microops[idx]->uop_pid != TheISA::PointerID(0))
+            else if (microops[idx]->isStore())
             {
 
                 microops[0]->clearFirstMicroop();
@@ -530,15 +262,13 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                 delete [] microops;
                 microops = microopTemp;
                 numMicroops = numMicroops + 1;
-                _isInjected = true;
+                isInjected = true;
                 break;
             }
 
-
-
         }
 
-        if (!_isInjected)
+        if (!isInjected)
             panic("wrong injection!");
 
     }
@@ -589,9 +319,9 @@ MacroopBase::injectMicroops(ThreadContext * _tc,
 void
 MacroopBase::injectAPFreeRet(ThreadContext * _tc, PCState &nextPC){
 
-  if (numMicroops > 0 && !_isInjected){
+  if (numMicroops > 0 && !isInjected){
 
-          _isInjected = true;
+          isInjected = true;
 
           // remember to set and clear last micro of original microops
           microops[0]->clearFirstMicroop();
@@ -639,9 +369,9 @@ MacroopBase::injectAPFreeRet(ThreadContext * _tc, PCState &nextPC){
 void
 MacroopBase::injectAPFreeCall(ThreadContext * _tc, PCState &nextPC){
 
-if (numMicroops > 0 && !_isInjected){
+if (numMicroops > 0 && !isInjected){
 
-        _isInjected = true;
+        isInjected = true;
 
         // remember to set and clear last micro of original microops
         microops[0]->clearFirstMicroop();
@@ -689,9 +419,9 @@ void
 MacroopBase::injectAPMallocSizeCollector(ThreadContext * _tc, PCState &nextPC){
 
 
-    if (numMicroops > 0 && !_isInjected){
+    if (numMicroops > 0 && !isInjected){
 
-        _isInjected = true;
+        isInjected = true;
 
         // remember to set and clear last micro of original microops
         microops[0]->clearFirstMicroop();
@@ -751,9 +481,9 @@ MacroopBase::injectAPMallocSizeCollector(ThreadContext * _tc, PCState &nextPC){
 void
 MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
 
-    if (numMicroops > 0 && !_isInjected){
+    if (numMicroops > 0 && !isInjected){
 
-        _isInjected = true;
+        isInjected = true;
 
         // remember to set and clear last micro of original microops
         microops[0]->clearFirstMicroop();
@@ -812,9 +542,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
  MacroopBase::injectAPCallocSizeCollector(ThreadContext * _tc, PCState &nextPC)
  {
 
-   if (numMicroops > 0 && !_isInjected){
+   if (numMicroops > 0 && !isInjected){
 
-       _isInjected = true;
+       isInjected = true;
 
        // remember to set and clear last micro of original microops
        microops[0]->clearFirstMicroop();
@@ -876,9 +606,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
  MacroopBase::injectAPCallocBaseCollector(ThreadContext * _tc, PCState &nextPC)
  {
 
-    if (numMicroops > 0 && !_isInjected){
+    if (numMicroops > 0 && !isInjected){
 
-           _isInjected = true;
+           isInjected = true;
 
            // remember to set and clear last micro of original microops
            microops[0]->clearFirstMicroop();
@@ -938,9 +668,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
 {
 
 
-     if (numMicroops > 0 && !_isInjected){
+     if (numMicroops > 0 && !isInjected){
 
-         _isInjected = true;
+         isInjected = true;
 
          // remember to set and clear last micro of original microops
          microops[0]->clearFirstMicroop();
@@ -1004,9 +734,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                                           PCState &nextPC)
 {
 
-    if (numMicroops > 0 && !_isInjected){
+    if (numMicroops > 0 && !isInjected){
 
-           _isInjected = true;
+           isInjected = true;
 
            // remember to set and clear last micro of original microops
            microops[0]->clearFirstMicroop();

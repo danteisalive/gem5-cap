@@ -1223,7 +1223,7 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
             si->injectMicroops(tc, thisPC, syms_it->second);
         }
         else {
-              si->updatePointerTracker(tc,thisPC);
+              //si->updatePointerTracker(tc,thisPC);
               // if this macroop is predicted to load a pointer
               //then we should not  this is a workaround for
               // a bug in squash method we check the bounds and permissions
@@ -1451,6 +1451,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             DynInstPtr instruction =
                 buildInst(tid, staticInst, curMacroop,
                           thisPC, nextPC, true);
+
 
             if (tc->enableCapability &&
                 TrackAlias(tc, thisPC))

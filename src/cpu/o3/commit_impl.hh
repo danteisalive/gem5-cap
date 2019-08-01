@@ -1292,10 +1292,19 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                     head_inst->seqNum, head_inst->pcState(),
                     si->disassemble(head_inst->pcState().pc())
                   );
-
-    // std::cout << head_inst->seqNum << " " << head_inst->pcState() <<
-    //           " " << si->disassemble(head_inst->pcState().pc()) <<
-    // std::endl;
+   // if (head_inst->isDirectCtrl() ||
+   //    head_inst->isIndirectCtrl() ||
+   //    head_inst->isCondCtrl() ||
+   //    head_inst->isUncondCtrl())
+   //  {
+   //    std::cout << head_inst->seqNum << " " << head_inst->pcState() <<
+   //              " " << si->disassemble(head_inst->pcState().pc()) << " " <<
+   //                 head_inst->isControl() <<
+   //                 head_inst->isDirectCtrl() <<
+   //                 head_inst->isIndirectCtrl() <<
+   //                 head_inst->isCondCtrl() <<
+   //                 head_inst->isUncondCtrl() << std::endl;
+   //  }
 
     if (tc->enableCapability){
       cpu->updatePIDHistory(head_inst);
@@ -1303,8 +1312,9 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     if (tc->enableCapability){
 
-      if (head_inst->isStore())
+      if (head_inst->isStore()){
         updateAliasTable(tid, head_inst);
+      }
 
       cpu->ExeAliasCache->RemoveStackAliases(
                       cpu->readArchIntReg(X86ISA::INTREG_RSP,tid),tc);
@@ -1363,7 +1373,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " PnA0: " << cpu->FalsePredict - cpu->P0An - cpu->PmAn <<
             " PmAn: " << cpu->PmAn <<std::endl <<
             " Number Of Mem Refs: " << cpu->numOfMemRefs <<std::endl <<
-            // " Heap Access: " << cpu->heapAccesses <
+            " Heap Access: " << cpu->heapAccesses <<
             " True Predections: " << cpu->truePredection <<
             " PnA0: " << cpu->HeapPnA0 <<
             " PnAm: " << cpu->HeapPnAm <<std::endl <<
@@ -1398,13 +1408,14 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (tc->enableCapability && head_inst->isBoundsCheckMicroop()){
-      if (head_inst->staticInst->uop_pid != TheISA::PointerID(0))
+      if (head_inst->dyn_pid != TheISA::PointerID(0))
         cpu->NumOfCommitedBoundsCheck++;
     }
 
     if ((head_inst->isLoad() || head_inst->isStore())  &&
         !head_inst->isBoundsCheckMicroop())
         cpu->numOfCommitedMemRefs++;
+
     // Update the commit rename map
     for (int i = 0; i < head_inst->numDestRegs(); i++) {
         renameMap[tid]->setEntry(head_inst->flattenedDestRegIdx(i),
