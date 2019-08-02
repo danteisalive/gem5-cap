@@ -805,7 +805,7 @@ AtomicSimpleCPU::tick()
                                   "LV4: " << LV4Size << " " <<
                                   "LV5: " << LV5Size << " " <<
                                   "LV6: " << LV6Size << " " <<
-                                  "LV7: " << LV6Size << " " <<
+                                  "LV7: " << LV7Size << " " <<
                                   std::endl;
                 }
 

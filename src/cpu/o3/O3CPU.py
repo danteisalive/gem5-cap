@@ -116,8 +116,8 @@ class DerivO3CPU(BaseCPU):
 
     LQEntries = Param.Unsigned(64, "Number of load queue entries")
     SQEntries = Param.Unsigned(36, "Number of store queue entries")
-    LSQDepCheckShift =
-            Param.Unsigned(4, "Number of places to shift addr before check")
+    LSQDepCheckShift =Param.Unsigned(4,
+            "Number of places to shift addr before check")
     LSQCheckLoads = Param.Bool(True,
         "Should dependency violations be checked for loads & stores or just stores")
     store_set_clear_period = Param.Unsigned(250000,
