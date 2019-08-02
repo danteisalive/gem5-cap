@@ -548,7 +548,7 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
                     bk->pid       = (Addr)pid_val;
                     unsigned char present =
                             VG_addToFM(tc.interval_tree, (UWord)bk, (UWord)0);
-                    assert(!present);
+                    //assert(!present);
                     capabilities_read++;
                   }
               }
