@@ -306,7 +306,7 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
 
     int num_of_cap_entrys = 0;
     //serialize interval_tree
-    if (tc.enableCapability && tc.InSlice){
+    if (tc.enableCapability){
         std::string data = "";
         int pass_size = 0;
         std::string filename = "system.capability.physmem.smem";
@@ -378,7 +378,7 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
                     filename);
     }
     //sanity check for gziped interval tree
-    if (tc.enableCapability && tc.InSlice){
+    if (tc.enableCapability){
 
       std::string data;
       std::string filename = "system.capability.physmem.smem";

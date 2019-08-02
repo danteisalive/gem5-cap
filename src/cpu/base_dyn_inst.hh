@@ -430,7 +430,7 @@ class BaseDynInst : public ExecContext, public RefCounted
 
        assert(cpu->curCycle() >= aliasFetchStartCycle); // to make sure
        // wait for 100 cycles
-       if ((cpu->curCycle() - aliasFetchStartCycle) > 100){
+       if ((cpu->curCycle() - aliasFetchStartCycle) > 250){
          // std::cout << std::dec << "Alias Fetch Completed at: " <<
          //              cpu->curCycle() <<
          //              " " << staticInst->disassemble(pcState().pc()) <<
