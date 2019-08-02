@@ -1480,7 +1480,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (tc->enableCapability && instruction->isBoundsCheckMicroop())
             {
                 cpu->NumOfInjectedBoundsCheck++;
-                instruction->setPredicate(false);
+                //instruction->setPredicate(false);
             }
 
             // If we're branching after this instruction, quit fetching

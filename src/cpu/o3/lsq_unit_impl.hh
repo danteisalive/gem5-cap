@@ -747,14 +747,16 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         load_fault == NoFault)
         return load_fault;
 
+
     // If the instruction faulted or predicated false, then we need to send it
     // along to commit without the instruction completing.
-    if (load_fault != NoFault || !inst->readPredicate()) {
+    if (load_fault != NoFault || !inst->readPredicate() ||
+        inst->isBoundsCheckMicroop()) {
         // Send this instruction to commit, also make sure iew stage
         // realizes there is activity.  Mark it as executed unless it
         // is a strictly ordered load that needs to hit the head of
         // commit.
-        if (!inst->readPredicate())
+        if (!inst->readPredicate() || inst->isBoundsCheckMicroop())
             inst->forwardOldRegs();
         DPRINTF(LSQUnit, "Load [sn:%lli] not executed from %s\n",
                 inst->seqNum,

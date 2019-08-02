@@ -706,22 +706,22 @@ AtomicSimpleCPU::tick()
               //     UpdatePointerTracker(threadContexts[0],pcState);
               // }
 
-              if (threadContexts[0]->enableCapability && fault == NoFault
-                  ){
-                UpdatePointerTrackerSpeculative(threadContexts[0],pcState);
-                ComparePointerTrackerSpeculative(threadContexts[0],pcState);
-              }
+              // if (threadContexts[0]->enableCapability && fault == NoFault
+              //     ){
+              //   UpdatePointerTrackerSpeculative(threadContexts[0],pcState);
+              //   ComparePointerTrackerSpeculative(threadContexts[0],pcState);
+              // }
 
-              // if (threadContexts[0]->enableCapability && fault == NoFault){
-              //       if (curStaticInst->isStore() &&
-              //           curStaticInst->getDataSize() == 8)
-              //       {
-              //         if (ENABLE_LOGGING)
-              //          updateAliasTableWithStack(threadContexts[0],pcState);
-              //         else
-              //            updateAliasTable(threadContexts[0],pcState);
-              //       }
-              //   }
+              if (threadContexts[0]->enableCapability && fault == NoFault){
+                    if (curStaticInst->isStore() &&
+                        curStaticInst->getDataSize() == 8)
+                    {
+                      // if (ENABLE_LOGGING)
+                       updateAliasTableWithStack(threadContexts[0],pcState);
+                      // else
+                      //    updateAliasTable(threadContexts[0],pcState);
+                    }
+              }
               // if (threadContexts[0]->enableCapability &&
               //     fault == NoFault &&
               //     (curStaticInst->isLoad() || curStaticInst->isStore())
@@ -731,14 +731,14 @@ AtomicSimpleCPU::tick()
               // }
 
 
-              if (threadContexts[0]->enableCapability && fault == NoFault){
-                    if (curStaticInst->isLoad() &&
-                        curStaticInst->getDataSize() == 8 &&
-                        threadContexts[0]->InSlice)
-                    {
-                        WarmupAliasTable(threadContexts[0],pcState);
-                    }
-                }
+              // if (threadContexts[0]->enableCapability && fault == NoFault){
+              //       if (curStaticInst->isLoad() &&
+              //           curStaticInst->getDataSize() == 8 &&
+              //           threadContexts[0]->InSlice)
+              //       {
+              //           WarmupAliasTable(threadContexts[0],pcState);
+              //       }
+              //   }
 
 
                 if (ENABLE_LOGGING)
@@ -769,10 +769,39 @@ AtomicSimpleCPU::tick()
                 {
                     std::cout << std::dec << t_info.numInsts.value() << " " <<
                               t_info.thread->num_of_allocations << " " <<
-                              threadContexts[0]->ShadowMemory.size() << " \n";
+                              threadContexts[0]->ShadowMemory.size() << " ";
                           // numOfMemRefs << " " << numOfHeapAccesses << " ";
                     // threadContexts[0]->LRUPidCache.LRUPIDCachePrintStats();
                      numOfMemRefs = 0; numOfHeapAccesses = 0;
+
+                     int LV1Size = AliasPageTable.size();
+
+                     int LV2Size = 0, LV3Size = 0, LV4Size = 0,
+                         LV5Size = 0, LV6Size = 0;
+
+                     for (auto &lv1_elem: AliasPageTable){
+                        LV2Size += lv1_elem.second.size();
+                        for (auto &lv2_elem: lv1_elem.second){
+                           LV3Size += lv2_elem.second.size();
+                           for (auto &lv3_elem: lv2_elem.second){
+                              LV4Size += lv3_elem.second.size();
+                              for (auto &lv4_elem: lv3_elem.second){
+                                 LV5Size += lv4_elem.second.size();
+                                 for (auto &lv5_elem: lv4_elem.second){
+                                   LV6Size += lv5_elem.second.size();
+                                 }
+                              }
+                           }
+                        }
+                     }
+
+                     std::cout << " AliasPageTable: " << std::dec <<
+                                  "LV1: " << LV1Size << " " <<
+                                  "LV2: " << LV2Size << " " <<
+                                  "LV3: " << LV3Size << " " <<
+                                  "LV4: " << LV4Size << " " <<
+                                  "LV5: " << LV5Size << " " <<
+                                  "LV6: " << LV6Size << std::endl;
                 }
 
                 if (fault == NoFault) {
@@ -1337,8 +1366,8 @@ void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
     // check whther it is an integer reg or not
     if (!curStaticInst->srcRegIdx(2).isIntReg()) return;
 
-    if (!(curStaticInst->getSegment() == TheISA::SEGMENT_REG_DS ||
-        curStaticInst->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+    // if (!(curStaticInst->getSegment() == TheISA::SEGMENT_REG_DS ||
+    //     curStaticInst->getSegment() == TheISA::SEGMENT_REG_SS)) return;
 
     // first delete all the aliases with the updated rsp
     uint64_t RSPValue = thread->readIntReg(X86ISA::INTREG_RSP);
@@ -1383,7 +1412,7 @@ void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
     Addr vpn = p->pTable->pageAlign(curStaticInst->atomic_vaddr);
 
     // if found: update the ShadowMemory
-    if (bk && (bk->payload == vaddr)) { // just the base addresses
+    if (bk) {
       assert(bk->pid != 0);
       threadContexts[0]->ShadowMemory[vpn][curStaticInst->atomic_vaddr] =
                                                                       bk->pid;
@@ -1396,6 +1425,15 @@ void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
                    std::dec << "PID: " << bk->pid <<
                    std::endl;
       }
+
+      uint64_t lv1 = curStaticInst->atomic_vaddr & LV1_MASK;
+      uint64_t lv2 = curStaticInst->atomic_vaddr & LV2_MASK;
+      uint64_t lv3 = curStaticInst->atomic_vaddr & LV3_MASK;
+      uint64_t lv4 = curStaticInst->atomic_vaddr & LV4_MASK;
+      uint64_t lv5 = curStaticInst->atomic_vaddr & LV5_MASK;
+      uint64_t lv6 = curStaticInst->atomic_vaddr & LV6_MASK;
+
+      AliasPageTable[lv1][lv2][lv3][lv4][lv5][lv6] = bk->pid;
     }
     else {
       // if not found in the capability cache, then check if the alias is

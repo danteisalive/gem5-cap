@@ -365,7 +365,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     // only used by inst queue to see whther miss is handled or not
     bool isCapabilityCheckCompleted()
     {
-      //return true;
+      return true;
       if (isCapFetched()){
           setCapabilityChecked();
           return true;
@@ -385,7 +385,7 @@ class BaseDynInst : public ExecContext, public RefCounted
 
 
     bool needAliasCacheAccess() const {
-      //return false;
+      return false;
       if (instFlags[AliasFetchStarted]) return false;
       if (!trackAlias()) return false;
       if (isMicroopInjected()) return false;
@@ -1154,29 +1154,28 @@ BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
     }
 
     // this is a check to see if this load needs to access alias
-    if (needAliasCacheAccess()){
+    if (tc->enableCapability)
+    {
+        if (needAliasCacheAccess()){
 
-        if (isAliasCacheMissed(addr)){
-          // there is a miss to alias cache we need to wait and maybe stall
-          // std::cout << std::dec << "AliasCache Miss: " << cpu->curCycle() <<
-          //             " " << staticInst->disassemble(pcState().pc()) <<
-          //             " [" << seqNum << "]" << std::endl;
+            if (isAliasCacheMissed(addr)){
 
-          aliasFetchStartCycle = cpu->curCycle();
-          instFlags[AliasFetchStarted] = true;
-          return NoFault;
+              aliasFetchStartCycle = cpu->curCycle();
+              instFlags[AliasFetchStarted] = true;
+              return NoFault;
+            }
+            else
+            {
+              instFlags[AliasFetchComplete] = true;
+              instFlags[AliasFetchStarted] = true;
+            }
+
         }
-        else
-        {
-          instFlags[AliasFetchComplete] = true;
-          instFlags[AliasFetchStarted] = true;
+        else {
+            // no need to check alias cache for this load
+            instFlags[AliasFetchComplete] = true;
+            instFlags[AliasFetchStarted] = true;
         }
-
-    }
-    else {
-        // no need to check alias cache for this load
-        instFlags[AliasFetchComplete] = true;
-        instFlags[AliasFetchStarted] = true;
     }
 
     instFlags[ReqMade] = true;
