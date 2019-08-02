@@ -777,7 +777,7 @@ AtomicSimpleCPU::tick()
                      int LV1Size = AliasPageTable.size();
 
                      int LV2Size = 0, LV3Size = 0, LV4Size = 0,
-                         LV5Size = 0, LV6Size = 0;
+                         LV5Size = 0, LV6Size = 0, LV7Size = 0;
 
                      for (auto &lv1_elem: AliasPageTable){
                         LV2Size += lv1_elem.second.size();
@@ -789,6 +789,9 @@ AtomicSimpleCPU::tick()
                                  LV5Size += lv4_elem.second.size();
                                  for (auto &lv5_elem: lv4_elem.second){
                                    LV6Size += lv5_elem.second.size();
+                                   for (auto &lv6_elem: lv5_elem.second){
+                                     LV7Size += lv6_elem.second.size();
+                                   }
                                  }
                               }
                            }
@@ -801,7 +804,9 @@ AtomicSimpleCPU::tick()
                                   "LV3: " << LV3Size << " " <<
                                   "LV4: " << LV4Size << " " <<
                                   "LV5: " << LV5Size << " " <<
-                                  "LV6: " << LV6Size << std::endl;
+                                  "LV6: " << LV6Size << " " <<
+                                  "LV7: " << LV6Size << " " <<
+                                  std::endl;
                 }
 
                 if (fault == NoFault) {
@@ -1432,8 +1437,9 @@ void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
       uint64_t lv4 = curStaticInst->atomic_vaddr & LV4_MASK;
       uint64_t lv5 = curStaticInst->atomic_vaddr & LV5_MASK;
       uint64_t lv6 = curStaticInst->atomic_vaddr & LV6_MASK;
+      uint64_t lv7 = curStaticInst->atomic_vaddr & LV7_MASK;
 
-      AliasPageTable[lv1][lv2][lv3][lv4][lv5][lv6] = bk->pid;
+      AliasPageTable[lv1][lv2][lv3][lv4][lv5][lv6][lv7] = bk->pid;
     }
     else {
       // if not found in the capability cache, then check if the alias is

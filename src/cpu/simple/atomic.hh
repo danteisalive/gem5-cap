@@ -103,19 +103,21 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     uint64_t numOfMemRefs;
     uint64_t numOfHeapAccesses;
 
-    typedef std::map<uint64_t, uint64_t> PTL6;
+    typedef std::map<uint64_t, uint64_t> PTL7;
+    typedef std::map<uint64_t, PTL7> PTL6;
     typedef std::map<uint64_t, PTL6> PTL5;
     typedef std::map<uint64_t, PTL5> PTL4;
     typedef std::map<uint64_t, PTL4> PTL3;
     typedef std::map<uint64_t, PTL3> PTL2;
     typedef std::map<uint64_t, PTL2> PTL;
 
-    #define LV6_MASK   ((uint64_t(0b111111111111)))
-    #define LV5_MASK   ((uint64_t(0b111111111) << 12))
-    #define LV4_MASK   ((uint64_t(0b111111111) << (12 + 9)))
-    #define LV3_MASK   ((uint64_t(0b111111111) << (12 + 9 + 9)))
-    #define LV2_MASK   ((uint64_t(0b111111111) << (12 + 9 + 9 + 9)))
-    #define LV1_MASK   ((uint64_t(0b111111111) << (12 + 9 + 9 + 9 + 9)))
+    #define LV7_MASK   ((uint64_t(0b111)))
+    #define LV6_MASK   ((uint64_t(0b111111111) << 3))
+    #define LV5_MASK   ((uint64_t(0b111111111) << (3 + 9)))
+    #define LV4_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9)))
+    #define LV3_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9 + 9)))
+    #define LV2_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9 + 9 + 9)))
+    #define LV1_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9 + 9 + 9 + 9)))
 
     PTL AliasPageTable;
 
