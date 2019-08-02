@@ -1391,9 +1391,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             tc->LRUPidCache.LRUPIDCachePrintStats();
             cpu->ExeAliasCache->print_stats();
 
-            std::cout << std::dec << head_inst->seqNum << " " <<
-                  std::hex << cpu->readArchIntReg(X86ISA::INTREG_RSP, tid) <<
-                  std::endl;
 
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;

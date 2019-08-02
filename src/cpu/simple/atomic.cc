@@ -140,16 +140,16 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
       warn("cannot read symtab!");
     }
 
-    UWord keyW, valW;
-    VG_initIterFM(threadContexts[0]->FunctionSymbols);
-    while (
-        VG_nextIterFM(threadContexts[0]->FunctionSymbols, &keyW, &valW )) {
-       Block* bk = (Block*)keyW;
-       assert(valW == 0);
-       assert(bk);
-       std::cout << std::hex << bk->payload << " " << bk->name << std::endl;
-    }
-    VG_doneIterFM( threadContexts[0]->FunctionSymbols );
+    // UWord keyW, valW;
+    // VG_initIterFM(threadContexts[0]->FunctionSymbols);
+    // while (
+    //     VG_nextIterFM(threadContexts[0]->FunctionSymbols, &keyW, &valW )) {
+    //    Block* bk = (Block*)keyW;
+    //    assert(valW == 0);
+    //    assert(bk);
+    //    std::cout << std::hex << bk->payload << " " << bk->name << std::endl;
+    // }
+    // VG_doneIterFM( threadContexts[0]->FunctionSymbols );
 }
 
 

@@ -518,7 +518,7 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
     }
 
     if (tc.enableCapability){
-
+      uint64_t consts_pid = 0x1000000000000; //const pid numbers
       int capabilities_read = 0;
       std::string data;
       std::string filename = "system.capability.physmem.smem";
@@ -542,13 +542,21 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
                     uint64_t payload_val = std::strtoull(payload.c_str(),0,16);
                     uint64_t size_val = std::strtoull(size.c_str(),0,16);
                     uint64_t pid_val = std::strtoull(pid.c_str(),0,16);
-                    Block* bk = new Block();
-                    bk->payload   = (Addr)payload_val;
-                    bk->req_szB   = (SizeT)size_val;
-                    bk->pid       = (Addr)pid_val;
-                    unsigned char present =
+                    // igonre const capabilities as they are inserted
+                    //into the interval tree in cpu initilization
+                    // therefore, we'll not have double insertion
+                    if (pid_val < consts_pid )
+                    {
+                        Block* bk = new Block();
+                        bk->payload   = (Addr)payload_val;
+                        bk->req_szB   = (SizeT)size_val;
+                        bk->pid       = (Addr)pid_val;
+                        unsigned char present =
                             VG_addToFM(tc.interval_tree, (UWord)bk, (UWord)0);
-                    //assert(!present);
+                        present = present;
+                        assert(!present);
+                    }
+
                     capabilities_read++;
                   }
               }
@@ -563,7 +571,7 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
             panic("Capability Checkpoint file (bytes_read < 0)");
           }
       }
-
+      tc.num_of_allocations = capabilities_read;
       std::cout << "In total read " << capabilities_read << " capabilities!" <<
                 std::endl;
     }
