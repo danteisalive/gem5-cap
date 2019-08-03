@@ -117,6 +117,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
         else fatal("Can't open symbols file");
     }
 
+    std::cout << "Atomic CPU Initilization: " << std::endl;
     threadContexts[0]->interval_tree = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionSymbols = VG_newFM(interval_tree_Cmp);
     threadContexts[0]->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);

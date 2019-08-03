@@ -398,7 +398,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         assert(o3_tc->cpu);
         o3_tc->thread = this->thread[tid];
 
-
+        std::cout << "CPU O3 Initilization: " << std::endl;
         o3_tc->enableCapability = params->enable_capability;
         o3_tc->symbolsFile = params->symbol_file;
         o3_tc->Collector_Status = ThreadContext::NONE;

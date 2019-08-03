@@ -110,7 +110,8 @@ def get_processes(options):
         idx += 1
 
     if options.smt:
-        assert(options.cpu_type == "DerivO3CPU")
+        assert(options.cpu_type == "DerivO3CPU" or
+               options.cpu_type == "O3_X86_skylake_1")
         return multiprocesses, idx
     else:
         return multiprocesses, 1
@@ -169,6 +170,7 @@ else:
 
 (CPUClass, test_mem_mode, FutureClass) = Simulation.setCPUClass(options)
 CPUClass.numThreads = numThreads
+CPUClass.branchPred.numThreads = numThreads
 
 CPUClass.enable_capability = options.enable_capability
 CPUClass.symbol_file = options.symbol_file

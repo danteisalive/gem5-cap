@@ -1848,7 +1848,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         assert(_pid_num == tc->ap_pid);
 
-        Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+        Block* bk = new Block();
         bk->payload   = (Addr)_pid_base;
         bk->req_szB   = (SizeT)tc->ap_size;
         bk->pid       = (Addr)_pid_num;
@@ -1953,7 +1953,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
          assert(_pid_num == tc->ap_pid);
 
 
-         Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+         Block* bk = new Block();
          bk->payload   = (Addr)_pid_base;
          bk->req_szB   = (SizeT)tc->ap_size;
          bk->pid       = (Addr)_pid_num;
@@ -2035,7 +2035,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
             assert(_pid_num == tc->ap_pid);
 
-            Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
+            Block* bk = new Block();
             bk->payload   = (Addr)_pid_base;
             bk->req_szB   = (SizeT)tc->ap_size;
             bk->pid       = (Addr)_pid_num;

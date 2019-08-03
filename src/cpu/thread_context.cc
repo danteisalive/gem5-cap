@@ -576,28 +576,31 @@ unserialize(ThreadContext &tc, CheckpointIn &cp)
                 std::endl;
     }
 
-    for (int i = 0; i < TheISA::NumIntRegs; i++)
-    {
-       uint64_t data = intRegs[i];
-       Block fake;
-       fake.payload = data;
-       fake.req_szB = 1;
-       UWord foundkey = 1;
-       UWord foundval = 1;
-       unsigned char found = VG_lookupFM( tc.interval_tree,
-                                   &foundkey, &foundval, (UWord)&fake );
-       if (found)
-       {
-          Block* res = (Block*)foundkey;
-          tc.PointerTrackerTable[i] = TheISA::PointerID(res->pid);
-          std::cout << TheISA::PointerID(res->pid) << std::endl;
-       }
-       else
-       {
-          tc.PointerTrackerTable[i] = TheISA::PointerID(0);
-          std::cout << TheISA::PointerID(0) << std::endl;
-       }
-    }
+    // if (tc.enableCapability)
+    // {
+    //     for (int i = 0; i < TheISA::NumIntRegs; i++)
+    //     {
+    //        uint64_t data = intRegs[i];
+    //        Block fake;
+    //        fake.payload = data;
+    //        fake.req_szB = 1;
+    //        UWord foundkey = 1;
+    //        UWord foundval = 1;
+    //        unsigned char found = VG_lookupFM( tc.interval_tree,
+    //                                    &foundkey, &foundval, (UWord)&fake );
+    //        if (found)
+    //        {
+    //           Block* res = (Block*)foundkey;
+    //           tc.PointerTrackerTable[i] = TheISA::PointerID(res->pid);
+    //           std::cout << TheISA::PointerID(res->pid) << std::endl;
+    //        }
+    //        else
+    //        {
+    //           tc.PointerTrackerTable[i] = TheISA::PointerID(0);
+    //           std::cout << TheISA::PointerID(0) << std::endl;
+    //        }
+    //     }
+    // }
 }
 
 void
@@ -609,6 +612,40 @@ takeOverFrom(ThreadContext &ntc, ThreadContext &otc)
     ntc.copyArchRegs(&otc);
     ntc.setContextId(otc.contextId());
     ntc.setThreadId(otc.threadId());
+
+
+    if (otc.enableCapability)
+      assert(ntc.enableCapability);
+
+    ntc.num_of_allocations = otc.num_of_allocations;
+
+    panic_if(otc.Collector_Status != ThreadContext::NONE,
+            "Collector is in a non-consistent state!");
+
+    //transfer Alias Table in ShadowMemory
+    ntc.ShadowMemory = otc.ShadowMemory;
+
+    //transfer capability cache in shadow_memory
+    uint64_t consts_pid = 0x1000000000000; //48 bits for the heap
+    UWord keyW, valW;
+    VG_initIterFM(otc.interval_tree);
+    while (VG_nextIterFM(otc.interval_tree, &keyW, &valW )) {
+        Block* res = (Block*)keyW;
+
+        if (res->pid < consts_pid){
+            Block* bk = new Block();
+            bk->payload   = res->payload;
+            bk->req_szB   = res->req_szB;
+            bk->pid       = res->pid;
+
+            unsigned char present =
+                VG_addToFM(ntc.interval_tree, (UWord)bk, (UWord)0);
+            assert(!present);
+        }
+
+    }
+    VG_doneIterFM(otc.interval_tree );
+
 
     if (FullSystem) {
         assert(ntc.getSystemPtr() == otc.getSystemPtr());

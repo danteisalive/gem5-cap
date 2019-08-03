@@ -1348,6 +1348,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             head_inst->isLastMicroop()
            )
         {
+
             std::cout <<
             "--------------------START OF EPOCH----------------------------" <<
             std::endl << std::dec << cpu->thread[tid]->numInsts.value() <<
