@@ -365,7 +365,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     // only used by inst queue to see whther miss is handled or not
     bool isCapabilityCheckCompleted()
     {
-      //return true;
+      return true;
       if (isCapFetched()){
           setCapabilityChecked();
           return true;
@@ -385,7 +385,7 @@ class BaseDynInst : public ExecContext, public RefCounted
 
 
     bool needAliasCacheAccess() const {
-      //return false;
+      return false;
       if (instFlags[AliasFetchStarted]) return false;
       if (!trackAlias()) return false;
       if (isMicroopInjected()) return false;

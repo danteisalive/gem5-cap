@@ -149,6 +149,11 @@ class ThreadContext
     WordFM*                                     interval_tree = NULL;
     std::vector<uint64_t>                       freedPIDVector;
     bool                                        InSlice;
+
+
+    uint64_t                             ap_base;
+    uint64_t                             AtomicPID;
+
     enum Status
     {
         /// Running.  Instructions should be executed only when

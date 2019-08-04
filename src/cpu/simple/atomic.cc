@@ -97,6 +97,8 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     threadContexts[0]->enableCapability = p->enable_capability;
     threadContexts[0]->symbolsFile = p->symbol_file;
     threadContexts[0]->Collector_Status = ThreadContext::NONE;
+    threadContexts[0]->AtomicPID = 0;
+    threadContexts[0]->num_of_allocations = 0;
 
     max_insts_any_thread = p->max_insts_any_thread;
     if (p->symbol_file != ""){
@@ -713,16 +715,16 @@ AtomicSimpleCPU::tick()
               //   ComparePointerTrackerSpeculative(threadContexts[0],pcState);
               // }
 
-              if (threadContexts[0]->enableCapability && fault == NoFault){
-                    if (curStaticInst->isStore() &&
-                        curStaticInst->getDataSize() == 8)
-                    {
-                      // if (ENABLE_LOGGING)
-                       updateAliasTableWithStack(threadContexts[0],pcState);
-                      // else
-                      //    updateAliasTable(threadContexts[0],pcState);
-                    }
-              }
+              // if (threadContexts[0]->enableCapability && fault == NoFault){
+              //       if (curStaticInst->isStore() &&
+              //           curStaticInst->getDataSize() == 8)
+              //       {
+              //         // if (ENABLE_LOGGING)
+              //          updateAliasTableWithStack(threadContexts[0],pcState);
+              //         // else
+              //         //    updateAliasTable(threadContexts[0],pcState);
+              //       }
+              // }
               // if (threadContexts[0]->enableCapability &&
               //     fault == NoFault &&
               //     (curStaticInst->isLoad() || curStaticInst->isStore())
@@ -732,14 +734,14 @@ AtomicSimpleCPU::tick()
               // }
 
 
-              // if (threadContexts[0]->enableCapability && fault == NoFault){
-              //       if (curStaticInst->isLoad() &&
-              //           curStaticInst->getDataSize() == 8 &&
-              //           threadContexts[0]->InSlice)
-              //       {
-              //           WarmupAliasTable(threadContexts[0],pcState);
-              //       }
-              //   }
+              if (threadContexts[0]->enableCapability && fault == NoFault){
+                    if (curStaticInst->isLoad() &&
+                        curStaticInst->getDataSize() == 8 &&
+                        threadContexts[0]->InSlice)
+                    {
+                        WarmupAliasTable(threadContexts[0],pcState);
+                    }
+                }
 
 
                 if (ENABLE_LOGGING)
@@ -769,45 +771,45 @@ AtomicSimpleCPU::tick()
                     ((uint64_t)t_info.numInsts.value() % 1000000 == 0))
                 {
                     std::cout << std::dec << t_info.numInsts.value() << " " <<
-                              t_info.thread->num_of_allocations << " " <<
-                              threadContexts[0]->ShadowMemory.size() << " ";
+                              threadContexts[0]->num_of_allocations << " " <<
+                              threadContexts[0]->ShadowMemory.size() << "\n";
                           // numOfMemRefs << " " << numOfHeapAccesses << " ";
                     // threadContexts[0]->LRUPidCache.LRUPIDCachePrintStats();
-                     numOfMemRefs = 0; numOfHeapAccesses = 0;
+                     //numOfMemRefs = 0; numOfHeapAccesses = 0;
 
-                     int LV1Size = AliasPageTable.size();
-
-                     int LV2Size = 0, LV3Size = 0, LV4Size = 0,
-                         LV5Size = 0, LV6Size = 0, LV7Size = 0;
-
-                     for (auto &lv1_elem: AliasPageTable){
-                        LV2Size += lv1_elem.second.size();
-                        for (auto &lv2_elem: lv1_elem.second){
-                           LV3Size += lv2_elem.second.size();
-                           for (auto &lv3_elem: lv2_elem.second){
-                              LV4Size += lv3_elem.second.size();
-                              for (auto &lv4_elem: lv3_elem.second){
-                                 LV5Size += lv4_elem.second.size();
-                                 for (auto &lv5_elem: lv4_elem.second){
-                                   LV6Size += lv5_elem.second.size();
-                                   for (auto &lv6_elem: lv5_elem.second){
-                                     LV7Size += lv6_elem.second.size();
-                                   }
-                                 }
-                              }
-                           }
-                        }
-                     }
-
-                     std::cout << " AliasPageTable: " << std::dec <<
-                                  "LV1: " << LV1Size << " " <<
-                                  "LV2: " << LV2Size << " " <<
-                                  "LV3: " << LV3Size << " " <<
-                                  "LV4: " << LV4Size << " " <<
-                                  "LV5: " << LV5Size << " " <<
-                                  "LV6: " << LV6Size << " " <<
-                                  "LV7: " << LV7Size << " " <<
-                                  std::endl;
+                     // int LV1Size = AliasPageTable.size();
+                     //
+                     // int LV2Size = 0, LV3Size = 0, LV4Size = 0,
+                     //     LV5Size = 0, LV6Size = 0, LV7Size = 0;
+                     //
+                     // for (auto &lv1_elem: AliasPageTable){
+                     //    LV2Size += lv1_elem.second.size();
+                     //    for (auto &lv2_elem: lv1_elem.second){
+                     //       LV3Size += lv2_elem.second.size();
+                     //       for (auto &lv3_elem: lv2_elem.second){
+                     //          LV4Size += lv3_elem.second.size();
+                     //          for (auto &lv4_elem: lv3_elem.second){
+                     //             LV5Size += lv4_elem.second.size();
+                     //             for (auto &lv5_elem: lv4_elem.second){
+                     //               LV6Size += lv5_elem.second.size();
+                     //               for (auto &lv6_elem: lv5_elem.second){
+                     //                 LV7Size += lv6_elem.second.size();
+                     //               }
+                     //             }
+                     //          }
+                     //       }
+                     //    }
+                     // }
+                     //
+                     // std::cout << " AliasPageTable: " << std::dec <<
+                     //              "LV1: " << LV1Size << " " <<
+                     //              "LV2: " << LV2Size << " " <<
+                     //              "LV3: " << LV3Size << " " <<
+                     //              "LV4: " << LV4Size << " " <<
+                     //              "LV5: " << LV5Size << " " <<
+                     //              "LV6: " << LV6Size << " " <<
+                     //              "LV7: " << LV7Size << " " <<
+                     //              std::endl;
                 }
 
                 if (fault == NoFault) {
@@ -903,40 +905,43 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
 
     if (_sym == TheISA::CheckType::AP_MALLOC_SIZE_COLLECT){
 
-      if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+      if (threadContexts[0]->Collector_Status !=
+          hreadContext::COLLECTOR_STATUS::NONE)
       {
-          std::cout << "PRE STATE: " << thread->collector_status <<
+          std::cout << "PRE STATE: " << threadContexts[0]->Collector_Status <<
             " " << pcState <<
             std::endl;
          panic("AP_MALLOC_SIZE_COLLECT: Invalid Status!");
       }
 
-      thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI);
+      threadContexts[0]->ap_size = thread->readIntReg(X86ISA::INTREG_RDI);
 
-      thread->collector_status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+      threadContexts[0]->Collector_Status =
+                ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
       { std::cout << "AP_MALLOC_SIZE_COLLECT: " << pcState <<
                " " << curStaticInst->disassemble(pcState.pc()) << " Size: " <<
-               std::hex << thread->ap_size << std::endl;
+               std::hex << threadContexts[0]->ap_size << std::endl;
       }
 
     }
     else if (_sym == TheISA::CheckType::AP_MALLOC_BASE_COLLECT){
 
-      if (thread->collector_status !=
+      if (threadContexts[0]->Collector_Status !=
                             ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE)
           panic("AP_MALLOC_BASE_COLLECT: Invalid Status!");
 
-      thread->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
+      threadContexts[0]->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
 
-      thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
-      thread->num_of_allocations++;
+      threadContexts[0]->Collector_Status =
+            ThreadContext::COLLECTOR_STATUS::NONE;
+      threadContexts[0]->num_of_allocations++;
 
       Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
-      bk->payload   = (Addr)thread->ap_base;
-      bk->req_szB   = (SizeT)thread->ap_size;
-      bk->pid       = (Addr)++thread->PID;
+      bk->payload   = (Addr)threadContexts[0]->ap_base;
+      bk->req_szB   = (SizeT)threadContexts[0]->ap_size;
+      bk->pid       = (Addr)++threadContexts[0]->AtomicPID;
       unsigned char present =
               VG_addToFM( _tc->interval_tree, (UWord)bk, (UWord)0);
       assert(!present);
@@ -944,50 +949,55 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
       { std::cout << "AP_MALLOC_BASE_COLLECT: " << pcState <<
                   " " << curStaticInst->disassemble(pcState.pc()) <<
-                  " Base: " << std::hex << thread->ap_base << std::endl;
+                  " Base: " << std::hex <<
+                  threadContexts[0]->ap_base << std::endl;
       }
       _tc->PointerTracker[X86ISA::INTREG_RAX] = bk->pid;
 
     }
     else if (_sym == TheISA::CheckType::AP_CALLOC_SIZE_COLLECT){
 
-      if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+      if (threadContexts[0]->Collector_Status !=
+          ThreadContext::COLLECTOR_STATUS::NONE)
       {
          panic("AP_CALLOC_SIZE_COLLECT: Invalid Status!");
       }
 
-      thread->ap_size = thread->readIntReg(X86ISA::INTREG_RDI) *
+      threadContexts[0]->ap_size = thread->readIntReg(X86ISA::INTREG_RDI) *
                         thread->readIntReg(X86ISA::INTREG_RSI);
-      thread->collector_status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+      threadContexts[0]->Collector_Status =
+              ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
       { std::cout << "AP_CALLOC_SIZE_COLLECT: " << pcState <<
                " " << curStaticInst->disassemble(pcState.pc()) << " Size: " <<
-               std::hex << thread->ap_size << std::endl;
+               std::hex << threadContexts[0]->ap_size << std::endl;
       }
 
     }
     else if (_sym == TheISA::CheckType::AP_CALLOC_BASE_COLLECT){
 
-       if (thread->collector_status !=
+       if (threadContexts[0]->Collector_Status !=
                         ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE)
           panic("AP_CALLOC_BASE_COLLECT: Invalid Status!");
 
-       thread->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
+       threadContexts[0]->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
 
-       thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
-       thread->num_of_allocations++;
+       threadContexts[0]->Collector_Status =
+              ThreadContext::COLLECTOR_STATUS::NONE;
+       threadContexts[0]->num_of_allocations++;
        // logs
        if (ATOMIC_CPU_COLLECTOR_DEBUG)
        { std::cout << "AP_CALLOC_BASE_COLLECT: " << pcState <<
                    " " << curStaticInst->disassemble(pcState.pc()) <<
-                   " Base: " << std::hex << thread->ap_base << std::endl;
+                   " Base: " << std::hex <<
+                   threadContexts[0]->ap_base << std::endl;
        }
 
        Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
-       bk->payload   = (Addr)thread->ap_base;
-       bk->req_szB   = (SizeT)thread->ap_size;
-       bk->pid       = (Addr)++thread->PID;
+       bk->payload   = (Addr)threadContexts[0]->ap_base;
+       bk->req_szB   = (SizeT)threadContexts[0]->ap_size;
+       bk->pid       = (Addr)++threadContexts[0]->AtomicPID;
        unsigned char present =
                   VG_addToFM( _tc->interval_tree, (UWord)bk, (UWord)0);
 
@@ -1073,29 +1083,32 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
           }
 
           free(bk);
-          thread->num_of_allocations--;
+          threadContexts[0]->num_of_allocations--;
       }
 
     }
     else if (_sym == TheISA::CheckType::AP_FREE_RET){
 
-      //thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+      //threadContexts[0]->Collector_Status =
+      //              ThreadContext::COLLECTOR_STATUS::NONE;
 
     }
     else if (_sym == TheISA::CheckType::AP_REALLOC_SIZE_COLLECT){
 
-      if (thread->collector_status != ThreadContext::COLLECTOR_STATUS::NONE)
+      if (threadContexts[0]->Collector_Status !=
+          ThreadContext::COLLECTOR_STATUS::NONE)
           panic("AP_REALLOC_SIZE_COLLECT: Invalid Status!");
 
-      thread->ap_size = thread->readIntReg(X86ISA::INTREG_RSI);
-      thread->collector_status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
+      threadContexts[0]->ap_size = thread->readIntReg(X86ISA::INTREG_RSI);
+      threadContexts[0]->Collector_Status =
+              ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
       uint64_t old_base_addr = thread->readIntReg(X86ISA::INTREG_RDI);
 
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
       { std::cout << "AP_REALLOC_SIZE_COLLECT: " << pcState <<
               " " << curStaticInst->disassemble(pcState.pc()) << " Size: " <<
-              std::hex << thread->ap_size << " Old Base Addr.: " <<
+              std::hex << threadContexts[0]->ap_size << " Old Base Addr.: " <<
               old_base_addr << std::endl;
       }
 
@@ -1147,30 +1160,32 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
 
           }
           free(bk);
-          thread->num_of_allocations--;
+          threadContexts[0]->num_of_allocations--;
       }
 
     }
     else if (_sym == TheISA::CheckType::AP_REALLOC_BASE_COLLECT){
 
-      if (thread->collector_status !=
+      if (threadContexts[0]->Collector_Status !=
                         ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
         panic("AP_REALLOC_BASE_COLLECT: Invalid Status!");
 
-      thread->collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
-      thread->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
-      thread->num_of_allocations++;
+      threadContexts[0]->Collector_Status =
+                  ThreadContext::COLLECTOR_STATUS::NONE;
+      threadContexts[0]->ap_base = thread->readIntReg(X86ISA::INTREG_RAX);
+      threadContexts[0]->num_of_allocations++;
       // logs
       if (ATOMIC_CPU_COLLECTOR_DEBUG)
       { std::cout << "AP_REALLOC_BASE_COLLECT: " << pcState <<
                   " " << curStaticInst->disassemble(pcState.pc()) <<
-                  " Base: " << std::hex << thread->ap_base << std::endl;
+                  " Base: " << std::hex <<
+                  threadContexts[0]->ap_base << std::endl;
       }
 
       Block* bk = static_cast<Block*>(malloc(sizeof(Block)));
-      bk->payload   = (Addr)thread->ap_base;
-      bk->req_szB   = (SizeT)thread->ap_size;
-      bk->pid       = (Addr)++thread->PID;
+      bk->payload   = (Addr)threadContexts[0]->ap_base;
+      bk->req_szB   = (SizeT)threadContexts[0]->ap_size;
+      bk->pid       = (Addr)++threadContexts[0]->AtomicPID;
 
       unsigned char present =
                 VG_addToFM( _tc->interval_tree, (UWord)bk, (UWord)0);

@@ -111,13 +111,13 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     typedef std::map<uint64_t, PTL3> PTL2;
     typedef std::map<uint64_t, PTL2> PTL;
 
-    #define LV7_MASK   ((uint64_t(0b111)))
-    #define LV6_MASK   ((uint64_t(0b111111111) << 3))
-    #define LV5_MASK   ((uint64_t(0b111111111) << (3 + 9)))
-    #define LV4_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9)))
-    #define LV3_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9 + 9)))
-    #define LV2_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9 + 9 + 9)))
-    #define LV1_MASK   ((uint64_t(0b111111111) << (3 + 9 + 9 + 9 + 9 + 9)))
+    #define LV7_MASK   uint64_t(0b111)
+    #define LV6_MASK   uint64_t(0b111111111) << (3)
+    #define LV5_MASK   uint64_t(0b111111111) << (3 + 9)
+    #define LV4_MASK   uint64_t(0b111111111) << (3 + 9 + 9)
+    #define LV3_MASK   uint64_t(0b111111111) << (3 + 9 + 9 + 9)
+    #define LV2_MASK   uint64_t(0b111111111) << (3 + 9 + 9 + 9 + 9)
+    #define LV1_MASK   uint64_t(0b111111111) << (3 + 9 + 9 + 9 + 9 + 9)
 
     PTL AliasPageTable;
 
