@@ -56,6 +56,76 @@
 namespace X86ISA
 {
 
+class LRUVictimCache
+{
+  private:
+    std::deque<Addr>            VictimCache;
+    int                          NumOfEntrys;
+
+  public:
+    LRUVictimCache(int _size): NumOfEntrys(_size)
+    {}
+
+    bool VictimCacheInitiateRead(Addr vaddr){
+
+      bool hit = false;
+      // First find the entry, if found bring it to the top of the queue
+      for (auto it = VictimCache.begin(); it != VictimCache.end(); )
+      {
+          if (*it == vaddr) {
+              it = VictimCache.erase(it);
+              hit = true;
+              break;
+          }
+          else {
+            it++;
+          }
+      }
+
+      // if true, just change the entry place as LRU policy
+      if (hit){
+        VictimCache.push_front(vaddr);
+      }
+
+      return hit;
+    }
+
+    // whenever there is an eviction from the alias cache, this function is
+    //called to store the eviction address
+    void VictimCacheWriteBack(Addr vaddr){
+        // first look to see if we have the evicted address or not
+        bool hit = false;
+        // First find the entry, if found bring it to the top of the queue
+        for (auto it = VictimCache.begin(); it != VictimCache.end(); )
+        {
+            if (*it == vaddr) {
+                it = VictimCache.erase(it);
+                hit = true;
+                break;
+            }
+            else {
+              it++;
+            }
+        }
+
+        if (hit){
+          VictimCache.push_front(vaddr);
+          return;
+        }
+
+        // by here we dont have any entry with the same address
+        if (VictimCache.size() <= NumOfEntrys){
+          VictimCache.push_front(vaddr);
+        }
+        else {
+          VictimCache.pop_back();
+          VictimCache.push_front(vaddr);
+        }
+
+    }
+
+};
+
 
 class LRUAliasCache
 {
@@ -65,6 +135,7 @@ class LRUAliasCache
     private:
         CacheEntry**                 AliasCache;
         ExeAliasBuffer               ExeAliasTableBuffer;
+        LRUVictimCache*              VictimCache;
         uint64_t                     NumWays;
         uint64_t                     NumSets;
         uint64_t                     CacheSize;
@@ -85,6 +156,8 @@ class LRUAliasCache
         uint64_t                     total_accesses;
         uint64_t                     total_hits;
         uint64_t                     total_misses;
+        uint64_t                     outstandingRead;
+        uint64_t                     outstandingWrite;
 
         LRUAliasCache(uint64_t _num_ways,
                             uint64_t _cache_block_size,

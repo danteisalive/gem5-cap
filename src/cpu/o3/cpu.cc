@@ -636,7 +636,103 @@ FullO3CPU<Impl>::regStats()
         .name(name() + ".misc_regfile_writes")
         .desc("number of misc regfile writes")
         .prereq(miscRegfileWrites);
+
+    numOfCapabilityGenMicroops
+        .name(name() + ".numOfCapabilityGenMicroops")
+        .desc("number of injected capability gen microops");
+
+    numOfCapabilityFreeMicroops
+        .name(name() + ".numOfCapabilityFreeMicroops")
+        .desc("number of injected capability free microops");
+
+
+    numOfCapabilityCheckMicroops
+        .name(name() + ".numOfCapabilityCheckMicroops")
+        .desc("number of injected capability check microops");
+
+
+    numAliasCacheAccesses
+        .name(name() + ".numAliasCacheAccesses")
+        .desc("Number of Alias Cache Accesses");
+
+
+    numAliasCacheMisses
+        .name(name() + ".numAliasCacheMisses")
+        .desc("Number of AliasCache Misses");
+
+
+    overallAliasCacheMissRate
+        .name(name() + ".overallAliasCacheMissRate")
+        .desc("Overall AliasCache Miss Rate")
+        .precision(6);
+    overallAliasCacheMissRate =
+                  numAliasCacheMisses / numAliasCacheAccesses;
+
+    numCapabilityCacheMisses
+          .name(name() + ".numCapabilityCacheMisses")
+          .desc("Number of Capability Cache Accesses");
+
+
+    numCapabilityCacheAccesses
+          .name(name() + ".numCapabilityCacheAccesses")
+          .desc("Number of Capability Cache Misses");
+
+    overallCapabilityCacheMissRate
+        .name(name() + ".overallCapabilityCacheMissRate")
+        .desc("Overall CapabilityCache Miss Rate")
+        .precision(6);
+    overallCapabilityCacheMissRate =
+                  numCapabilityCacheMisses / numCapabilityCacheAccesses;
+
+    LVPTMissPredict
+        .name(name() + ".LVPTMissPredict")
+        .desc("LVPT Mispredicted PIDs");
+
+
+    LVPTMissPredictPnA0
+        .name(name() + ".LVPTMissPredictPnA0")
+        .desc("LVPT Mispredicted PnA0 PIDs");
+
+
+    LVPTMissPredictP0An
+        .name(name() + ".LVPTMissPredictP0An")
+        .desc("LVPT Mispredicted P0An PIDs");
+
+
+    LVPTMissPredictPmAn
+        .name(name() + ".LVPTMissPredictPmAn")
+        .desc("LVPT Mispredicted PmAn PIDs");
+
+
+
+    numOfAliasTableAccess
+        .name(name() + ".numOfAliasTableAccess")
+        .desc("Number of Checkes for PID Misprediction");
+
+
+    LVPTAccuracy
+        .name(name() + ".LVPTAccuracy")
+        .desc("Overall LVPT Accuracy")
+        .precision(6);
+    LVPTAccuracy =  LVPTMissPredict / numOfAliasTableAccess;
+
+
+    numOutStandingReadAliasCacheAccesses
+        .name(name() + ".numOutStandingReadAliasCacheAccesses")
+        .desc("Number of Read Accesses to Alias Table in Shadow Memory");
+
+
+    numOutStandingWriteAliasCacheAccesses
+        .name(name() + ".numOutStandingWriteAliasCacheAccesses")
+        .desc("Number of Write Accesses to Alias Table in Shadow Memory");
+
+
+    numOutStandingCapabilityCacheAccesses
+        .name(name() + ".numOutStandingCapabilityCacheAccesses")
+        .desc("Number of R/W Accesses to Capability Cache in Shadow Memory");
+
 }
+
 
 template <class Impl>
 void

@@ -40,7 +40,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                             uint64_t _cache_size) :
             NumWays(_num_ways), CacheSize(_cache_size),
             CacheBlockSize(_cache_block_size),
-            total_accesses(0), total_hits(0), total_misses(0)
+            total_accesses(0), total_hits(0), total_misses(0),
+            outstandingRead(0), outstandingWrite(0)
     {
 
                 NumSets = (CacheSize / CacheBlockSize) / (NumWays);
@@ -53,6 +54,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 for (size_t i = 0; i < NumSets; i++) {
                   AliasCache[i]  = new CacheEntry[NumWays];
                 }
+
+                VictimCache = new LRUVictimCache(32);
 
 
                 for (size_t set = 0; set < NumSets; set++) {
@@ -75,6 +78,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
     LRUAliasCache::~LRUAliasCache(){
           delete [] AliasCache;
+          delete VictimCache;
     }
 
         // this function is called when we want to write or read an alias
@@ -143,6 +147,14 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
               AliasCache[thisIsTheSet][i].lruAge++;
             }
 
+
+            // if the candidate entry is valid just write it to the
+            // victim cache no matter it is dirty or not
+            if (AliasCache[thisIsTheSet][candidateWay].valid)
+            {
+                VictimCache->VictimCacheWriteBack(
+                              AliasCache[thisIsTheSet][candidateWay].vaddr);
+            }
             // new read it from shadow_memory
             // if the page does not have any pid then it's defenitly a
             // PID(0). In this case just send it back and do not update
@@ -256,6 +268,12 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
         }
 
+        if (VictimCache->VictimCacheInitiateRead(vaddr))
+        {
+          total_hits++;
+          return true;
+        }
+
         // if we are here then it means a miss
         // find the candiate for replamcement
         total_misses++;
@@ -356,6 +374,14 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
         for (size_t i = 0; i < NumWays; i++) {
           AliasCache[thisIsTheSet][i].lruAge++;
+        }
+
+        // This entry is going to get evicted no matter it's dirty or not
+        // just put it into the victim cache
+        if (AliasCache[thisIsTheSet][candidateWay].valid)
+        {
+            VictimCache->VictimCacheWriteBack(
+                          AliasCache[thisIsTheSet][candidateWay].vaddr);
         }
 
         // here we know that the entry is not in the cache

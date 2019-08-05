@@ -1392,7 +1392,29 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             tc->LRUPidCache.LRUPIDCachePrintStats();
             cpu->ExeAliasCache->print_stats();
 
+            // final stats
+            cpu->numOfAliasTableAccess += cpu->NumOfAliasTableAccess;
+            cpu->LVPTMissPredictPmAn += cpu->PmAn;
+            cpu->LVPTMissPredictP0An += cpu->P0An;
+            cpu->LVPTMissPredictPnA0 +=
+                      (cpu->FalsePredict - cpu->P0An - cpu->PmAn);
+            cpu->LVPTMissPredict += cpu->FalsePredict;
+            cpu->numOfCapabilityCheckMicroops += cpu->NumOfCommitedBoundsCheck;
 
+            cpu->numOutStandingCapabilityCacheAccesses =
+                                      tc->LRUPidCache.total_misses;
+            cpu->numOutStandingReadAliasCacheAccesses =
+                                      cpu->ExeAliasCache->outstandingRead;
+            cpu->numOutStandingWriteAliasCacheAccesses =
+                                      cpu->ExeAliasCache->outstandingWrite;
+
+            cpu->numCapabilityCacheMisses = tc->LRUPidCache.total_misses;
+            cpu->numCapabilityCacheAccesses = tc->LRUPidCache.total_accesses;
+
+            cpu->numAliasCacheMisses = cpu->ExeAliasCache->total_misses;
+            cpu->numAliasCacheAccesses = cpu->ExeAliasCache->total_accesses;
+
+            //transient stats
             cpu->NumOfAliasTableAccess=0; cpu->FalsePredict=0;
             cpu->PnA0 = 0; cpu->P0An=0; cpu->PmAn = 0;
             cpu->heapAccesses = 0; cpu->truePredection = 0;
@@ -1406,8 +1428,28 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (tc->enableCapability && head_inst->isBoundsCheckMicroop()){
-      if (head_inst->dyn_pid != TheISA::PointerID(0))
+    //  if (head_inst->dyn_pid != TheISA::PointerID(0))
+    //  {
         cpu->NumOfCommitedBoundsCheck++;
+    //  }
+    }
+
+    if ((tc->enableCapability) &&
+        (head_inst->isMallocBaseCollectorMicroop() ||
+        head_inst->isMallocSizeCollectorMicroop() ||
+        head_inst->isCallocSizeCollectorMicroop() ||
+        head_inst->isCallocBaseCollectorMicroop() ||
+        head_inst->isReallocSizeCollectorMicroop() ||
+        head_inst->isReallocBaseCollectorMicroop()))
+    {
+          cpu->numOfCapabilityGenMicroops++;
+    }
+
+    if ((tc->enableCapability) &&
+        (head_inst->isFreeCallMicroop() ||
+        head_inst->isFreeRetMicroop())
+        ){
+          cpu->numOfCapabilityFreeMicroops++;
     }
 
     if ((head_inst->isLoad() || head_inst->isStore())  &&

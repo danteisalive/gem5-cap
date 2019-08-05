@@ -840,6 +840,27 @@ class FullO3CPU : public BaseO3CPU
     //number of misc
     Stats::Scalar miscRegfileReads;
     Stats::Scalar miscRegfileWrites;
+
+
+
+    Stats::Scalar numOutStandingCapabilityCacheAccesses;//
+    Stats::Scalar numOutStandingWriteAliasCacheAccesses;//
+    Stats::Scalar numOutStandingReadAliasCacheAccesses;//
+    Stats::Scalar numOfAliasTableAccess;//
+    Stats::Scalar LVPTMissPredictPmAn;//
+    Stats::Scalar LVPTMissPredictP0An;//
+    Stats::Scalar LVPTMissPredictPnA0;//
+    Stats::Scalar LVPTMissPredict;//
+    Stats::Formula LVPTAccuracy;//
+    Stats::Scalar numAliasCacheMisses;
+    Stats::Scalar numAliasCacheAccesses;
+    Stats::Scalar numCapabilityCacheMisses;
+    Stats::Scalar numCapabilityCacheAccesses;
+    Stats::Formula overallCapabilityCacheMissRate;//
+    Stats::Formula overallAliasCacheMissRate;//
+    Stats::Scalar numOfCapabilityCheckMicroops;//
+    Stats::Scalar numOfCapabilityFreeMicroops;//
+    Stats::Scalar numOfCapabilityGenMicroops;//
 };
 
 #endif // __CPU_O3_CPU_HH__

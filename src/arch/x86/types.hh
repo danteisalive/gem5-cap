@@ -205,6 +205,7 @@ namespace X86ISA
         int           MAX_SIZE;
 
         //TODO: move these to gem5 stats
+      public:
         uint64_t                     total_accesses;
         uint64_t                     total_hits;
         uint64_t                     total_misses;

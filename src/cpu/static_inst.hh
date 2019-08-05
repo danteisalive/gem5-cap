@@ -242,10 +242,24 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// The binary machine instruction.
     ExtMachInst machInst;
 
-    //TheISA::PointerID static_pid{0};
-    //bool checked;
+    TheISA::PointerID static_pid{0};
+
     Addr atomic_vaddr; // this address is used in atomic mode
-    //bool capabilityCacheMiss;
+
+    void setSrcRegPid(int _index, uint64_t _pid){
+      _srcRegPid[_index] = _pid;
+    }
+
+    uint64_t getSrcRegPid(int _index){
+      return   _srcRegPid[_index];
+    }
+    void setDestRegPid(int _index, uint64_t _pid){
+      _destRegPid[_index] = _pid;
+    }
+
+    uint64_t getDestRegPid(int _index){
+      return   _destRegPid[_index];
+    }
 
   protected:
 

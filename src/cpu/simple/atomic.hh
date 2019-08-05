@@ -92,6 +92,9 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     void AccessCapabilityCache(ThreadContext * tc,
                              TheISA::PCState &pcState);
 
+    void Verify(ThreadContext * tc,
+                              TheISA::PCState &pcState);
+
     void trackAlias(TheISA::PCState &pcState);
     Block* find_Block_containing ( Addr a );
     void getLog(ThreadContext * _tc, TheISA::PCState &pcState);

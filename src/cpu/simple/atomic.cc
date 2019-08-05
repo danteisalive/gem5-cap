@@ -733,6 +733,9 @@ AtomicSimpleCPU::tick()
               //     AccessCapabilityCache(threadContexts[0], pcState);
               // }
 
+              // if (threadContexts[0]->enableCapability && fault == NoFault){
+              //   Verify(threadContexts[0],pcState);
+              // }
 
               if (threadContexts[0]->enableCapability && fault == NoFault){
                     if (curStaticInst->isLoad() &&
@@ -906,7 +909,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
     if (_sym == TheISA::CheckType::AP_MALLOC_SIZE_COLLECT){
 
       if (threadContexts[0]->Collector_Status !=
-          hreadContext::COLLECTOR_STATUS::NONE)
+          ThreadContext::COLLECTOR_STATUS::NONE)
       {
           std::cout << "PRE STATE: " << threadContexts[0]->Collector_Status <<
             " " << pcState <<
@@ -1857,5 +1860,141 @@ void AtomicSimpleCPU::UpdatePointerTrackerSpeculative(ThreadContext * tc,
   //   }
   //   std::cout << "****************************************************\n";
   // }
+
+}
+
+
+// first call this
+void AtomicSimpleCPU::Verify(ThreadContext * tc,
+                         PCState &pcState)
+{
+
+  SimpleExecContext& t_info = *threadInfo[0];
+  SimpleThread* thread = t_info.thread;
+  if (thread->stop_tracking) return;
+  if (!curStaticInst->isInteger()) return;
+  if (curStaticInst->isStore()) return;
+
+  // src and reg PID determination
+  for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
+    if (curStaticInst->srcRegIdx(i).isIntReg())
+    {
+        uint64_t srcDataRegContent =
+            thread->readIntReg(curStaticInst->srcRegIdx(i).index());
+        Block* src_bk = find_Block_containing(srcDataRegContent);
+        if (src_bk){
+            curStaticInst->setSrcRegPid(i, src_bk->pid);
+        }
+        else {
+            curStaticInst->setSrcRegPid(i, 0);
+        }
+    }
+    else {
+      curStaticInst->setSrcRegPid(i, 0);
+    }
+  }
+
+  for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+    if (curStaticInst->destRegIdx(i).isIntReg())
+    {
+        uint64_t destDataRegContent =
+            thread->readIntReg(curStaticInst->destRegIdx(i).index());
+        Block* dest_bk = find_Block_containing(destDataRegContent);
+        if (dest_bk){
+            curStaticInst->setDestRegPid(i, dest_bk->pid);
+        }
+        else {
+            curStaticInst->setDestRegPid(i, 0);
+        }
+    }
+    else {
+      curStaticInst->setDestRegPid(i, 0);
+    }
+  }
+
+  //sanitization
+  for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
+      for (size_t j = i+1; j < curStaticInst->numSrcRegs(); j++) {
+        if (curStaticInst->getSrcRegPid(i) != 0 &&
+            curStaticInst->getSrcRegPid(j) != 0 &&
+            curStaticInst->getSrcRegPid(i) != curStaticInst->getSrcRegPid(j))
+        {
+          std::cout << pcState;
+          std::cout << curStaticInst->disassemble(pcState.pc()) << std::endl;
+          for (size_t k = 0; k < curStaticInst->numSrcRegs(); k++) {
+            std::cout << "SRC " << k << ": " <<
+                      curStaticInst->getSrcRegPid(k) << std::endl;
+          }
+          for (size_t k = 0; k < curStaticInst->numDestRegs(); k++) {
+            std::cout << "DEST " << k << ": " <<
+                      curStaticInst->getDestRegPid(k) << std::endl;
+          }
+          panic("What kind of sorcery is this!");
+        }
+      }
+
+  }
+
+  for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+      for (size_t j = i+1; j < curStaticInst->numDestRegs(); j++) {
+        if (curStaticInst->getDestRegPid(i) != 0 &&
+            curStaticInst->getDestRegPid(j) != 0 &&
+            curStaticInst->getDestRegPid(i) != curStaticInst->getDestRegPid(j))
+        {
+          std::cout << pcState;
+          std::cout << curStaticInst->disassemble(pcState.pc()) << std::endl;
+          for (size_t k = 0; k < curStaticInst->numSrcRegs(); k++) {
+            std::cout << "SRC " << k << ": " <<
+                      curStaticInst->getSrcRegPid(k) << std::endl;
+          }
+          for (size_t k = 0; k < curStaticInst->numDestRegs(); k++) {
+            std::cout << "DEST " << k << ": " <<
+                      curStaticInst->getDestRegPid(k) << std::endl;
+          }
+          panic("What kind of sorcery is this!");
+        }
+      }
+
+  }
+
+  // rules
+  if (curStaticInst->isLoad() && curStaticInst->getDataSize() == 8)
+  {
+      // pointer refill
+      for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+
+      }
+
+  }
+  else if (curStaticInst->isLoad() && curStaticInst->getDataSize() != 8)
+  {
+
+      for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
+          if (curStaticInst->getDestRegPid(i))
+          {
+                std::cout << "Warning: Load.datasize != 8 : " << std::endl;
+                std::cout << pcState;
+                std::cout << curStaticInst->disassemble(pcState.pc()) <<
+                            std::endl;
+          }
+      }
+
+  }
+  else if (curStaticInst->getDataSize() == 8) {
+
+      for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
+        if (curStaticInst->getSrcRegPid(i))
+        {
+
+
+        }
+      }
+
+  }
+  else if (curStaticInst->getDataSize() != 8) {
+
+
+  }
+
 
 }
