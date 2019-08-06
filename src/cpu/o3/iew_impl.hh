@@ -2095,7 +2095,7 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
   // check if this is a base address or not
   TheISA::PointerID _pid = TheISA::PointerID(0);
   Block* bk = cpu->find_Block_containing(dataRegContent,tid);
-  if (bk && (bk->payload == dataRegContent)) { // just the base addresses
+  if (bk /*&& (bk->payload == dataRegContent)*/) { // just the base addresses
     assert(bk->pid != 0);
     _pid = TheISA::PointerID(bk->pid);
 
