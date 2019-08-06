@@ -142,7 +142,9 @@ StaticInst::updatePointerTracker(ThreadContext * tc, TheISA::PCState &nextPC){
 }
 
 bool
-StaticInst::injectCheckMicroops(){
+StaticInst::injectCheckMicroops(
+        std::array<TheISA::PointerID, TheISA::NumIntRegs> _fetchArchRegsPid)
+{
     panic("injectCheckMicroops: This should only be called by a macroop");
 }
 

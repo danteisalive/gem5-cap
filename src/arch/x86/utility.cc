@@ -80,7 +80,7 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
   int         fd, ii, count;
   Elf64_Ehdr	*ehdr = NULL;
   std::map<int, Elf64_Word>  shs_flags;
-  //uint64_t consts_pid = 0x1000000000000; //48 bits for the heap
+  uint64_t consts_pid = 0x1000000000000; //48 bits for the heap
   elf_version(EV_CURRENT);
 
   fd = open(file_name, O_RDONLY);
@@ -204,39 +204,39 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
               }
           }
 
-          // else if ((ELF64_ST_TYPE(sym.st_info) == STT_COMMON ||
-          //          ELF64_ST_TYPE(sym.st_info) == STT_OBJECT) &&
-          //          (sym.st_size > 0))
-          // {
-          //     Addr base = (Addr)sym.st_value;
-          //
-          //     Block fake;
-          //     fake.payload = (Addr)sym.st_value;
-          //     fake.req_szB = 1;
-          //     UWord foundkey = 1;
-          //     UWord foundval = 1;
-          //     unsigned char found = VG_lookupFM( tc->interval_tree,
-          //                             &foundkey, &foundval, (UWord)&fake );
-          //     if (found) {
-          //     }
-          //     else {
-          //       Block* bk = new Block();
-          //       bk->payload   = (Addr)sym.st_value;
-          //       bk->req_szB   = (SizeT)sym.st_size;
-          //       bk->pid = ++consts_pid;
-          //       unsigned char present =
-          //               VG_addToFM( tc->interval_tree, (UWord)bk, (UWord)0);
-          //
-          //       present = present;
-          //
-          //       Process *proc = tc->getProcessPtr();
-          //       Addr vpn = proc->pTable->pageAlign(base);
-          //       tc->ShadowMemory[vpn][base] = TheISA::PointerID(bk->pid);
-          //
-          //       //assert(!present);
-          //     }
-          //
-          // }
+          else if ((ELF64_ST_TYPE(sym.st_info) == STT_COMMON ||
+                   ELF64_ST_TYPE(sym.st_info) == STT_OBJECT) &&
+                   (sym.st_size > 0))
+          {
+              Addr base = (Addr)sym.st_value;
+
+              Block fake;
+              fake.payload = (Addr)sym.st_value;
+              fake.req_szB = 1;
+              UWord foundkey = 1;
+              UWord foundval = 1;
+              unsigned char found = VG_lookupFM( tc->interval_tree,
+                                      &foundkey, &foundval, (UWord)&fake );
+              if (found) {
+              }
+              else {
+                Block* bk = new Block();
+                bk->payload   = (Addr)sym.st_value;
+                bk->req_szB   = (SizeT)sym.st_size;
+                bk->pid = ++consts_pid;
+                unsigned char present =
+                        VG_addToFM( tc->interval_tree, (UWord)bk, (UWord)0);
+
+                present = present;
+
+                Process *proc = tc->getProcessPtr();
+                Addr vpn = proc->pTable->pageAlign(base);
+                tc->ShadowMemory[vpn][base] = TheISA::PointerID(bk->pid);
+
+                //assert(!present);
+              }
+
+          }
 
 
       }

@@ -344,7 +344,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual void undoInjecttion();
 
     virtual uint64_t getNumOfMicroops();
-    virtual bool injectCheckMicroops();
+    virtual bool injectCheckMicroops(
+            std::array<TheISA::PointerID,
+            TheISA::NumIntRegs> _fetchArchRegsPid);
     virtual void updatePointerTracker(
                             ThreadContext * tc, TheISA::PCState &nextPC);
     virtual bool filterInst(ThreadContext * tc, TheISA::PCState &nextPC);

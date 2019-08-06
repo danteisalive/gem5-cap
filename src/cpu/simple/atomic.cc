@@ -715,16 +715,16 @@ AtomicSimpleCPU::tick()
               //   ComparePointerTrackerSpeculative(threadContexts[0],pcState);
               // }
 
-              // if (threadContexts[0]->enableCapability && fault == NoFault){
-              //       if (curStaticInst->isStore() &&
-              //           curStaticInst->getDataSize() == 8)
-              //       {
-              //         // if (ENABLE_LOGGING)
-              //          updateAliasTableWithStack(threadContexts[0],pcState);
-              //         // else
-              //         //    updateAliasTable(threadContexts[0],pcState);
-              //       }
-              // }
+              if (threadContexts[0]->enableCapability && fault == NoFault){
+                    if (curStaticInst->isStore() &&
+                        curStaticInst->getDataSize() == 8)
+                    {
+                      // if (ENABLE_LOGGING)
+                       updateAliasTableWithStack(threadContexts[0],pcState);
+                      // else
+                      //    updateAliasTable(threadContexts[0],pcState);
+                    }
+              }
               // if (threadContexts[0]->enableCapability &&
               //     fault == NoFault &&
               //     (curStaticInst->isLoad() || curStaticInst->isStore())
@@ -780,39 +780,39 @@ AtomicSimpleCPU::tick()
                     // threadContexts[0]->LRUPidCache.LRUPIDCachePrintStats();
                      //numOfMemRefs = 0; numOfHeapAccesses = 0;
 
-                     // int LV1Size = AliasPageTable.size();
-                     //
-                     // int LV2Size = 0, LV3Size = 0, LV4Size = 0,
-                     //     LV5Size = 0, LV6Size = 0, LV7Size = 0;
-                     //
-                     // for (auto &lv1_elem: AliasPageTable){
-                     //    LV2Size += lv1_elem.second.size();
-                     //    for (auto &lv2_elem: lv1_elem.second){
-                     //       LV3Size += lv2_elem.second.size();
-                     //       for (auto &lv3_elem: lv2_elem.second){
-                     //          LV4Size += lv3_elem.second.size();
-                     //          for (auto &lv4_elem: lv3_elem.second){
-                     //             LV5Size += lv4_elem.second.size();
-                     //             for (auto &lv5_elem: lv4_elem.second){
-                     //               LV6Size += lv5_elem.second.size();
-                     //               for (auto &lv6_elem: lv5_elem.second){
-                     //                 LV7Size += lv6_elem.second.size();
-                     //               }
-                     //             }
-                     //          }
-                     //       }
-                     //    }
-                     // }
-                     //
-                     // std::cout << " AliasPageTable: " << std::dec <<
-                     //              "LV1: " << LV1Size << " " <<
-                     //              "LV2: " << LV2Size << " " <<
-                     //              "LV3: " << LV3Size << " " <<
-                     //              "LV4: " << LV4Size << " " <<
-                     //              "LV5: " << LV5Size << " " <<
-                     //              "LV6: " << LV6Size << " " <<
-                     //              "LV7: " << LV7Size << " " <<
-                     //              std::endl;
+                     int LV1Size = AliasPageTable.size();
+
+                     int LV2Size = 0, LV3Size = 0, LV4Size = 0,
+                         LV5Size = 0, LV6Size = 0, LV7Size = 0;
+
+                     for (auto &lv1_elem: AliasPageTable){
+                        LV2Size += lv1_elem.second.size();
+                        for (auto &lv2_elem: lv1_elem.second){
+                           LV3Size += lv2_elem.second.size();
+                           for (auto &lv3_elem: lv2_elem.second){
+                              LV4Size += lv3_elem.second.size();
+                              for (auto &lv4_elem: lv3_elem.second){
+                                 LV5Size += lv4_elem.second.size();
+                                 for (auto &lv5_elem: lv4_elem.second){
+                                   LV6Size += lv5_elem.second.size();
+                                   for (auto &lv6_elem: lv5_elem.second){
+                                     LV7Size += lv6_elem.second.size();
+                                   }
+                                 }
+                              }
+                           }
+                        }
+                     }
+
+                     std::cout << " AliasPageTable: " << std::dec <<
+                                  "LV1: " << LV1Size << " " <<
+                                  "LV2: " << LV2Size << " " <<
+                                  "LV3: " << LV3Size << " " <<
+                                  "LV4: " << LV4Size << " " <<
+                                  "LV5: " << LV5Size << " " <<
+                                  "LV6: " << LV6Size << " " <<
+                                  "LV7: " << LV7Size << " " <<
+                                  std::endl;
                 }
 
                 if (fault == NoFault) {
@@ -1458,6 +1458,7 @@ void AtomicSimpleCPU::updateAliasTableWithStack(ThreadContext * _tc,
       uint64_t lv6 = curStaticInst->atomic_vaddr & LV6_MASK;
       uint64_t lv7 = curStaticInst->atomic_vaddr & LV7_MASK;
 
+    //  std::cout << lv6 << " " << lv7 << std::endl;
       AliasPageTable[lv1][lv2][lv3][lv4][lv5][lv6][lv7] = bk->pid;
     }
     else {

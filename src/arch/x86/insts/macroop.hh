@@ -141,7 +141,8 @@ public:
     }
 
     bool filterInst(ThreadContext * tc,PCState &nextPC);
-    bool injectCheckMicroops();
+    bool injectCheckMicroops(
+        std::array<TheISA::PointerID, TheISA::NumIntRegs> _fetchArchRegsPid);
 
     void updatePointerTracker(ThreadContext * tc, PCState &nextPC);
 

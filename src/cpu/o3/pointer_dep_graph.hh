@@ -131,6 +131,11 @@ class PointerDependencyGraph
     uint64_t nodesTraversed;
     // Debug variable, remove when done testing.
     uint64_t nodesRemoved;
+
+    std::array<TheISA::PointerID, TheISA::NumIntRegs>
+    getFetchArchRegsPidArray(){
+       return FetchArchRegsPid;
+    }
 };
 
 template <class DynInstPtr>
@@ -160,7 +165,9 @@ PointerDependencyGraph<DynInstPtr>::insert(DynInstPtr &inst)
     if (inst->isBoundsCheckMicroop()) return;
 
     //transfer capabilities
-    if (inst->isMallocBaseCollectorMicroop())
+    if (inst->isMallocBaseCollectorMicroop() ||
+        inst->isCallocBaseCollectorMicroop() ||
+        inst->isReallocBaseCollectorMicroop())
     {
         // here we generate a new PID and insert it into rax
         dependGraph[X86ISA::INTREG_RAX].push_front(
@@ -168,6 +175,13 @@ PointerDependencyGraph<DynInstPtr>::insert(DynInstPtr &inst)
         FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
 
         //dump();
+    }
+    else if (inst->isFreeCallMicroop() ||
+            inst->isReallocSizeCollectorMicroop())
+    {
+      dependGraph[X86ISA::INTREG_RDI].push_front(
+                                      PointerDepEntry(inst, inst->dyn_pid));
+      FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
     }
     // this can be a potential pointer refill
     else if (inst->isLoad() && inst->staticInst->getDataSize() == 8)
@@ -304,6 +318,18 @@ PointerDependencyGraph<DynInstPtr>::doSquash(uint64_t squashedSeqNum){
         }
 
     } // for loop
+
+    // now for each int reg update the FetchArchRegsPid with the front inst
+    // if there is no inst in the queue then update it with the
+    // CommitArchRegsPid
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
+        if (dependGraph[i].empty()){
+          FetchArchRegsPid[i] = CommitArchRegsPid[i];
+        }
+        else {
+          FetchArchRegsPid[i] = dependGraph[i].front().pid;
+        }
+    }
 
     if (POINTER_DEP_GRAPH_SQUASH_DEBUG)
     {

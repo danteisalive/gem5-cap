@@ -171,6 +171,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 if (AliasCache[thisIsTheSet][candidateWay].valid &&
                     AliasCache[thisIsTheSet][candidateWay].dirty)
                 {
+                    outstandingWrite++;
                     uint64_t wb_addr =
                                 AliasCache[thisIsTheSet][candidateWay].vaddr;
                     Process *p = tc->getProcessPtr();
@@ -277,6 +278,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         // if we are here then it means a miss
         // find the candiate for replamcement
         total_misses++;
+        outstandingRead++;
         return false;
 
 
@@ -390,6 +392,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         if (AliasCache[thisIsTheSet][candidateWay].valid &&
             AliasCache[thisIsTheSet][candidateWay].dirty)
         {
+            outstandingWrite++;
             uint64_t wb_addr = AliasCache[thisIsTheSet][candidateWay].vaddr;
             Process *p = tc->getProcessPtr();
             Addr wb_vpn = p->pTable->pageAlign(wb_addr);

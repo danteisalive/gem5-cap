@@ -73,7 +73,9 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 }
 
 
-bool MacroopBase::injectCheckMicroops(){
+bool MacroopBase::injectCheckMicroops(
+        std::array<TheISA::PointerID, TheISA::NumIntRegs> _fetchArchRegsPid)
+{
 
   if ((numMicroops > 0) && (!isInjected))
   {
@@ -108,7 +110,15 @@ bool MacroopBase::injectCheckMicroops(){
                 continue;
               }
               else {
-                return true;
+                if (microops[i]->getBase() < TheISA::NumIntRegs){
+                    if (_fetchArchRegsPid[microops[i]->getBase()] !=
+                        TheISA::PointerID(0))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
               }
           }
       }
@@ -391,9 +401,9 @@ if (numMicroops > 0 && !isInjected){
                         (1ULL << StaticInst::IsSerializing)|
                         (1ULL << StaticInst::IsSerializeBefore)|
                         (1ULL << StaticInst::IsFreeCallMicroop),
-                        InstRegIndex(X86ISA::NUM_INTREGS+17),
                         InstRegIndex(X86ISA::INTREG_RDI),
-                        InstRegIndex(X86ISA::NUM_INTREGS+17),
+                        InstRegIndex(X86ISA::INTREG_RDI),
+                        InstRegIndex(X86ISA::INTREG_RDI),
                         8,
                         0);
 
@@ -454,9 +464,9 @@ MacroopBase::injectAPMallocSizeCollector(ThreadContext * _tc, PCState &nextPC){
                         (1ULL << StaticInst::IsFirstMicroop)|
                         (1ULL << StaticInst::IsSerializing)|
                         (1ULL << StaticInst::IsSerializeBefore),
-                        InstRegIndex(X86ISA::NUM_INTREGS+17),
                         InstRegIndex(X86ISA::INTREG_RDI),
-                        InstRegIndex(X86ISA::NUM_INTREGS+17),
+                        InstRegIndex(X86ISA::INTREG_RDI),
+                        InstRegIndex(X86ISA::INTREG_RDI),
                         8,
                         0);
 
@@ -579,7 +589,7 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                        (1ULL << StaticInst::IsSerializeBefore),
                        InstRegIndex(X86ISA::INTREG_RSI),
                        InstRegIndex(X86ISA::INTREG_RDI),
-                       InstRegIndex(X86ISA::NUM_INTREGS+17),
+                       InstRegIndex(X86ISA::INTREG_RDI),
                        8,
                        0);
 
@@ -641,9 +651,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                            (1ULL << StaticInst::IsCallocBaseCollectorMicroop)|
                            (1ULL << StaticInst::IsSerializing)|
                            (1ULL << StaticInst::IsSerializeBefore),
-                           InstRegIndex(X86ISA::NUM_INTREGS+17),
                            InstRegIndex(X86ISA::INTREG_RAX),
-                           InstRegIndex(X86ISA::NUM_INTREGS+17),
+                           InstRegIndex(X86ISA::INTREG_RAX),
+                           InstRegIndex(X86ISA::INTREG_RAX),
                            8,
                            0);
 
@@ -705,7 +715,7 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                          (1ULL << StaticInst::IsSerializeBefore),
                          InstRegIndex(X86ISA::INTREG_RSI),
                          InstRegIndex(X86ISA::INTREG_RDI),
-                         InstRegIndex(X86ISA::NUM_INTREGS+17),
+                         InstRegIndex(X86ISA::INTREG_RDI),
                          8,
                          0);
 
@@ -769,9 +779,9 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                            (1ULL << StaticInst::IsReallocBaseCollectorMicroop)|
                            (1ULL << StaticInst::IsSerializing)|
                            (1ULL << StaticInst::IsSerializeBefore),
-                           InstRegIndex(X86ISA::NUM_INTREGS+17),
                            InstRegIndex(X86ISA::INTREG_RAX),
-                           InstRegIndex(X86ISA::NUM_INTREGS+17),
+                           InstRegIndex(X86ISA::INTREG_RAX),
+                           InstRegIndex(X86ISA::INTREG_RAX),
                            8,
                            0);
 

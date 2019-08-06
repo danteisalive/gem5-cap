@@ -1228,7 +1228,8 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
               //then we should not  this is a workaround for
               // a bug in squash method we check the bounds and permissions
               //but in a different way
-              if (si->injectCheckMicroops())
+              if (si->injectCheckMicroops(
+                    cpu->PointerDepGraph.getFetchArchRegsPidArray()))
               {
                 si->injectMicroops(tc, thisPC,
                                    TheISA::CheckType::AP_BOUNDS_INJECT);
@@ -1456,11 +1457,20 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (tc->enableCapability &&
                 TrackAlias(tc, thisPC))
             {
-                if (instruction->isMallocBaseCollectorMicroop()){
+                if (instruction->isMallocBaseCollectorMicroop() ||
+                    instruction->isCallocBaseCollectorMicroop() ||
+                    instruction->isReallocBaseCollectorMicroop())
+                {
                     instruction->dyn_pid = TheISA::PointerID(
                                         cpu->readArchIntReg(X86ISA::INTREG_R16,
                                         instruction->threadNumber));
                 }
+                else if (instruction->isFreeCallMicroop() ||
+                         instruction->isReallocSizeCollectorMicroop())
+                {
+                    instruction->dyn_pid = TheISA::PointerID(0);
+                }
+
                 cpu->PointerDepGraph.insert(instruction);
             }
 
