@@ -432,8 +432,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
             else fatal("Can't open symbols file");
         }
 
-        for (int i = 0; i < TheISA::NumIntRegsToTrack; i++)
-           o3_tc->PointerTrackerTable[i] = TheISA::PointerID(0);
+        // for (int i = 0; i < TheISA::NumIntRegsToTrack; i++)
+        //    o3_tc->PointerTrackerTable[i] = TheISA::PointerID(0);
 
 
 
@@ -980,6 +980,7 @@ void
 FullO3CPU<Impl>::insertThread(ThreadID tid)
 {
     DPRINTF(O3CPU,"[tid:%i] Initializing thread into CPU");
+
     // Will change now that the PC and thread state is internal to the CPU
     // and not in the ThreadContext.
     ThreadContext *src_tc;
@@ -1202,6 +1203,7 @@ void
 FullO3CPU<Impl>::unserializeThread(CheckpointIn &cp, ThreadID tid)
 {
     thread[tid]->unserialize(cp);
+
 }
 
 template <class Impl>
@@ -1390,6 +1392,7 @@ template <class Impl>
 void
 FullO3CPU<Impl>::takeOverFrom(BaseCPU *oldCPU)
 {
+
     BaseCPU::takeOverFrom(oldCPU);
 
     fetch.takeOverFrom();
@@ -1406,6 +1409,17 @@ FullO3CPU<Impl>::takeOverFrom(BaseCPU *oldCPU)
 
     lastRunningCycle = curCycle();
     _status = Idle;
+
+    ThreadContext* tc = oldCPU->getContext(0);
+    if (tc->enableCapability)
+    {
+      for (size_t i = 0; i < NumIntRegs; i++) {
+        PointerDepGraph.setFetchArchRegsPidArray(i,
+                        TheISA::PointerID(tc->PointerTracker[i]));
+        PointerDepGraph.setCommitArchRegsPidArray(i,
+                        TheISA::PointerID(tc->PointerTracker[i]));
+      }
+    }
 }
 
 template <class Impl>

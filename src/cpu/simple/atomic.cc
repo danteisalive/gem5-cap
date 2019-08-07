@@ -705,9 +705,11 @@ AtomicSimpleCPU::tick()
                   }
               }
 
-              // if (threadContexts[0]->enableCapability && fault == NoFault){
-              //     UpdatePointerTracker(threadContexts[0],pcState);
-              // }
+              //this is used bu the takeOverFrom in O3cpu to initilize the
+              // pointer tracker
+              if (threadContexts[0]->enableCapability && fault == NoFault){
+                  UpdatePointerTracker(threadContexts[0],pcState);
+              }
 
               // if (threadContexts[0]->enableCapability && fault == NoFault
               //     ){
@@ -1598,112 +1600,19 @@ void AtomicSimpleCPU::UpdatePointerTracker(ThreadContext * tc,
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
 
-    if (curStaticInst->isLoad() && curStaticInst->getDataSize() == 8)
+    for (int i = 0; i < TheISA::NumIntRegs; i++)
     {
-        // pointer refill
-        for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
-            if (curStaticInst->destRegIdx(i).isIntReg())
-            {
-                uint64_t dataRegContent =
-                    thread->readIntReg(curStaticInst->destRegIdx(i).index());
-                Block* dest_bk = find_Block_containing(dataRegContent);
-                if (dest_bk){
-
-                    std::cout << pcState;
-                    std::cout <<
-                      curStaticInst->disassemble(pcState.pc()) << std::endl;
-                    std::cout <<
-                      "Pointer Refill:" << curStaticInst->destRegIdx(i) <<
-                      " {PID(" << dest_bk->pid << ")}" << std::endl;
-                }
-            }
-        }
-
-    }
-    else if (curStaticInst->isStore() && curStaticInst->getDataSize() == 8)
-    {
-        // pointer spill
-        if (curStaticInst->getDataSize() == 8) {
-            for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
-                if (curStaticInst->srcRegIdx(i).isIntReg() &&
-                    curStaticInst->srcRegIdx(i).index() ==
-                                curStaticInst->getMemOpDataRegIndex()
-                    )
-                {
-                    uint64_t dataRegContent =
-                      thread->readIntReg(curStaticInst->srcRegIdx(i).index());
-                    Block* src_bk = find_Block_containing(dataRegContent);
-                    if (src_bk){
-                        std::cout << pcState;
-                        std::cout <<
-                        curStaticInst->disassemble(pcState.pc()) << std::endl;
-                        std::cout <<
-                        "Pointer Spill:" << curStaticInst->srcRegIdx(i) <<
-                        " {PID(" << src_bk->pid << ")}" << std::endl;
-                    }
-                }
-
-            }
-        }
-
-    }
-    else if (curStaticInst->getDataSize() == 8) {
-
-        for (size_t i = 0; i < curStaticInst->numDestRegs(); i++) {
-          if (curStaticInst->destRegIdx(i).isIntReg())
-          {
-              uint64_t dataRegContent =
-                    thread->readIntReg(curStaticInst->destRegIdx(i).index());
-              Block* dest_bk = find_Block_containing(dataRegContent);
-              if (dest_bk){
-
-                  std::cout << pcState;
-                  std::cout <<
-                      curStaticInst->disassemble(pcState.pc()) << std::endl;
-
-                  for (size_t i = 0; i < curStaticInst->numSrcRegs(); i++) {
-                    if (curStaticInst->srcRegIdx(i).isIntReg())
-                    {
-                      Block* bk_src = find_Block_containing(dataRegContent);
-                      if (bk_src){
-                        std::cout <<
-                                "Src: " << curStaticInst->srcRegIdx(i) <<
-                                " {PID(" << dest_bk->pid << ")}" << std::endl;
-                      }
-                      else
-                      {
-                        std::cout << "Src: " << curStaticInst->srcRegIdx(i) <<
-                                      " {PID(0)}" << std::endl;
-                      }
-                    }
-                  }
-
-                  std::cout << "Dest:" << curStaticInst->destRegIdx(i) <<
-                                " {PID(" << dest_bk->pid << ")}" << std::endl;
-
-              }
-          }
-        }
-
+      uint64_t dataRegContent = thread->readIntReg(i);
+      Block* src_bk = find_Block_containing(dataRegContent);
+      if (src_bk){
+          tc->PointerTracker[i] = src_bk->pid;
+      }
+      else {
+          tc->PointerTracker[i] = 0;
+      }
     }
 
 
-    if (curStaticInst->isMemRef()){
-        // heap access
-        Block* bk = find_Block_containing(curStaticInst->atomic_vaddr);
-        // if found: update the ShadowMemory
-        if (bk) { // just the base addresses
-          assert(bk->pid != 0);
-          if (bk){
-              std::cout << pcState;
-              std::cout <<
-                curStaticInst->disassemble(pcState.pc()) << std::endl;
-              std::cout << "Heap Access:" << std::hex <<
-                            curStaticInst->atomic_vaddr << std::dec <<
-                            " {PID(" << bk->pid << ")}" << std::endl;
-          }
-        }
-    }
 
 }
 

@@ -1861,7 +1861,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
         // rax now is a pointer
         TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-        tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
+      //  tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
 
     }
     else if (inst->isFreeCallMicroop()){
@@ -1896,7 +1896,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
           cpu->ExeAliasCache->Invalidate(tc, _pid);
 
         // RDI is not a pointer anymore
-        tc->PointerTrackerTable[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
+      //  tc->PointerTrackerTable[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
 
     }
     else if (inst->isFreeRetMicroop()){
@@ -1966,7 +1966,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
          tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
          // rax now is a pointer
          TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-         tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
+         //tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
 
     }
     else if (inst->isReallocSizeCollectorMicroop()){
@@ -2048,7 +2048,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
             // rax now is a pointer
             TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-            tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
+          //  tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
 
     }
   }
@@ -2095,7 +2095,7 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
   // check if this is a base address or not
   TheISA::PointerID _pid = TheISA::PointerID(0);
   Block* bk = cpu->find_Block_containing(dataRegContent,tid);
-  if (bk /*&& (bk->payload == dataRegContent)*/) { // just the base addresses
+  if (bk && (bk->payload == dataRegContent)) { // just the base addresses
     assert(bk->pid != 0);
     _pid = TheISA::PointerID(bk->pid);
 

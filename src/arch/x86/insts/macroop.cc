@@ -118,7 +118,7 @@ bool MacroopBase::injectCheckMicroops(
                     }
                 }
 
-                return false;
+                continue;
               }
           }
       }

@@ -133,8 +133,15 @@ class PointerDependencyGraph
     uint64_t nodesRemoved;
 
     std::array<TheISA::PointerID, TheISA::NumIntRegs>
-    getFetchArchRegsPidArray(){
+     getFetchArchRegsPidArray(){
        return FetchArchRegsPid;
+    }
+
+    void setFetchArchRegsPidArray(int idx, TheISA::PointerID _pid){
+        FetchArchRegsPid[idx] = _pid;
+    }
+    void setCommitArchRegsPidArray(int idx, TheISA::PointerID _pid){
+        CommitArchRegsPid[idx] = _pid;
     }
 };
 
