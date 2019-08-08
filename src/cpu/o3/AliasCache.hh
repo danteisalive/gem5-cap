@@ -133,9 +133,14 @@ class LRUAliasCache
     typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
 
     private:
+    void WriteBack(Addr wb_addr);
+
+    private:
         CacheEntry**                 AliasCache;
         ExeAliasBuffer               ExeAliasTableBuffer;
         LRUVictimCache*              VictimCache;
+        std::deque<Addr>             WbBuffer;
+
         uint64_t                     NumWays;
         uint64_t                     NumSets;
         uint64_t                     CacheSize;

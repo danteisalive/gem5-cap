@@ -2103,8 +2103,7 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 
   // finally if it's a base adress write it in the execute alias table
   //put it into exe alias table and later in commit delete it
-
-  cpu->ExeAliasCache->InsertStoreQueue(inst->seqNum, inst->effAddr, _pid);
+    cpu->ExeAliasCache->InsertStoreQueue(inst->seqNum, inst->effAddr, _pid);
 
 }
 

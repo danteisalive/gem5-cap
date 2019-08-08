@@ -171,9 +171,11 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 if (AliasCache[thisIsTheSet][candidateWay].valid &&
                     AliasCache[thisIsTheSet][candidateWay].dirty)
                 {
-                    outstandingWrite++;
+
+                    //send the wb_addr to WbBuffer;
                     uint64_t wb_addr =
                                 AliasCache[thisIsTheSet][candidateWay].vaddr;
+                    WriteBack(wb_addr);
                     Process *p = tc->getProcessPtr();
                     Addr wb_vpn = p->pTable->pageAlign(wb_addr);
                     // in this case writeback
@@ -301,8 +303,18 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 // this is not a stack alias therfore commit it to
                 // shadow memory and then erase it
                 //writeback to alias cache
+                // if this page has no alias and wb_pid is zero
+                // do not send it for commit just remove it
                 TheISA::PointerID writeback_pid = it->second;
-                Commit(it->first.second, tc, writeback_pid);
+                Process *p = tc->getProcessPtr();
+                Addr vaddr_vpn = p->pTable->pageAlign(vaddr);
+                auto sm_it = tc->ShadowMemory.find(vaddr_vpn);
+
+                if (writeback_pid != TheISA::PointerID(0) &&
+                    sm_it != tc->ShadowMemory.end())
+                {
+                  Commit(it->first.second, tc, writeback_pid);
+                }
                 //delete from alias store buffer
                 ExeAliasTableBuffer.erase(it);
                 return true;
@@ -392,8 +404,9 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         if (AliasCache[thisIsTheSet][candidateWay].valid &&
             AliasCache[thisIsTheSet][candidateWay].dirty)
         {
-            outstandingWrite++;
+
             uint64_t wb_addr = AliasCache[thisIsTheSet][candidateWay].vaddr;
+            WriteBack(wb_addr);
             Process *p = tc->getProcessPtr();
             Addr wb_vpn = p->pTable->pageAlign(wb_addr);
             // in this case writeback
@@ -671,5 +684,30 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
       }
 
     }
+
+    void LRUAliasCache::WriteBack(Addr wb_addr){
+        //first search in the qeue, if the address is there,
+        // update it else just put it into the front
+        if (std::find(WbBuffer.begin(), WbBuffer.end(), wb_addr) !=
+                      WbBuffer.end())
+        {
+          return;
+        }
+        else {
+          WbBuffer.push_front(wb_addr);
+        }
+
+        // if the number of writes is greater than threshold,
+        // write back the store
+        if (WbBuffer.size() > 24) // wb max threshold = 24
+        {
+          while (WbBuffer.size() > 8) // wb low threshold = 8
+          {
+            WbBuffer.pop_back();
+            outstandingWrite++;
+          }
+        }
+    }
+
 
   }

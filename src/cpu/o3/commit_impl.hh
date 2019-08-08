@@ -1523,10 +1523,6 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
 
 
-  // sanitization
-  if (head_inst->isMicroopInjected()) return;
-  if (head_inst->isBoundsCheckMicroop()) return;
-
   cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, tc);
 
   Process *p = tc->getProcessPtr();
