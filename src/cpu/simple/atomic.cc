@@ -707,9 +707,9 @@ AtomicSimpleCPU::tick()
 
               //this is used bu the takeOverFrom in O3cpu to initilize the
               // pointer tracker
-              // if (threadContexts[0]->enableCapability && fault == NoFault){
-              //     UpdatePointerTracker(threadContexts[0],pcState);
-              // }
+              if (threadContexts[0]->enableCapability && fault == NoFault){
+                  UpdatePointerTracker(threadContexts[0],pcState);
+              }
 
               // if (threadContexts[0]->enableCapability && fault == NoFault
               //     ){
