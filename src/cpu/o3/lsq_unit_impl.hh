@@ -1505,11 +1505,20 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 pid != TheISA::PointerID(0))
             {
                 cpu->P0An++;
+
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid != TheISA::PointerID(0))
             {
                cpu->PmAn++;
+               inst->macroop->setMacroopPid(pid);
+               return false;
+            }
+            else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
+                     pid == TheISA::PointerID(0))
+            {
+                inst->macroop->setMacroopPid(pid);
+                return false;
             }
 
             if (ENABLE_PREDICTOR_DEBUG){
