@@ -721,10 +721,10 @@ AtomicSimpleCPU::tick()
                     if (curStaticInst->isStore() &&
                         curStaticInst->getDataSize() == 8)
                     {
-                      // if (ENABLE_LOGGING)
-                       updateAliasTableWithStack(threadContexts[0],pcState);
-                      // else
-                      //    updateAliasTable(threadContexts[0],pcState);
+                       if (ENABLE_LOGGING)
+                          updateAliasTableWithStack(threadContexts[0],pcState);
+                       // else
+                       //    updateAliasTable(threadContexts[0],pcState);
                     }
               }
               // if (threadContexts[0]->enableCapability &&
@@ -773,7 +773,7 @@ AtomicSimpleCPU::tick()
 
                 if (threadContexts[0]->enableCapability &&
                     fault == NoFault && curStaticInst->isLastMicroop() &&
-                    ((uint64_t)t_info.numInsts.value() % 1000000 == 0))
+                    ((uint64_t)t_info.numInsts.value() % 10000000 == 0))
                 {
                     std::cout << std::dec << t_info.numInsts.value() << " " <<
                               threadContexts[0]->num_of_allocations << " " <<
@@ -782,46 +782,46 @@ AtomicSimpleCPU::tick()
                     // threadContexts[0]->LRUPidCache.LRUPIDCachePrintStats();
                      //numOfMemRefs = 0; numOfHeapAccesses = 0;
 
-                     int LV1Size = AliasPageTable.size();
-
-                     int LV2Size = 0, LV3Size = 0, LV4Size = 0,
-                         LV5Size = 0, LV6Size = 0, LV7Size = 0;
-
-                     for (auto &lv1_elem: AliasPageTable){
-                        LV2Size += lv1_elem.second.size();
-                        for (auto &lv2_elem: lv1_elem.second){
-                           LV3Size += lv2_elem.second.size();
-                           for (auto &lv3_elem: lv2_elem.second){
-                              LV4Size += lv3_elem.second.size();
-                              for (auto &lv4_elem: lv3_elem.second){
-                                 LV5Size += lv4_elem.second.size();
-                                 for (auto &lv5_elem: lv4_elem.second){
-                                   LV6Size += lv5_elem.second.size();
-                                 }
-                              }
-                           }
-                        }
-                     }
-
-                     uint64_t storage = 0;
-                     storage = ceil((double)LV1Size/256) +
-                               ceil((double)LV2Size/512) +
-                               ceil((double)LV3Size/512) +
-                               ceil((double)LV4Size/512) +
-                               ceil((double)LV5Size/512) +
-                               ceil((double)LV6Size/1024) ;
-                     storage = storage * 4;
-
-                     std::cout << " AliasPageTable: " << std::dec <<
-                                  "LV1: " << LV1Size << " " <<
-                                  "LV2: " << LV2Size << " " <<
-                                  "LV3: " << LV3Size << " " <<
-                                  "LV4: " << LV4Size << " " <<
-                                  "LV5: " << LV5Size << " " <<
-                                  "LV6: " << LV6Size << " " <<
-                                  "LV7: " << LV7Size << " " <<
-                                  "Storage Size: " << storage << " " <<
-                                  std::endl;
+                //      int LV1Size = AliasPageTable.size();
+                //
+                //      int LV2Size = 0, LV3Size = 0, LV4Size = 0,
+                //          LV5Size = 0, LV6Size = 0, LV7Size = 0;
+                //
+                //      for (auto &lv1_elem: AliasPageTable){
+                //         LV2Size += lv1_elem.second.size();
+                //         for (auto &lv2_elem: lv1_elem.second){
+                //            LV3Size += lv2_elem.second.size();
+                //            for (auto &lv3_elem: lv2_elem.second){
+                //               LV4Size += lv3_elem.second.size();
+                //               for (auto &lv4_elem: lv3_elem.second){
+                //                  LV5Size += lv4_elem.second.size();
+                //                  for (auto &lv5_elem: lv4_elem.second){
+                //                    LV6Size += lv5_elem.second.size();
+                //                  }
+                //               }
+                //            }
+                //         }
+                //      }
+                //
+                //      uint64_t storage = 0;
+                //      storage = ceil((double)LV1Size/256) +
+                //                ceil((double)LV2Size/512) +
+                //                ceil((double)LV3Size/512) +
+                //                ceil((double)LV4Size/512) +
+                //                ceil((double)LV5Size/512) +
+                //                ceil((double)LV6Size/1024) ;
+                //      storage = storage * 4;
+                //
+                //      std::cout << " AliasPageTable: " << std::dec <<
+                //                   "LV1: " << LV1Size << " " <<
+                //                   "LV2: " << LV2Size << " " <<
+                //                   "LV3: " << LV3Size << " " <<
+                //                   "LV4: " << LV4Size << " " <<
+                //                   "LV5: " << LV5Size << " " <<
+                //                   "LV6: " << LV6Size << " " <<
+                //                   "LV7: " << LV7Size << " " <<
+                //                   "Storage Size: " << storage << " " <<
+                //                   std::endl;
                 }
 
                 if (fault == NoFault) {

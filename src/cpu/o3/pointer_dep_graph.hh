@@ -101,6 +101,8 @@ class PointerDependencyGraph
 
 
     void doSquash(uint64_t squashedSeqNum);
+
+    void doUpdate(DynInstPtr& inst);
     /** Removes an instruction from a single linked list. */
     void doCommit(DynInstPtr inst);
 
@@ -411,6 +413,13 @@ PointerDependencyGraph<DynInstPtr>::dump()
         std::cout << std::endl;
 
     } // for loop
+
+}
+
+template <class DynInstPtr>
+void
+PointerDependencyGraph<DynInstPtr>::doUpdate(DynInstPtr& inst)
+{
 
 }
 
