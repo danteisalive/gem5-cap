@@ -539,6 +539,14 @@ BaseSimpleCPU::preExecute()
         //out micro ops
         if (instPtr && instPtr->isMacroop()) {
             curMacroStaticInst = instPtr;
+            if (thread->pcState().pc() == 0x4667e0 ||
+               thread->pcState().pc() == 0x47a750 ||
+               thread->pcState().pc() == 0x4b29d0 ||
+               thread->pcState().pc() == 0x4db460 ||
+               thread->pcState().pc() == 0x510f10)
+               {
+                 printf("FUCK ME!\n");
+               }
             curStaticInst =
                 curMacroStaticInst->fetchMicroop(pcState.microPC());
         } else {
