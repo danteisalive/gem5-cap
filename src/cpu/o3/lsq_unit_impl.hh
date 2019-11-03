@@ -1531,7 +1531,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             }
 
             inst->macroop->setMacroopPid(pid);
-            return true;
+            return false;
 
       }
       else
