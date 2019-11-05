@@ -1369,6 +1369,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             " Number of Execute Alias Table accesses: " <<
             cpu->NumOfAliasTableAccess << std::endl <<
             " Prediction Accuracy(1e6 Instr.): " << accuracy << std::endl <<
+            " Predictor Average Confidence Level(1e6 Instr.): " <<
+            cpu->getLVPTAveConfidenceLevel() << std::endl <<
             " NumOfMissPredictions: " << cpu->FalsePredict <<std::endl <<
             " P0An: " << cpu->P0An <<
             " PnA0: " << cpu->FalsePredict - cpu->P0An - cpu->PmAn <<

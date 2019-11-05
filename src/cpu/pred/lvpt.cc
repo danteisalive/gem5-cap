@@ -70,12 +70,26 @@ DefaultLVPT::DefaultLVPT(unsigned _numEntries,
     }
 
     localCtrs.resize(numEntries);
-
     for (size_t i = 0; i < numEntries; i++) {
         localCtrs[i].setBits(2);
         localCtrs[i].setInitial(0x3); // initial value is 0x11
         localCtrs[i].reset();
     }
+
+    confLevel.resize(numEntries);
+    for (size_t i = 0; i < numEntries; i++) {
+        confLevel[i].setBits(4);
+        confLevel[i].setInitial(0); // initial value is 0
+        confLevel[i].reset();
+    }
+
+    localPointerPredictor.resize(numEntries);
+    for (size_t i = 0; i < numEntries; i++) {
+        localPointerPredictor[i].setBits(2);
+        localPointerPredictor[i].setInitial(0); // initial value is 0
+        localPointerPredictor[i].reset();
+    }
+
 
 
 }
@@ -135,32 +149,43 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
 
     assert(lvpt_idx < numEntries);
 
-    if (lvpt[lvpt_idx].valid
-        && inst_tag == lvpt[lvpt_idx].tag
-        && lvpt[lvpt_idx].tid == tid)
+    if (lvpt[lvpt_idx].valid)
     {
       //std::cout << std::hex << "Lookup localCtrs: " <<
     //  localCtrs[lvpt_idx].read() << std::endl;
-      switch (localCtrs[lvpt_idx].read()) {
-        case 0x0:
-          return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
-                                   localBiases[lvpt_idx]);
-        case 0x1:
-          return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
-                                   localBiases[lvpt_idx]);
-        case 0x2:
-          return lvpt[lvpt_idx].target;
-        case 0x3:
-          return lvpt[lvpt_idx].target;
-        default:
-          assert("invalud localCtrs value!");
-          return TheISA::PointerID(0);
-      }
+      if (inst_tag == lvpt[lvpt_idx].tag
+          && lvpt[lvpt_idx].tid == tid)
+      {
+          switch (localCtrs[lvpt_idx].read()) {
+            case 0x0:
+              return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+                                       localBiases[lvpt_idx]);
+            case 0x1:
+              return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+                                       localBiases[lvpt_idx]);
+            case 0x2:
+            case 0x3:
+               if (lvpt[lvpt_idx].target == TheISA::PointerID(0) &&
+                   localPointerPredictor[lvpt_idx].read() == 0x00)
+               {
+                  return lvpt[lvpt_idx].target;
+               }
+               else {
+                  return TheISA::PointerID(1);
+               }
 
+            default:
+              assert("invalud localCtrs value!");
+              return TheISA::PointerID(0);
+          }
+      }
+      else {
+          return TheISA::PointerID(1);
+      }
     }
     else
     {
-        return TheISA::PointerID(0);
+        return TheISA::PointerID(1);
     }
 }
 
@@ -248,6 +273,22 @@ DefaultLVPT::update(Addr instPC,
           break;
         default:
           assert("localCtrs ivanlid value!");
+      }
+
+      //update these two counters with real predictions
+      // if the prediction is true increase confidence level otw. decrease
+      if (predict){
+          confLevel[lvpt_idx].increment();
+      }
+      else{
+          confLevel[lvpt_idx].decrement();
+      }
+
+      if (target.getPID() == 0){
+          localPointerPredictor[lvpt_idx].decrement();
+      }
+      else {
+          localPointerPredictor[lvpt_idx].increment();
       }
 
 

@@ -536,6 +536,10 @@ class FullO3CPU : public BaseO3CPU
                       DynInstPtr &inst, TheISA::PointerID& _new_pid,
                       bool predict
                       );
+    float getLVPTAveConfidenceLevel()
+    {
+        return fetch.getFetchLVPT()->getAverageConfidenceLevel();
+    }
     /** Sets the commit PC state of a specific thread. */
     void pcState(const TheISA::PCState &newPCState, ThreadID tid);
 

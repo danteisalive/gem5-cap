@@ -116,6 +116,17 @@ class DefaultLVPT
 
     void updatePIDHistory(const InstSeqNum &done_sn, ThreadID tid);
 
+    float getAverageConfidenceLevel() {
+
+        float avg = 0.0;
+
+        for (size_t i = 0; i < numEntries; i++) {
+          avg += float(confLevel[i].read());
+        }
+
+        return avg/numEntries;
+    }
+
   private:
     struct PIDPredictorHistory {
         /**
@@ -184,6 +195,8 @@ class DefaultLVPT
     std::vector<LVPTEntry>  lvpt;
     std::vector<int>        localBiases;
     std::vector<SatCounter> localCtrs;
+    std::vector<SatCounter> confLevel;
+    std::vector<SatCounter> localPointerPredictor;
     /** The number of entries in the LVPT. */
     unsigned numEntries;
 

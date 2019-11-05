@@ -1512,14 +1512,14 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             {
                cpu->PmAn++;
                inst->macroop->setMacroopPid(pid);
-               cpu->updateFetchLVPT(inst, pid, true);
+               cpu->updateFetchLVPT(inst, pid, false);
                return false;
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
             {
                 inst->macroop->setMacroopPid(pid);
-                cpu->updateFetchLVPT(inst, pid, true);
+                cpu->updateFetchLVPT(inst, pid, false);
                 return false;
             }
 
