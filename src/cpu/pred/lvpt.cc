@@ -85,7 +85,7 @@ DefaultLVPT::DefaultLVPT(unsigned _numEntries,
 
     localPointerPredictor.resize(numEntries);
     for (size_t i = 0; i < numEntries; i++) {
-        localPointerPredictor[i].setBits(2);
+        localPointerPredictor[i].setBits(4);
         localPointerPredictor[i].setInitial(0); // initial value is 0
         localPointerPredictor[i].reset();
     }
@@ -145,47 +145,51 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
 {
     unsigned lvpt_idx = getIndex(instPC, tid);
 
-    Addr inst_tag = getTag(instPC);
+    //Addr inst_tag = getTag(instPC);
 
     assert(lvpt_idx < numEntries);
 
     if (lvpt[lvpt_idx].valid)
     {
-      //std::cout << std::hex << "Lookup localCtrs: " <<
-    //  localCtrs[lvpt_idx].read() << std::endl;
-      if (inst_tag == lvpt[lvpt_idx].tag
-          && lvpt[lvpt_idx].tid == tid)
+
+      TheISA::PointerID pred_pid = TheISA::PointerID(0);
+      if (1/*inst_tag == lvpt[lvpt_idx].tag
+          && lvpt[lvpt_idx].tid == tid*/)
       {
           switch (localCtrs[lvpt_idx].read()) {
             case 0x0:
-              return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
                                        localBiases[lvpt_idx]);
+              break;
             case 0x1:
-              return TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
                                        localBiases[lvpt_idx]);
+              break;
             case 0x2:
             case 0x3:
-               if (lvpt[lvpt_idx].target == TheISA::PointerID(0) &&
-                   localPointerPredictor[lvpt_idx].read() == 0x00)
-               {
-                  return lvpt[lvpt_idx].target;
-               }
-               else {
-                  return TheISA::PointerID(1);
-               }
+              pred_pid = lvpt[lvpt_idx].target;
+              break;
 
             default:
-              assert("invalud localCtrs value!");
+              assert("Invalud localCtrs value!");
               return TheISA::PointerID(0);
           }
       }
-      else {
-          return TheISA::PointerID(1);
+      // else {
+      //     return TheISA::PointerID(0);
+      // }
+      if (localPointerPredictor[lvpt_idx].read() > 0 &&
+          pred_pid == TheISA::PointerID(0))
+      {
+          return TheISA::PointerID(0x1000000000000-1);
       }
+
+      return pred_pid;
+
     }
     else
     {
-        return TheISA::PointerID(1);
+        return TheISA::PointerID(0);
     }
 }
 
