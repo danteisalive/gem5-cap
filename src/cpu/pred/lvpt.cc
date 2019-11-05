@@ -179,7 +179,8 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
       //     return TheISA::PointerID(0);
       // }
       if (localPointerPredictor[lvpt_idx].read() > 0 &&
-          pred_pid == TheISA::PointerID(0))
+          pred_pid == TheISA::PointerID(0) &&
+          confLevel[lvpt_idx].read() > 1)
       {
           return TheISA::PointerID(0x1000000000000-1);
       }
@@ -288,12 +289,12 @@ DefaultLVPT::update(Addr instPC,
           confLevel[lvpt_idx].decrement();
       }
 
-      if (target.getPID() == 0){
-          localPointerPredictor[lvpt_idx].decrement();
-      }
-      else {
+      if (target.getPID() != 0){
           localPointerPredictor[lvpt_idx].increment();
       }
+      // else {
+      //     localPointerPredictor[lvpt_idx].increment();
+      // }
 
 
 
