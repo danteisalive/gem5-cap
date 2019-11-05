@@ -1820,6 +1820,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                   inst->readDestReg(inst->staticInst.get(),0) <<
                   " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                   " " << inst->seqNum <<
+                  " " <<  std::hex << inst->pcState().instAddr() <<
                   std::endl;}
 
         uint64_t _pid_num=cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
@@ -1841,6 +1842,7 @@ DefaultIEW<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                     inst->readDestReg(inst->staticInst.get(),0) <<
                     " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
                     " " <<  inst->seqNum <<
+                    " " <<  std::hex << inst->pcState().instAddr() <<
                     std::endl;}
 
         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
