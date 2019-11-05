@@ -606,7 +606,7 @@ void
 AtomicSimpleCPU::tick()
 {
 
-    #define ENABLE_LOGGING 0
+    #define ENABLE_LOGGING 1
     DPRINTF(SimpleCPU, "Tick\n");
 
     // Change thread if multi-threaded
@@ -744,9 +744,10 @@ AtomicSimpleCPU::tick()
                         curStaticInst->getDataSize() == 8 &&
                         threadContexts[0]->InSlice)
                     {
-                        WarmupAliasTable(threadContexts[0],pcState);
+                      if (!ENABLE_LOGGING)
+                          WarmupAliasTable(threadContexts[0],pcState);
                     }
-                }
+              }
 
 
                 if (ENABLE_LOGGING)

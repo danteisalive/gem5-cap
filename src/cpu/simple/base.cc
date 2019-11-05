@@ -545,7 +545,7 @@ BaseSimpleCPU::preExecute()
                thread->pcState().pc() == 0x4db460 ||
                thread->pcState().pc() == 0x510f10)
                {
-                 printf("FUCK ME!\n");
+                 printf("OMNETPP!\n");
                }
             curStaticInst =
                 curMacroStaticInst->fetchMicroop(pcState.microPC());
