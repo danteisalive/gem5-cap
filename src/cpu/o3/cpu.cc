@@ -743,6 +743,17 @@ FullO3CPU<Impl>::regStats()
       .name(name() + ".LVPTMissPredictP0ANLowConfidence")
       .desc("");
 
+    LVPTMissPredictP0ANPointerLowConfidence
+      .name(name() + ".LVPTMissPredictP0ANPointerLowConfidence")
+      .desc("");
+
+    LVPTMissPredictPMANPointerLowConfidence
+      .name(name() + ".LVPTMissPredictPMANPointerLowConfidence")
+      .desc("");
+
+    LVPTMissPredictPNA0PointerLowConfidence
+      .name(name() + ".LVPTMissPredictPNA0PointerLowConfidence")
+      .desc("");
 }
 
 

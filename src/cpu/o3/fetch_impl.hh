@@ -562,8 +562,8 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
                                         StaticInstPtr &inst)
 {
     ThreadContext * tc = cpu->tcBase(tid);
-    TheISA::PointerID _pid = LVPT->lookup(thisPC.instAddr(), tid);
-    inst->PredictionConfidenceLevel = _pid.getConfidenceLevel();
+    TheISA::PointerID _pid = LVPT->lookup(inst, thisPC.instAddr(), tid);
+
 
     if (_pid != TheISA::PointerID(0)){
         tc->LRUPidCache.LRUPIDCache_Access(_pid.getPID());
@@ -571,9 +571,6 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
 
     inst->setMacroopPid(_pid);
 
-    panic_if(inst->getMacroopPid().getConfidenceLevel() <= -1,
-            "lookupAndUpdateLVPT:\
-             inst->getMacroopPid().getConfidenceLevel() <= -1");
 }
 
 

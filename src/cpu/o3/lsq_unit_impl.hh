@@ -1519,10 +1519,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             {
                 cpu->P0An++;
                 cpu->updateFetchLVPT(inst, pid, false);
-                inst->PredictionConfidenceLevel =
-                      inst->macroop->getMacroopPid().getConfidenceLevel();
                 inst->MissPIDSquashType = Impl::MisspredictionType::P0AN;
-                pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
                 inst->macroop->setMacroopPid(pid);
                 return true;
 
@@ -1532,10 +1529,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             {
                cpu->PmAn++;
                cpu->updateFetchLVPT(inst, pid, false);
-               inst->PredictionConfidenceLevel =
-                     inst->macroop->getMacroopPid().getConfidenceLevel();
                inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
-               pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
                inst->macroop->setMacroopPid(pid);
                return false;
             }
@@ -1544,10 +1538,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             {
                 cpu->PnA0++;
                 cpu->updateFetchLVPT(inst, pid, false);
-                inst->PredictionConfidenceLevel =
-                      inst->macroop->getMacroopPid().getConfidenceLevel();
                 inst->MissPIDSquashType = Impl::MisspredictionType::PNA0;
-                pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
+
                 inst->macroop->setMacroopPid(pid);
                 return false;
             }

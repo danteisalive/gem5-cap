@@ -615,22 +615,37 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
         panic_if(inst->macroop->PredictionConfidenceLevel <= -1,
                 "squashDueToMispredictedPID: \
                  inst->PredictionConfidenceLevel == -1");
-
+        panic_if(inst->macroop->PredictionPointerRefillConfidence <= -1,
+                "squashDueToMispredictedPID: \
+                inst->PredictionPointerRefillConfidence == -1");
         switch (inst->MissPIDSquashType) {
           case MisspredictionType::P0AN:
             cpu->LVPTMissPredictP0An++;
-            if (inst->PredictionConfidenceLevel < 8)
+
+            if (inst->macroop->PredictionConfidenceLevel < 12)
               cpu->LVPTMissPredictP0ANLowConfidence++;
+
+            if (inst->macroop->PredictionPointerRefillConfidence < 12)
+              cpu->LVPTMissPredictP0ANPointerLowConfidence++;
+
             break;
           case MisspredictionType::PMAN:
             cpu->LVPTMissPredictPmAn++;
-            if (inst->PredictionConfidenceLevel < 8)
+            if (inst->macroop->PredictionConfidenceLevel < 12)
               cpu->LVPTMissPredictPMANLowConfidence++;
+
+            if (inst->macroop->PredictionPointerRefillConfidence < 12)
+              cpu->LVPTMissPredictPMANPointerLowConfidence++;
+
             break;
           case MisspredictionType::PNA0:
             cpu->LVPTMissPredictPnA0++;
-            if (inst->PredictionConfidenceLevel < 8)
+            if (inst->macroop->PredictionConfidenceLevel < 12)
               cpu->LVPTMissPredictPNA0LowConfidence++;
+
+            if (inst->macroop->PredictionPointerRefillConfidence < 12)
+                cpu->LVPTMissPredictPNA0PointerLowConfidence++;
+
             break;
           default:
             panic("squashDueToMispredictedPID");

@@ -244,6 +244,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     TheISA::PointerID static_pid{0};
     int PredictionConfidenceLevel;
+    int PredictionPointerRefillConfidence;
 
     Addr atomic_vaddr; // this address is used in atomic mode
 
@@ -307,6 +308,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
           mnemonic(_mnemonic), cachedDisassembly(0)
     { isInjected = false; /*checked = false;*/ atomic_vaddr = 0;
       PredictionConfidenceLevel = -1;
+      PredictionPointerRefillConfidence = -1;
     }
 
   public:

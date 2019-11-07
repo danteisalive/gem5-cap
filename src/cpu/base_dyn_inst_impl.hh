@@ -103,7 +103,7 @@ BaseDynInst<Impl>::initVars()
     instFlags[AliasFetchComplete] = false;
     instFlags[AliasFetchStarted] = false;
     MissPIDSquashType = MisspredictionType::NONE;
-    PredictionConfidenceLevel = -1;
+    //PredictionConfidenceLevel = -1;
 
     lqIdx = -1;
     sqIdx = -1;

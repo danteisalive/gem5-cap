@@ -38,6 +38,7 @@
 #include "config/the_isa.hh"
 #include "cpu/inst_seq.hh"
 #include "cpu/pred/sat_counter.hh"
+#include "cpu/static_inst.hh"
 
 class DefaultLVPT
 {
@@ -81,7 +82,7 @@ class DefaultLVPT
      *  @param tid The thread id.
      *  @return Returns the target of the branch.
      */
-    TheISA::PointerID lookup(Addr instPC, ThreadID tid);
+    TheISA::PointerID lookup(StaticInstPtr inst, Addr instPC, ThreadID tid);
 
     /** Checks if a branch is in the LVPT.
      *  @param inst_PC The address of the branch to look up.

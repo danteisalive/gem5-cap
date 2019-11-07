@@ -871,6 +871,9 @@ class FullO3CPU : public BaseO3CPU
     Stats::Scalar LVPTMissPredictPNA0LowConfidence;
     Stats::Scalar LVPTMissPredictPMANLowConfidence;
     Stats::Scalar LVPTMissPredictP0ANLowConfidence;
+    Stats::Scalar LVPTMissPredictP0ANPointerLowConfidence;
+    Stats::Scalar LVPTMissPredictPMANPointerLowConfidence;
+    Stats::Scalar LVPTMissPredictPNA0PointerLowConfidence;
 };
 
 #endif // __CPU_O3_CPU_HH__

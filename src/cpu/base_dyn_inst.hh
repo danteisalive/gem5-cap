@@ -199,7 +199,7 @@ class BaseDynInst : public ExecContext, public RefCounted
 
     TheISA::PointerID   dyn_pid{0};
     MisspredictionType  MissPIDSquashType;
-    int                 PredictionConfidenceLevel;
+    //int                 PredictionConfidenceLevel;
 
     ////////////////////// Branch Data ///////////////
     /** Predicted PC state after this instruction. */

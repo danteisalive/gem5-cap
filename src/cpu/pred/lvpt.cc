@@ -141,7 +141,7 @@ DefaultLVPT::valid(Addr instPC, ThreadID tid)
 // address is valid, and also the address.  For now will just use addr = 0 to
 // represent invalid entry.
 TheISA::PointerID
-DefaultLVPT::lookup(Addr instPC, ThreadID tid)
+DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
 {
     unsigned lvpt_idx = getIndex(instPC, tid);
 
@@ -187,15 +187,17 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
 
       // set the confidence level of this prediction
 
-      //pred_pid.setConfidenceLevel((int)confLevel[lvpt_idx].read());
-      pred_pid.setConfidenceLevel((int)localPointerPredictor[lvpt_idx].read());
-
+      inst->PredictionConfidenceLevel = (int)confLevel[lvpt_idx].read();
+      inst->PredictionPointerRefillConfidence =
+                                (int)localPointerPredictor[lvpt_idx].read();
       return pred_pid;
 
     }
     else
     {
-        return TheISA::PointerID(0,0);
+        inst->PredictionConfidenceLevel = 0;
+        inst->PredictionPointerRefillConfidence = 0;
+        return TheISA::PointerID(0);
     }
 }
 
