@@ -618,19 +618,16 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
 
         switch (inst->MissPIDSquashType) {
           case MisspredictionType::P0AN:
-            //cpu->P0An++;
             cpu->LVPTMissPredictP0An++;
             if (inst->PredictionConfidenceLevel < 8)
               cpu->LVPTMissPredictP0ANLowConfidence++;
             break;
           case MisspredictionType::PMAN:
-            //cpu->PmAn++;
             cpu->LVPTMissPredictPmAn++;
             if (inst->PredictionConfidenceLevel < 8)
               cpu->LVPTMissPredictPMANLowConfidence++;
             break;
           case MisspredictionType::PNA0:
-            //cpu->PnA0++;
             cpu->LVPTMissPredictPnA0++;
             if (inst->PredictionConfidenceLevel < 8)
               cpu->LVPTMissPredictPNA0LowConfidence++;

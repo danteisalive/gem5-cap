@@ -1537,7 +1537,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
                pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
                inst->macroop->setMacroopPid(pid);
-               return true;
+               return false;
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
@@ -1549,7 +1549,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 inst->MissPIDSquashType = Impl::MisspredictionType::PNA0;
                 pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
                 inst->macroop->setMacroopPid(pid);
-                return true;
+                return false;
             }
 
 

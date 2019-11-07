@@ -186,7 +186,9 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
       // }
 
       // set the confidence level of this prediction
-      pred_pid.setConfidenceLevel((int)confLevel[lvpt_idx].read());
+
+      //pred_pid.setConfidenceLevel((int)confLevel[lvpt_idx].read());
+      pred_pid.setConfidenceLevel((int)localPointerPredictor[lvpt_idx].read());
 
       return pred_pid;
 
@@ -281,22 +283,6 @@ DefaultLVPT::update(Addr instPC,
           break;
         default:
           assert("localCtrs ivanlid value!");
-      }
-
-      //update these two counters with real predictions
-      // if the prediction is true increase confidence level otw. decrease
-      if (predict){
-          confLevel[lvpt_idx].increment();
-      }
-      else{
-          confLevel[lvpt_idx].decrement();
-      }
-
-      if (target.getPID() != 0){
-          localPointerPredictor[lvpt_idx].increment();
-      }
-      else {
-          localPointerPredictor[lvpt_idx].decrement();
       }
 
 
@@ -427,6 +413,23 @@ DefaultLVPT::updatePIDHistory(const InstSeqNum &done_sn, ThreadID tid)
        {
          LVPTHistory *history =
              static_cast<LVPTHistory*>(pred_hist_it->second.lvptEntryHistory);
+
+        //update these two counters with real predictions
+        // if the prediction is true increase confidence level otw. decrease
+
+        if (pred_hist_it->second.predResult){
+            confLevel[pred_hist_it->second.lvptIdx].increment();
+        }
+        else{
+            confLevel[pred_hist_it->second.lvptIdx].decrement();
+        }
+
+        if (pred_hist_it->second.targetPID.getPID() != 0){
+            localPointerPredictor[pred_hist_it->second.lvptIdx].increment();
+        }
+        else {
+            localPointerPredictor[pred_hist_it->second.lvptIdx].decrement();
+        }
 
          delete history;
 
