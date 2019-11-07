@@ -101,6 +101,8 @@ class DefaultCommit
     typedef typename CPUPol::Fetch Fetch;
     typedef typename CPUPol::IEW IEW;
 
+    typedef typename Impl::MisspredictionType MisspredictionType;
+
     typedef O3ThreadState<Impl> Thread;
 
     /** Overall commit status. Used to determine if the CPU can deschedule
@@ -496,7 +498,9 @@ class DefaultCommit
     /** Stat for the total number of squashed instructions discarded by commit.
      */
     Stats::Scalar commitSquashedInsts;
-    /** Stat for the total number of times commit has had to stall due to a non-
+    Stats::Scalar commitSquashedInstsDueToMissPID;
+    /** Stat for the total number of times commit
+        has had to stall due to a non-
      * speculative instruction reaching the head of the ROB.
      */
     Stats::Scalar commitNonSpecStalls;

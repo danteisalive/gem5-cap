@@ -185,6 +185,7 @@ struct DefaultRenameDefaultIEW {
 template<class Impl>
 struct DefaultIEWDefaultCommit {
     typedef typename Impl::DynInstPtr DynInstPtr;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
     int size;
 
@@ -201,6 +202,7 @@ struct DefaultIEWDefaultCommit {
 
     TheISA::PointerID squashedPID[Impl::MaxThreads];
     bool squashDueToMispredictedPID[Impl::MaxThreads];
+    MisspredictionType squashMisspredictionType[Impl::MaxThreads];
 
 };
 
@@ -217,6 +219,7 @@ struct IssueStruct {
 template<class Impl>
 struct TimeBufStruct {
     typedef typename Impl::DynInstPtr DynInstPtr;
+    typedef typename Impl::MisspredictionType MisspredictionType;
     struct decodeComm {
         TheISA::PCState nextPC;
         DynInstPtr mispredictInst;
@@ -320,6 +323,7 @@ struct TimeBufStruct {
 
         TheISA::PointerID squashedPID;
         bool squashDueToMispredictedPID;
+        MisspredictionType squashMisspredictionType;
 
     };
 

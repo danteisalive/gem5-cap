@@ -112,6 +112,7 @@ ROB<Impl>::resetState()
 {
     for (ThreadID tid = 0; tid  < numThreads; tid++) {
         doneSquashing[tid] = true;
+        MissPIDSquashType[tid] = MisspredictionType::NONE;
         threadEntries[tid] = 0;
         squashIt[tid] = instList[tid].end();
         squashedSeqNum[tid] = 0;
@@ -342,6 +343,7 @@ ROB<Impl>::doSquash(ThreadID tid)
         squashIt[tid] = instList[tid].end();
 
         doneSquashing[tid] = true;
+        MissPIDSquashType[tid] = MisspredictionType::NONE;
         return;
     }
 
@@ -361,6 +363,7 @@ ROB<Impl>::doSquash(ThreadID tid)
         // Mark the instruction as squashed, and ready to commit so that
         // it can drain out of the pipeline.
         (*squashIt[tid])->setSquashed();
+        (*squashIt[tid])->MissPIDSquashType = MissPIDSquashType[tid];
 
         (*squashIt[tid])->setCanCommit();
 
@@ -372,7 +375,7 @@ ROB<Impl>::doSquash(ThreadID tid)
             squashIt[tid] = instList[tid].end();
 
             doneSquashing[tid] = true;
-
+            MissPIDSquashType[tid] = MisspredictionType::NONE;
             return;
         }
 
@@ -394,6 +397,7 @@ ROB<Impl>::doSquash(ThreadID tid)
         squashIt[tid] = instList[tid].end();
 
         doneSquashing[tid] = true;
+        MissPIDSquashType[tid] = MisspredictionType::NONE;
     }
 
     if (robTailUpdate) {
@@ -484,7 +488,8 @@ ROB<Impl>::updateTail()
 
 template <class Impl>
 void
-ROB<Impl>::squash(InstSeqNum squash_num, ThreadID tid)
+ROB<Impl>::squash(MisspredictionType _MissPIDSquashType,
+                  InstSeqNum squash_num, ThreadID tid)
 {
     if (isEmpty(tid)) {
         DPRINTF(ROB, "Does not need to squash due to being empty "
@@ -501,6 +506,7 @@ ROB<Impl>::squash(InstSeqNum squash_num, ThreadID tid)
     doneSquashing[tid] = false;
 
     squashedSeqNum[tid] = squash_num;
+    MissPIDSquashType[tid] = _MissPIDSquashType;
 
     if (!instList[tid].empty()) {
         InstIt tail_thread = instList[tid].end();

@@ -103,6 +103,7 @@ class PointerDependencyGraph
     void doSquash(uint64_t squashedSeqNum);
 
     void doUpdate(DynInstPtr& inst);
+    void InternalUpdate(PointerDepEntry* it ,DynInstPtr &inst);
     /** Removes an instruction from a single linked list. */
     void doCommit(DynInstPtr inst);
 
@@ -420,6 +421,199 @@ template <class DynInstPtr>
 void
 PointerDependencyGraph<DynInstPtr>::doUpdate(DynInstPtr& inst)
 {
+    #define POINTER_DEP_GRAPH_UPDATE_DEBUG 0
+
+    if (inst->isBoundsCheckMicroop()) return; // we do not save these
+    if (!inst->isLoad()) {
+        panic("doUpdate called with a non-load instruction!");
+    }
+
+    if (POINTER_DEP_GRAPH_UPDATE_DEBUG)
+    {
+        std::cout <<"--------START----------\n";
+        std::cout << std::dec << "Updating: [" <<
+                  inst->seqNum << "]"<< std::endl;
+        std::cout << "Before Update:\n";
+        dump();
+    }
+
+    //find the load uop
+    // we should defenitly find it othersie it's a panic!
+    // doUpdate happends before squash so we should find it in the DEP Graph
+    bool found = false;
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        // Erase  (C++11 and later)
+        for (auto it = dependGraph[indx].begin();
+            it != dependGraph[indx].end(); it++)
+        {
+            //if found: update and return
+            if (it->inst->seqNum == inst->seqNum) {
+                // get the actual PID for this load
+                TheISA::PointerID _pid = inst->macroop->getMacroopPid();
+                // insert an entry for the destination reg
+                for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+                    if (inst->staticInst->destRegIdx(i).isIntReg() &&
+                        (inst->staticInst->destRegIdx(i).index() <
+                                                  TheISA::NumIntRegs))
+                    {
+                        int dest_reg_idx =
+                            inst->staticInst->destRegIdx(i).index();
+                        panic_if(dest_reg_idx != i,
+                          "destination reg id does not \
+                           match with updated load!");
+                        it->pid = _pid;
+                    }
+                }
+
+                found = true;
+                break;
+
+            }
+        }
+
+    } // for loop
+    panic_if(!found, "Could not find the load uop\
+                     when updating the DEP Graph!");
+
+    // now one by one find all the instruction with seqNum greater
+    // than load uop and update their uops
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        // Erase  (C++11 and later)
+        for (auto it = dependGraph[indx].begin();
+          it != dependGraph[indx].end(); it++)
+        {
+            if (it->inst->seqNum > inst->seqNum) {
+              //InternalUpdate(it, inst);
+            }
+        }
+    }
+
+    // now update FetchArchRegsPid with the latest values
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
+        FetchArchRegsPid[i] = dependGraph[i].front().pid;
+    }
+
+
+    if (POINTER_DEP_GRAPH_COMMIT_DEBUG)
+    {
+        std::cout << "After Update\n";
+        dump();
+        std::cout << "--------END----------\n";
+    }
+
+
+
+}
+
+template <class DynInstPtr>
+void
+PointerDependencyGraph<DynInstPtr>::InternalUpdate(
+                                  PointerDepEntry* it ,DynInstPtr &inst)
+{
+
+    #define ENABLE_DEP_GRAPH_INTERNAL_UPDATE 0
+
+    if (inst->isBoundsCheckMicroop()) return;
+
+    if (inst->isLoad() && inst->staticInst->getDataSize() == 8)
+    {
+        // get the predicted PID for this load
+        TheISA::PointerID _pid = inst->macroop->getMacroopPid();
+        // insert an entry for the destination reg
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+            if (inst->staticInst->destRegIdx(i).isIntReg() &&
+                (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+            {
+                int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+                dependGraph[dest_reg_idx].push_front(
+                                              PointerDepEntry(inst, _pid));
+                FetchArchRegsPid[dest_reg_idx] = _pid;
+            }
+        }
+    }
+    else if (inst->isLoad() && inst->staticInst->getDataSize() != 8)
+    {
+        // this is defenitly not a pointer refill
+        // set the dest regs as PID(0)
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+            if (inst->staticInst->destRegIdx(i).isIntReg() &&
+               (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+            {
+                int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+                dependGraph[dest_reg_idx].push_front(
+                                              PointerDepEntry(inst, _pid));
+                FetchArchRegsPid[dest_reg_idx] = _pid;
+            }
+        }
+    }
+    else if (inst->staticInst->getDataSize() == 8) {
+
+        TheISA::PointerID _pid{0} ;
+        for (size_t i = 0; i < inst->staticInst->numSrcRegs(); i++) {
+          if (inst->staticInst->srcRegIdx(i).isIntReg() &&
+              (inst->staticInst->srcRegIdx(i).index() < TheISA::NumIntRegs))
+          {
+              // if one of the sources is not pid(0), assign it to pid
+              // and break;
+              int src_reg_idx = inst->staticInst->srcRegIdx(i).index();
+              if (FetchArchRegsPid[src_reg_idx] != TheISA::PointerID(0))
+              {
+                _pid = FetchArchRegsPid[src_reg_idx];
+                break;
+              }
+          }
+        }
+
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+          if (inst->staticInst->destRegIdx(i).isIntReg() &&
+              (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+          {
+             // assign pid to all of the dest regs
+             int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+             dependGraph[dest_reg_idx].push_front(
+                                        PointerDepEntry(inst, _pid));
+             FetchArchRegsPid[dest_reg_idx] = _pid;
+          }
+        }
+
+    }
+    // defenitly this is not a pointer transefer
+    // zero out all the dest regs
+    else if (inst->staticInst->getDataSize() != 8) {
+
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+          if (inst->staticInst->destRegIdx(i).isIntReg() &&
+              (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
+          {
+              // zero out all dest regs
+              int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+              dependGraph[dest_reg_idx].push_front(
+                                        PointerDepEntry(inst, _pid));
+              FetchArchRegsPid[dest_reg_idx] = _pid;
+          }
+        }
+    }
+
+    // zero out all interface regs for the next macroopp
+    if (inst->isLastMicroop()){
+      TheISA::PointerID _pid = TheISA::PointerID(0);
+      for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
+          //zero out all dest regs
+          FetchArchRegsPid[i] = _pid;
+      }
+      //dump();
+    }
+
+
+
+      if (ENABLE_DEP_GRAPH_INTERNAL_UPDATE)
+      {
+        dump();
+        std::cout << "-------------END--------------\n";
+      }
+
 
 }
 

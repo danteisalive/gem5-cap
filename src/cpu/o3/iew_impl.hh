@@ -175,6 +175,11 @@ DefaultIEW<Impl>::regStats()
         .name(name() + ".iewDispSquashedInsts")
         .desc("Number of squashed instructions skipped by dispatch");
 
+    iewDispSquashedInstsDueToMissPID
+        .name(name() + ".iewDispSquashedInstsDueToMissPID")
+        .desc("Number of squashed instructions skipped by dispatch\
+              Due to PID Missprediction" );
+
     iewDispLoadInsts
         .name(name() + ".iewDispLoadInsts")
         .desc("Number of dispatched load instructions");
@@ -230,6 +235,11 @@ DefaultIEW<Impl>::regStats()
     iewExecSquashedInsts
         .name(name() + ".iewExecSquashedInsts")
         .desc("Number of squashed instructions skipped in execute");
+
+    iewExecSquashedInstsDueToMissPID
+        .name(name() + ".iewExecSquashedInstsDueToMissPID")
+        .desc("Number of squashed instructions skipped in execute\
+              Due to Misspredicted PID");
 
     iewExecutedSwp
         .init(cpu->numThreads)
@@ -457,10 +467,26 @@ DefaultIEW<Impl>::squash(ThreadID tid)
     DPRINTF(IEW, "[tid:%i]: Squashing all instructions.\n", tid);
 
     // Tell the IQ to start squashing.
+    if (fromCommit->commitInfo[tid].squashDueToMispredictedPID &&
+        fromCommit->commitInfo[tid].squashMisspredictionType ==
+                                    Impl::MisspredictionType::NONE )
+    {
+      assert("IEW: squashDueToMispredictedPID && \
+              SQUASH::MisspredictionType::NONE");
+    }
+    if (!fromCommit->commitInfo[tid].squashDueToMispredictedPID &&
+        fromCommit->commitInfo[tid].squashMisspredictionType !=
+                                    Impl::MisspredictionType::NONE )
+    {
+      assert("IEW: ~squashDueToMispredictedPID && \
+                   ~SQUASH::MisspredictionType::NONE");
+    }
+
     instQueue.squash(tid);
 
     // Tell the LDSTQ to start squashing.
-    ldstQueue.squash(fromCommit->commitInfo[tid].doneSeqNum, tid);
+    ldstQueue.squash(fromCommit->commitInfo[tid].squashMisspredictionType,
+                     fromCommit->commitInfo[tid].doneSeqNum, tid);
     updatedQueues = true;
 
     // Clear the skid buffer in case it has any data in it.
@@ -508,7 +534,7 @@ DefaultIEW<Impl>::squashDueToBranch(DynInstPtr &inst, ThreadID tid)
         toCommit->includeSquashInst[tid] = false;
 
         toCommit->squashDueToMispredictedPID[tid] = false;
-
+        toCommit->squashMisspredictionType[tid] = MisspredictionType::NONE;
         wroteToTimeBuffer = true;
 
         squashExecuteAliasTable(inst, false);
@@ -541,7 +567,7 @@ DefaultIEW<Impl>::squashDueToMemOrder(DynInstPtr &inst, ThreadID tid)
         // Must include the memory violator in the squash.
         toCommit->includeSquashInst[tid] = true;
         toCommit->squashDueToMispredictedPID[tid] = false;
-
+        toCommit->squashMisspredictionType[tid] = MisspredictionType::NONE;
         wroteToTimeBuffer = true;
 
         squashExecuteAliasTable(inst, true);
@@ -566,6 +592,7 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
 
         TheISA::PCState pc = inst->pcState();
 
+        cpu->LVPTMissPredict++;
         // we never squash on macroops which have injected microops!
         // if (inst->macroop->hasInjection()){
         //     inst->macroop->isSquashedAfterInjection = true;
@@ -583,6 +610,35 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
         toCommit->mispredictInst[tid] = NULL;
         toCommit->squashedPID[tid] = inst->macroop->getMacroopPid();
         toCommit->squashDueToMispredictedPID[tid] = true;
+        toCommit->squashMisspredictionType[tid] = inst->MissPIDSquashType;
+
+        panic_if(inst->macroop->PredictionConfidenceLevel <= -1,
+                "squashDueToMispredictedPID: \
+                 inst->PredictionConfidenceLevel == -1");
+
+        switch (inst->MissPIDSquashType) {
+          case MisspredictionType::P0AN:
+            //cpu->P0An++;
+            cpu->LVPTMissPredictP0An++;
+            if (inst->PredictionConfidenceLevel < 8)
+              cpu->LVPTMissPredictP0ANLowConfidence++;
+            break;
+          case MisspredictionType::PMAN:
+            //cpu->PmAn++;
+            cpu->LVPTMissPredictPmAn++;
+            if (inst->PredictionConfidenceLevel < 8)
+              cpu->LVPTMissPredictPMANLowConfidence++;
+            break;
+          case MisspredictionType::PNA0:
+            //cpu->PnA0++;
+            cpu->LVPTMissPredictPnA0++;
+            if (inst->PredictionConfidenceLevel < 8)
+              cpu->LVPTMissPredictPNA0LowConfidence++;
+            break;
+          default:
+            panic("squashDueToMispredictedPID");
+
+        }
         // Must include the memory violator in the squash? I dont think so
         // we will just update the PID and continue running
         toCommit->includeSquashInst[tid] = true;
@@ -1059,6 +1115,10 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
 
             ++iewDispSquashedInsts;
 
+            if (inst->MissPIDSquashType != MisspredictionType::NONE){
+              ++iewDispSquashedInstsDueToMissPID;
+            }
+
             insts_to_dispatch.pop();
 
             //Tell Rename That An Instruction has been processed
@@ -1302,6 +1362,10 @@ DefaultIEW<Impl>::executeInsts()
             inst->setCanCommit();
 
             ++iewExecSquashedInsts;
+            if (inst->MissPIDSquashType != MisspredictionType::NONE){
+                ++iewExecSquashedInstsDueToMissPID;
+            }
+
 
             continue;
         }

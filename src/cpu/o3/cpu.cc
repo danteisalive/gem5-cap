@@ -731,6 +731,18 @@ FullO3CPU<Impl>::regStats()
         .name(name() + ".numOutStandingCapabilityCacheAccesses")
         .desc("Number of R/W Accesses to Capability Cache in Shadow Memory");
 
+    LVPTMissPredictPNA0LowConfidence
+      .name(name() + ".LVPTMissPredictPNA0LowConfidence")
+      .desc("");
+
+    LVPTMissPredictPMANLowConfidence
+      .name(name() + ".LVPTMissPredictPMANLowConfidence")
+      .desc("");
+
+    LVPTMissPredictP0ANLowConfidence
+      .name(name() + ".LVPTMissPredictP0ANLowConfidence")
+      .desc("");
+
 }
 
 
@@ -1071,12 +1083,12 @@ FullO3CPU<Impl>::removeThread(ThreadID tid)
     // Squash Throughout Pipeline
     DynInstPtr inst = commit.rob->readHeadInst(tid);
     InstSeqNum squash_seq_num = inst->seqNum;
-    fetch.squash(0, squash_seq_num, inst, tid, false);
+    fetch.squash(0, squash_seq_num, inst, tid, false,MisspredictionType::NONE);
     decode.squash(tid);
     rename.squash(squash_seq_num, tid);
     iew.squash(tid);
-    iew.ldstQueue.squash(squash_seq_num, tid);
-    commit.rob->squash(squash_seq_num, tid);
+    iew.ldstQueue.squash(MisspredictionType::NONE ,squash_seq_num, tid);
+    commit.rob->squash(MisspredictionType::NONE,squash_seq_num, tid);
 
 
     assert(iew.instQueue.getCount(tid) == 0);
@@ -1864,7 +1876,8 @@ FullO3CPU<Impl>::removeFrontInst(DynInstPtr &inst)
 
 template <class Impl>
 void
-FullO3CPU<Impl>::removeInstsNotInROB(ThreadID tid)
+FullO3CPU<Impl>::removeInstsNotInROB(ThreadID tid,
+                                     MisspredictionType _MissPIDSquashType)
 {
     DPRINTF(O3CPU, "Thread %i: Deleting instructions from instruction"
             " list.\n", tid);
@@ -1895,7 +1908,7 @@ FullO3CPU<Impl>::removeInstsNotInROB(ThreadID tid)
     while (inst_it != end_it) {
         assert(!instList.empty());
 
-        squashInstIt(inst_it, tid);
+        squashInstIt(inst_it, tid, _MissPIDSquashType);
 
         inst_it--;
     }
@@ -1903,7 +1916,7 @@ FullO3CPU<Impl>::removeInstsNotInROB(ThreadID tid)
     // If the ROB was empty, then we actually need to remove the first
     // instruction as well.
     if (rob_empty) {
-        squashInstIt(inst_it, tid);
+        squashInstIt(inst_it, tid, _MissPIDSquashType);
     }
 }
 
@@ -1916,7 +1929,8 @@ FullO3CPU<Impl>::removeInstsUntil(const InstSeqNum &seq_num, ThreadID tid)
     removeInstsThisCycle = true;
 
     ListIt inst_iter = instList.end();
-
+    panic("function removeInstsUntilis called! MisspredictionType::NONE\
+          is not correct! FIX IT!");
     inst_iter--;
 
     DPRINTF(O3CPU, "Deleting instructions from instruction "
@@ -1927,7 +1941,7 @@ FullO3CPU<Impl>::removeInstsUntil(const InstSeqNum &seq_num, ThreadID tid)
 
         bool break_loop = (inst_iter == instList.begin());
 
-        squashInstIt(inst_iter, tid);
+        squashInstIt(inst_iter, tid, MisspredictionType::NONE) ;
 
         inst_iter--;
 
@@ -1938,7 +1952,8 @@ FullO3CPU<Impl>::removeInstsUntil(const InstSeqNum &seq_num, ThreadID tid)
 
 template <class Impl>
 inline void
-FullO3CPU<Impl>::squashInstIt(const ListIt &instIt, ThreadID tid)
+FullO3CPU<Impl>::squashInstIt(const ListIt &instIt, ThreadID tid,
+                              MisspredictionType _MissPIDSquashType)
 {
     if ((*instIt)->threadNumber == tid) {
         DPRINTF(O3CPU, "Squashing instruction, "
@@ -1949,6 +1964,7 @@ FullO3CPU<Impl>::squashInstIt(const ListIt &instIt, ThreadID tid)
 
         // Mark it as squashed.
         (*instIt)->setSquashed();
+        (*instIt)->MissPIDSquashType = _MissPIDSquashType;
 
         // @todo: Formulate a consistent method for deleting
         // instructions from the instruction list

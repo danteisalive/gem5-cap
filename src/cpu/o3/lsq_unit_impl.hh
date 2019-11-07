@@ -1120,7 +1120,8 @@ LSQUnit<Impl>::writebackStores()
 
 template <class Impl>
 void
-LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
+LSQUnit<Impl>::squash(MisspredictionType _MissPIDSquashType,
+                      const InstSeqNum &squashed_num)
 {
     DPRINTF(LSQUnit, "Squashing until [sn:%lli]!"
             "(Loads:%i Stores:%i)\n", squashed_num, loads, stores);
@@ -1141,7 +1142,9 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
         }
 
         // Clear the smart pointer to make sure it is decremented.
+        loadQueue[load_idx]->MissPIDSquashType = _MissPIDSquashType;
         loadQueue[load_idx]->setSquashed();
+        loadQueue[load_idx]->setSquashedInLSQ();
         squashExecuteAliasTable(loadQueue[load_idx], squashed_num);
         loadQueue[load_idx] = NULL;
         --loads;
@@ -1186,7 +1189,9 @@ LSQUnit<Impl>::squash(const InstSeqNum &squashed_num)
         }
 
         // Clear the smart pointer to make sure it is decremented.
+        storeQueue[store_idx].inst->MissPIDSquashType = _MissPIDSquashType;
         storeQueue[store_idx].inst->setSquashed();
+        storeQueue[store_idx].inst->setSquashedInLSQ();
         squashExecuteAliasTable(storeQueue[store_idx].inst, squashed_num);
         storeQueue[store_idx].inst = NULL;
         storeQueue[store_idx].canWB = 0;
@@ -1492,37 +1497,13 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
 
     cpu->NumOfAliasTableAccess++;
-
+    cpu->numOfAliasTableAccess++;
     // threrefore we need to go to AliasCache
     TheISA::PointerID pid = TheISA::PointerID(0);
     cpu->ExeAliasCache->Access(inst->effAddr, tc, &pid);
 
     if (inst->macroop->getMacroopPid() != pid)
     {
-
-            cpu->FalsePredict++;
-            if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
-                pid != TheISA::PointerID(0))
-            {
-                cpu->P0An++;
-
-            }
-            else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
-                     pid != TheISA::PointerID(0))
-            {
-               cpu->PmAn++;
-               inst->macroop->setMacroopPid(pid);
-               cpu->updateFetchLVPT(inst, pid, false);
-               return false;
-            }
-            else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
-                     pid == TheISA::PointerID(0))
-            {
-                inst->macroop->setMacroopPid(pid);
-                cpu->updateFetchLVPT(inst, pid, false);
-                return false;
-            }
-
             if (ENABLE_PREDICTOR_DEBUG){
                std::cout << std::hex <<
                           "EXECUTE: False Prediction Load Instruction: " <<
@@ -1531,9 +1512,48 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                           "Predicted: " << inst->macroop->getMacroopPid() <<
                           " " << "Actual: " << pid << std::endl;
             }
-            cpu->updateFetchLVPT(inst, pid, false);
-            inst->macroop->setMacroopPid(pid);
-            return true;
+
+            cpu->FalsePredict++;
+            if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
+                pid != TheISA::PointerID(0))
+            {
+                cpu->P0An++;
+                cpu->updateFetchLVPT(inst, pid, false);
+                inst->PredictionConfidenceLevel =
+                      inst->macroop->getMacroopPid().getConfidenceLevel();
+                inst->MissPIDSquashType = Impl::MisspredictionType::P0AN;
+                pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
+                inst->macroop->setMacroopPid(pid);
+                return true;
+
+            }
+            else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
+                     pid != TheISA::PointerID(0))
+            {
+               cpu->PmAn++;
+               cpu->updateFetchLVPT(inst, pid, false);
+               inst->PredictionConfidenceLevel =
+                     inst->macroop->getMacroopPid().getConfidenceLevel();
+               inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
+               pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
+               inst->macroop->setMacroopPid(pid);
+               return true;
+            }
+            else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
+                     pid == TheISA::PointerID(0))
+            {
+                cpu->PnA0++;
+                cpu->updateFetchLVPT(inst, pid, false);
+                inst->PredictionConfidenceLevel =
+                      inst->macroop->getMacroopPid().getConfidenceLevel();
+                inst->MissPIDSquashType = Impl::MisspredictionType::PNA0;
+                pid.setConfidenceLevel(inst->PredictionConfidenceLevel);
+                inst->macroop->setMacroopPid(pid);
+                return true;
+            }
+
+
+
 
       }
       else

@@ -95,6 +95,8 @@ class DefaultIEW
     typedef typename CPUPol::RenameStruct RenameStruct;
     typedef typename CPUPol::IssueStruct IssueStruct;
 
+    typedef typename Impl::MisspredictionType MisspredictionType;
+
   public:
     /** Overall IEW stage status. Used to determine if the CPU can
      * deschedule itself due to a lack of activity.
@@ -435,6 +437,7 @@ class DefaultIEW
     Stats::Scalar iewDispatchedInsts;
     /** Stat for total number of squashed instructions dispatch skips. */
     Stats::Scalar iewDispSquashedInsts;
+    Stats::Scalar iewDispSquashedInstsDueToMissPID;
     /** Stat for total number of dispatched load instructions. */
     Stats::Scalar iewDispLoadInsts;
     /** Stat for total number of dispatched store instructions. */
@@ -464,6 +467,7 @@ class DefaultIEW
 //    Stats::Scalar iewExecStoreInsts;
     /** Stat for total number of squashed instructions skipped at execute. */
     Stats::Scalar iewExecSquashedInsts;
+    Stats::Scalar iewExecSquashedInstsDueToMissPID;
     /** Number of executed software prefetches. */
     Stats::Vector iewExecutedSwp;
     /** Number of executed nops. */

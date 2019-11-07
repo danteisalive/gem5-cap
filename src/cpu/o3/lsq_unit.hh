@@ -85,6 +85,7 @@ class LSQUnit {
     typedef typename Impl::CPUPol::IEW IEW;
     typedef typename Impl::CPUPol::LSQ LSQ;
     typedef typename Impl::CPUPol::IssueStruct IssueStruct;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
   public:
     /** Constructs an LSQ unit. init() must be called prior to use. */
@@ -179,7 +180,8 @@ class LSQUnit {
     void resizeSQ(unsigned size);
 
     /** Squashes all instructions younger than a specific sequence number. */
-    void squash(const InstSeqNum &squashed_num);
+    void squash(MisspredictionType MissPIDSquashType,
+                const InstSeqNum &squashed_num);
 
     /** Returns if there is a memory ordering violation. Value is reset upon
      * call to getMemDepViolator().

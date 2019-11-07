@@ -68,7 +68,6 @@ BaseDynInst<Impl>::BaseDynInst(const StaticInstPtr &_staticInst,
     seqNum = seq_num;
     pc = _pc;
     predPC = _predPC;
-
     initVars();
 }
 
@@ -79,6 +78,7 @@ BaseDynInst<Impl>::BaseDynInst(const StaticInstPtr &_staticInst,
 {
     seqNum = 0;
     initVars();
+
 }
 
 template <class Impl>
@@ -102,6 +102,8 @@ BaseDynInst<Impl>::initVars()
     aliasFetchStartCycle = 0;
     instFlags[AliasFetchComplete] = false;
     instFlags[AliasFetchStarted] = false;
+    MissPIDSquashType = MisspredictionType::NONE;
+    PredictionConfidenceLevel = -1;
 
     lqIdx = -1;
     sqIdx = -1;

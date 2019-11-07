@@ -81,6 +81,7 @@ class BaseDynInst : public ExecContext, public RefCounted
   public:
     // Typedef for the CPU.
     typedef typename Impl::CPUType ImplCPU;
+    typedef typename Impl::MisspredictionType MisspredictionType;
     typedef typename ImplCPU::ImplState ImplState;
     using VecRegContainer = TheISA::VecRegContainer;
 
@@ -95,6 +96,8 @@ class BaseDynInst : public ExecContext, public RefCounted
         MaxInstSrcRegs = TheISA::MaxInstSrcRegs,        /// Max source regs
         MaxInstDestRegs = TheISA::MaxInstDestRegs       /// Max dest regs
     };
+
+
 
   protected:
     enum Status {
@@ -142,6 +145,8 @@ class BaseDynInst : public ExecContext, public RefCounted
         AliasFetchComplete,
         MaxFlags
     };
+
+
 
   public:
     /** The sequence number of the instruction. */
@@ -192,7 +197,10 @@ class BaseDynInst : public ExecContext, public RefCounted
     /** Iterator pointing to this BaseDynInst in the list of all insts. */
     ListIt instListIt;
 
-    TheISA::PointerID dyn_pid{0};
+    TheISA::PointerID   dyn_pid{0};
+    MisspredictionType  MissPIDSquashType;
+    int                 PredictionConfidenceLevel;
+
     ////////////////////// Branch Data ///////////////
     /** Predicted PC state after this instruction. */
     TheISA::PCState predPC;

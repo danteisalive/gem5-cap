@@ -61,6 +61,7 @@ class LSQ {
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef typename Impl::CPUPol::IEW IEW;
     typedef typename Impl::CPUPol::LSQUnit LSQUnit;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
     /** SMT policy. */
     enum LSQPolicy {
@@ -142,8 +143,10 @@ class LSQ {
     /**
      * Squash instructions from a thread until the specified sequence number.
      */
-    void squash(const InstSeqNum &squashed_num, ThreadID tid)
-    { thread[tid].squash(squashed_num); }
+    void squash(MisspredictionType MissPIDSquashType ,
+                const InstSeqNum &squashed_num,
+                ThreadID tid)
+    { thread[tid].squash(MissPIDSquashType, squashed_num); }
 
     /** Returns whether or not there was a memory ordering violation. */
     bool violation();

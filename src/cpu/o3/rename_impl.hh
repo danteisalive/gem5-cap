@@ -367,8 +367,11 @@ DefaultRename<Impl>::squash(const InstSeqNum &squash_seq_num, ThreadID tid)
     for (int i=0; i<fromDecode->size; i++) {
         if (fromDecode->insts[i]->threadNumber == tid &&
             fromDecode->insts[i]->seqNum > squash_seq_num) {
+
             fromDecode->insts[i]->setSquashed();
             wroteToTimeBuffer = true;
+            fromDecode->insts[i]->MissPIDSquashType =
+                  fromCommit->commitInfo[tid].squashMisspredictionType;
         }
 
     }

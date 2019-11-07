@@ -59,15 +59,22 @@ namespace X86ISA
   {
   private:
       uint64_t id;
+      int ConfidenceLevel;
   public:
 
       PointerID(){
           id = 0;
+          ConfidenceLevel = -1;
       }
 
       PointerID(uint64_t _id){
-
           id = _id;
+          ConfidenceLevel = -1;
+      }
+
+      PointerID(uint64_t _id, int _confLevel){
+          id = _id;
+          ConfidenceLevel = _confLevel;
       }
 
       ~PointerID()
@@ -93,7 +100,7 @@ namespace X86ISA
 
               // do the copy
               this->id = _pid.id;
-
+              this->ConfidenceLevel = _pid.ConfidenceLevel;
               // return the existing object so we can chain this operator
               return *this;
       }
@@ -122,10 +129,13 @@ namespace X86ISA
       PointerID(const PointerID& _PID)
       {
           this->id = _PID.id;
+          this->ConfidenceLevel = _PID.ConfidenceLevel;
       }
 
       void        setPID(uint64_t _id) { id = _id; }
       uint64_t    getPID() const { return id; }
+      void setConfidenceLevel(int _confLevel){ConfidenceLevel = _confLevel;}
+      int  getConfidenceLevel(){return ConfidenceLevel;};
 
 
   };

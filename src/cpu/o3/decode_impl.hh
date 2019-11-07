@@ -150,6 +150,12 @@ DefaultDecode<Impl>::regStats()
         .name(name() + ".SquashedInsts")
         .desc("Number of squashed instructions handled by decode")
         .prereq(decodeSquashedInsts);
+
+    decodeSquashedInstsDueToMissPID
+        .name(name() + ".decodeSquashedInstsDueToMissPID")
+        .desc("Number of squashed instructions handled by decode due to \
+               Mispredicted PID")
+        .prereq(decodeSquashedInstsDueToMissPID);
 }
 
 template<class Impl>
@@ -321,6 +327,7 @@ DefaultDecode<Impl>::squash(DynInstPtr &inst, ThreadID tid)
         if (fromFetch->insts[i]->threadNumber == tid &&
             fromFetch->insts[i]->seqNum > squash_seq_num) {
             fromFetch->insts[i]->setSquashed();
+            fromFetch->insts[i]->MissPIDSquashType = MisspredictionType::NONE;
         }
     }
 
@@ -370,6 +377,8 @@ DefaultDecode<Impl>::squash(ThreadID tid)
         if (fromFetch->insts[i]->threadNumber == tid) {
             fromFetch->insts[i]->setSquashed();
             squash_count++;
+            fromFetch->insts[i]->MissPIDSquashType =
+                  fromCommit->commitInfo[tid].squashMisspredictionType;
         }
     }
 
@@ -674,6 +683,10 @@ DefaultDecode<Impl>::decodeInsts(ThreadID tid)
                     tid, inst->seqNum, inst->pcState());
 
             ++decodeSquashedInsts;
+
+            if (inst->MissPIDSquashType != MisspredictionType::NONE){
+                ++decodeSquashedInstsDueToMissPID;
+            }
 
             --insts_available;
 

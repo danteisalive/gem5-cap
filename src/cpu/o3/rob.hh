@@ -64,6 +64,7 @@ class ROB
     //Typedefs from the Impl.
     typedef typename Impl::O3CPU O3CPU;
     typedef typename Impl::DynInstPtr DynInstPtr;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
     typedef std::pair<RegIndex, PhysRegIndex> UnmapInfo;
     typedef typename std::list<DynInstPtr>::iterator InstIt;
@@ -204,7 +205,8 @@ class ROB
     /** Squashes all instructions younger than the given sequence number for
      *  the specific thread.
      */
-    void squash(InstSeqNum squash_num, ThreadID tid);
+    void squash(MisspredictionType _MissPIDSquashType,
+                InstSeqNum squash_num, ThreadID tid);
 
     /** Updates the head instruction with the new oldest instruction. */
     void updateHead();
@@ -325,6 +327,7 @@ class ROB
   private:
     /** The sequence number of the squashed instruction. */
     InstSeqNum squashedSeqNum[Impl::MaxThreads];
+    MisspredictionType MissPIDSquashType[Impl::MaxThreads];
 
     /** Is the ROB done squashing. */
     bool doneSquashing[Impl::MaxThreads];

@@ -65,11 +65,13 @@ class DefaultDecode
     typedef typename Impl::O3CPU O3CPU;
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef typename Impl::CPUPol CPUPol;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
     // Typedefs from the CPU policy.
     typedef typename CPUPol::FetchStruct FetchStruct;
     typedef typename CPUPol::DecodeStruct DecodeStruct;
     typedef typename CPUPol::TimeStruct TimeStruct;
+
 
   public:
     /** Overall decode stage status. Used to determine if the CPU can
@@ -316,6 +318,7 @@ class DefaultDecode
     Stats::Scalar decodeDecodedInsts;
     /** Stat for total number of squashed instructions. */
     Stats::Scalar decodeSquashedInsts;
+    Stats::Scalar decodeSquashedInstsDueToMissPID;
 };
 
 #endif // __CPU_O3_DECODE_HH__

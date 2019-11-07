@@ -77,6 +77,7 @@ class DefaultFetch
     typedef typename Impl::DynInst DynInst;
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef typename Impl::O3CPU O3CPU;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
     /** Typedefs from the CPU policy. */
     typedef typename CPUPol::FetchStruct FetchStruct;
@@ -340,7 +341,8 @@ class DefaultFetch
      */
     void squash(const TheISA::PCState &newPC, const InstSeqNum seq_num,
                 DynInstPtr squashInst, ThreadID tid,
-                bool squashDueToMispredictedPID);
+                bool squashDueToMispredictedPID,
+                MisspredictionType _MissPIDSquashType);
 
     /** Ticks the fetch stage, processing all inputs signals and fetching
      * as many instructions as possible.

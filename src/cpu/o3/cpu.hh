@@ -113,6 +113,7 @@ class FullO3CPU : public BaseO3CPU
     typedef typename Impl::CPUPol CPUPolicy;
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef typename Impl::O3CPU O3CPU;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
     using VecElem =  TheISA::VecElem;
     using VecRegContainer =  TheISA::VecRegContainer;
@@ -576,13 +577,15 @@ class FullO3CPU : public BaseO3CPU
 
     /** Remove all instructions that are not currently in the ROB.
      *  There's also an option to not squash delay slot instructions.*/
-    void removeInstsNotInROB(ThreadID tid);
+    void removeInstsNotInROB(ThreadID tid,
+                             MisspredictionType _MissPIDSquashType);
 
     /** Remove all instructions younger than the given sequence number. */
     void removeInstsUntil(const InstSeqNum &seq_num, ThreadID tid);
 
     /** Removes the instruction pointed to by the iterator. */
-    inline void squashInstIt(const ListIt &instIt, ThreadID tid);
+    inline void squashInstIt(const ListIt &instIt, ThreadID tid,
+                             MisspredictionType _MissPIDSquashType);
 
     /** Cleans up all instructions on the remove list. */
     void cleanUpRemovedInsts();
@@ -865,6 +868,9 @@ class FullO3CPU : public BaseO3CPU
     Stats::Scalar numOfCapabilityCheckMicroops;//
     Stats::Scalar numOfCapabilityFreeMicroops;//
     Stats::Scalar numOfCapabilityGenMicroops;//
+    Stats::Scalar LVPTMissPredictPNA0LowConfidence;
+    Stats::Scalar LVPTMissPredictPMANLowConfidence;
+    Stats::Scalar LVPTMissPredictP0ANLowConfidence;
 };
 
 #endif // __CPU_O3_CPU_HH__

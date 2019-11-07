@@ -90,6 +90,7 @@ class InstructionQueue
     typedef typename Impl::CPUPol::MemDepUnit MemDepUnit;
     typedef typename Impl::CPUPol::IssueStruct IssueStruct;
     typedef typename Impl::CPUPol::TimeStruct TimeStruct;
+    typedef typename Impl::MisspredictionType MisspredictionType;
 
     // Typedef of iterator through the list of instructions.
     typedef typename std::list<DynInstPtr>::iterator ListIt;
@@ -457,6 +458,7 @@ class InstructionQueue
     /** The sequence number of the squashed instruction. */
     InstSeqNum squashedSeqNum[Impl::MaxThreads];
 
+    MisspredictionType squashMisspredictionType[Impl::MaxThreads];
     /** A cache of the recently woken registers.  It is 1 if the register
      *  has been woken up recently, and 0 if the register has been added
      *  to the dependency graph and has not yet received its value.  It

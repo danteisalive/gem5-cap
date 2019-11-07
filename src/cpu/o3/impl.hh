@@ -79,6 +79,13 @@ struct O3CPUImpl
       MaxWidth = 8,
       MaxThreads = 4
     };
+
+    enum MisspredictionType {
+        NONE = 0,
+        PMAN,
+        P0AN,
+        PNA0
+    };
 };
 
 #endif // __CPU_O3_SPARC_IMPL_HH__

@@ -1294,7 +1294,8 @@ InstructionQueue<Impl>::squash(ThreadID tid)
     // Read instruction sequence number of last instruction out of the
     // time buffer.
     squashedSeqNum[tid] = fromCommit->commitInfo[tid].doneSeqNum;
-
+    squashMisspredictionType[tid] =
+              fromCommit->commitInfo[tid].squashMisspredictionType;
     doSquash(tid);
 
     // Also tell the memory dependence unit to squash.
@@ -1406,6 +1407,7 @@ InstructionQueue<Impl>::doSquash(ThreadID tid)
 
             // Mark it as squashed within the IQ.
             squashed_inst->setSquashedInIQ();
+            squashed_inst->MissPIDSquashType = squashMisspredictionType[tid];
 
             // @todo: Remove this hack where several statuses are set so the
             // inst will flow through the rest of the pipeline.

@@ -178,19 +178,22 @@ DefaultLVPT::lookup(Addr instPC, ThreadID tid)
       // else {
       //     return TheISA::PointerID(0);
       // }
-      if (localPointerPredictor[lvpt_idx].read() > 0 &&
-          pred_pid == TheISA::PointerID(0) &&
-          confLevel[lvpt_idx].read() > 1)
-      {
-          return TheISA::PointerID(0x1000000000000-1);
-      }
+      // if (localPointerPredictor[lvpt_idx].read() > 0 &&
+      //     pred_pid == TheISA::PointerID(0) &&
+      //     confLevel[lvpt_idx].read() > 1)
+      // {
+      //     return TheISA::PointerID(0x1000000000000-1);
+      // }
+
+      // set the confidence level of this prediction
+      pred_pid.setConfidenceLevel((int)confLevel[lvpt_idx].read());
 
       return pred_pid;
 
     }
     else
     {
-        return TheISA::PointerID(0);
+        return TheISA::PointerID(0,0);
     }
 }
 
@@ -292,9 +295,9 @@ DefaultLVPT::update(Addr instPC,
       if (target.getPID() != 0){
           localPointerPredictor[lvpt_idx].increment();
       }
-      // else {
-      //     localPointerPredictor[lvpt_idx].increment();
-      // }
+      else {
+          localPointerPredictor[lvpt_idx].decrement();
+      }
 
 
 

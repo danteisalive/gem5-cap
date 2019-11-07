@@ -177,6 +177,11 @@ DefaultCommit<Impl>::regStats()
         .desc("The number of squashed insts skipped by commit")
         .prereq(commitSquashedInsts);
 
+    commitSquashedInstsDueToMissPID
+        .name(name() + ".commitSquashedInstsDueToMissPID")
+        .desc("The number of squashed insts skipped by commit")
+        .prereq(commitSquashedInstsDueToMissPID);
+
     commitNonSpecStalls
         .name(name() + ".commitNonSpecStalls")
         .desc("The number of times commit has been forced to stall to "
@@ -566,7 +571,7 @@ DefaultCommit<Impl>::squashAll(ThreadID tid)
     // Hopefully nothing breaks.)
     youngestSeqNum[tid] = lastCommitedSeqNum[tid];
 
-    rob->squash(squashed_inst, tid);
+    rob->squash(MisspredictionType::NONE, squashed_inst, tid);
     changedROBNumEntries[tid] = true;
 
     // Send back the sequence number of the squashed instruction.
@@ -882,7 +887,8 @@ DefaultCommit<Impl>::commit()
             // number as the youngest instruction in the ROB.
             youngestSeqNum[tid] = squashed_inst;
 
-            rob->squash(squashed_inst, tid);
+            rob->squash(
+                  fromIEW->squashMisspredictionType[tid], squashed_inst, tid);
             changedROBNumEntries[tid] = true;
 
             toIEW->commitInfo[tid].doneSeqNum = squashed_inst;
@@ -891,6 +897,8 @@ DefaultCommit<Impl>::commit()
             toIEW->commitInfo[tid].squashedPID = fromIEW->squashedPID[tid];
             toIEW->commitInfo[tid].squashDueToMispredictedPID =
                                     fromIEW->squashDueToMispredictedPID[tid];
+            toIEW->commitInfo[tid].squashMisspredictionType =
+                                    fromIEW->squashMisspredictionType[tid];
             // Send back the rob squashing signal so other stages know that
             // the ROB is in the process of squashing.
             toIEW->commitInfo[tid].robSquashing = true;
@@ -1019,6 +1027,9 @@ DefaultCommit<Impl>::commitInsts()
             rob->retireHead(commit_thread);
 
             ++commitSquashedInsts;
+            if (head_inst->MissPIDSquashType != MisspredictionType::NONE){
+                ++commitSquashedInstsDueToMissPID;
+            }
             // Notify potential listeners that this instruction is squashed
             ppSquash->notify(head_inst);
 
@@ -1373,15 +1384,15 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             cpu->getLVPTAveConfidenceLevel() << std::endl <<
             " NumOfMissPredictions: " << cpu->FalsePredict <<std::endl <<
             " P0An: " << cpu->P0An <<
-            " PnA0: " << cpu->FalsePredict - cpu->P0An - cpu->PmAn <<
+            " PnA0: " << cpu->PnA0 <<
             " PmAn: " << cpu->PmAn <<std::endl <<
             " Number Of Mem Refs: " << cpu->numOfMemRefs <<std::endl <<
-            " Heap Access: " << cpu->heapAccesses <<
-            " True Predections: " << cpu->truePredection <<
-            " PnA0: " << cpu->HeapPnA0 <<
-            " PnAm: " << cpu->HeapPnAm <<std::endl <<
-            " Pointer Tracker Prediction Accuracy: " <<
-                  (double)cpu->truePredection/cpu->numOfMemRefs <<std::endl <<
+          //  " Heap Access: " << cpu->heapAccesses <<
+            //" True Predections: " << cpu->truePredection <<
+            //" PnA0: " << cpu->HeapPnA0 <<
+            //" PnAm: " << cpu->HeapPnAm <<std::endl <<
+            //" Pointer Tracker Prediction Accuracy: " <<
+            //  (double)cpu->truePredection/cpu->numOfMemRefs <<std::endl <<
             " NumOfInjectedBoundsCheck: " <<
             cpu->NumOfInjectedBoundsCheck <<std::endl <<
             " NumOfExecutedBoundsCheck: " <<
@@ -1395,12 +1406,11 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             cpu->ExeAliasCache->print_stats();
 
             // final stats
-            cpu->numOfAliasTableAccess += cpu->NumOfAliasTableAccess;
-            cpu->LVPTMissPredictPmAn += cpu->PmAn;
-            cpu->LVPTMissPredictP0An += cpu->P0An;
-            cpu->LVPTMissPredictPnA0 +=
-                      (cpu->FalsePredict - cpu->P0An - cpu->PmAn);
-            cpu->LVPTMissPredict += cpu->FalsePredict;
+            //cpu->numOfAliasTableAccess += cpu->NumOfAliasTableAccess;
+            //cpu->LVPTMissPredictPmAn += cpu->PmAn;
+            //cpu->LVPTMissPredictP0An += cpu->P0An;
+            //cpu->LVPTMissPredictPnA0 += cpu->PnA0;
+            //cpu->LVPTMissPredict += cpu->FalsePredict;
             cpu->numOfCapabilityCheckMicroops += cpu->NumOfCommitedBoundsCheck;
 
             cpu->numOutStandingCapabilityCacheAccesses =

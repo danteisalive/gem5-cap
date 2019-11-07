@@ -59,6 +59,7 @@ public:
   protected:
      const char *macrocodeBlock;
      TheISA::PointerID macroop_pid{0};
+
      uint32_t numMicroops;
      uint32_t numOfOriginalMicroops;
      X86ISA::EmulEnv env;

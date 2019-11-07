@@ -563,11 +563,17 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
 {
     ThreadContext * tc = cpu->tcBase(tid);
     TheISA::PointerID _pid = LVPT->lookup(thisPC.instAddr(), tid);
+    inst->PredictionConfidenceLevel = _pid.getConfidenceLevel();
+
     if (_pid != TheISA::PointerID(0)){
         tc->LRUPidCache.LRUPIDCache_Access(_pid.getPID());
     }
 
     inst->setMacroopPid(_pid);
+
+    panic_if(inst->getMacroopPid().getConfidenceLevel() <= -1,
+            "lookupAndUpdateLVPT:\
+             inst->getMacroopPid().getConfidenceLevel() <= -1");
 }
 
 
@@ -841,7 +847,6 @@ DefaultFetch<Impl>::squashFromDecode(const TheISA::PCState &newPC,
     doSquash(newPC, squashInst, tid, false);
 
     cpu->PointerDepGraph.doSquash(seq_num);
-    //panic_if(1, "squashFromDecode");
     // Tell the CPU to remove any instructions that are in flight between
     // fetch and decode.
     cpu->removeInstsUntil(seq_num, tid);
@@ -907,14 +912,15 @@ void
 DefaultFetch<Impl>::squash(const TheISA::PCState &newPC,
                            const InstSeqNum seq_num, DynInstPtr squashInst,
                            ThreadID tid,
-                           bool squashDueToMispredictedPID)
+                           bool squashDueToMispredictedPID,
+                           MisspredictionType _MissPIDSquashType)
 {
     DPRINTF(Fetch, "[tid:%u]: Squash from commit.\n", tid);
 
     doSquash(newPC, squashInst, tid, squashDueToMispredictedPID);
     cpu->PointerDepGraph.doSquash(seq_num);
     // Tell the CPU to remove any instructions that are not in the ROB.
-    cpu->removeInstsNotInROB(tid);
+    cpu->removeInstsNotInROB(tid, _MissPIDSquashType);
 }
 
 template <class Impl>
@@ -1072,7 +1078,8 @@ DefaultFetch<Impl>::checkSignalsAndUpdate(ThreadID tid)
         squash(fromCommit->commitInfo[tid].pc,
                fromCommit->commitInfo[tid].doneSeqNum,
                fromCommit->commitInfo[tid].squashInst, tid,
-               fromCommit->commitInfo[tid].squashDueToMispredictedPID);
+               fromCommit->commitInfo[tid].squashDueToMispredictedPID,
+               fromCommit->commitInfo[tid].squashMisspredictionType);
 
         // If it was a branch mispredict on a control instruction, update the
         // branch predictor with that instruction, otherwise just kill the

@@ -243,6 +243,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     ExtMachInst machInst;
 
     TheISA::PointerID static_pid{0};
+    int PredictionConfidenceLevel;
 
     Addr atomic_vaddr; // this address is used in atomic mode
 
@@ -304,7 +305,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
           _numFPDestRegs(0), _numIntDestRegs(0), _numCCDestRegs(0),
           _numVecDestRegs(0), _numVecElemDestRegs(0), machInst(_machInst),
           mnemonic(_mnemonic), cachedDisassembly(0)
-    { isInjected = false; /*checked = false;*/ atomic_vaddr = 0;}
+    { isInjected = false; /*checked = false;*/ atomic_vaddr = 0;
+      PredictionConfidenceLevel = -1;
+    }
 
   public:
     virtual ~StaticInst();
