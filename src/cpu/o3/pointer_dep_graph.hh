@@ -458,7 +458,7 @@ PointerDependencyGraph<DynInstPtr>::doUpdate(DynInstPtr& inst)
                     {
                         int dest_reg_idx =
                             inst->staticInst->destRegIdx(i).index();
-                        panic_if(dest_reg_idx != i,
+                        panic_if(dest_reg_idx != indx,
                           "destination reg id does not \
                            match with updated load!");
                         it->pid = _pid;
@@ -477,16 +477,16 @@ PointerDependencyGraph<DynInstPtr>::doUpdate(DynInstPtr& inst)
 
     // now one by one find all the instruction with seqNum greater
     // than load uop and update their uops
-    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
-        // Erase  (C++11 and later)
-        for (auto it = dependGraph[indx].begin();
-          it != dependGraph[indx].end(); it++)
-        {
-            if (it->inst->seqNum > inst->seqNum) {
-              //InternalUpdate(it, inst);
-            }
-        }
-    }
+    // for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+    //     // Erase  (C++11 and later)
+    //     for (auto it = dependGraph[indx].begin();
+    //       it != dependGraph[indx].end(); it++)
+    //     {
+    //         if (it->inst->seqNum > inst->seqNum) {
+    //           //InternalUpdate(it, inst);
+    //         }
+    //     }
+    // }
 
     // now update FetchArchRegsPid with the latest values
     for (size_t i = 0; i < TheISA::NumIntRegs; i++) {

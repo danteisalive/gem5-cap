@@ -480,6 +480,66 @@ MemDepUnit<MemDepPred, Impl>::wakeDependents(DynInstPtr &inst)
     inst_entry->dependInsts.clear();
 }
 
+
+template <class MemDepPred, class Impl>
+void
+MemDepUnit<MemDepPred, Impl>::zeroIdiomInjectedMicroops(ThreadID tid,
+                                                        InstSeqNum _seqNum)
+{
+    if (!instsToReplay.empty()) {
+        ListIt replay_it = instsToReplay.begin();
+        while (replay_it != instsToReplay.end()) {
+            if ((*replay_it)->threadNumber == tid &&
+                (*replay_it)->seqNum > _seqNum &&
+                (*replay_it)->isBoundsCheckMicroop()) {
+                instsToReplay.erase(replay_it++);
+            } else {
+                ++replay_it;
+            }
+        }
+    }
+
+    ListIt inst_it = instList[tid].end();
+    --inst_it;
+
+    MemDepHashIt hash_it;
+
+    while (!instList[tid].empty() &&
+           (*inst_it)->seqNum > _seqNum) {
+
+
+        if (!(*inst_it)->isBoundsCheckMicroop()){
+            inst_it--;
+            continue;
+        }
+        DPRINTF(MemDepUnit, "Zero Idiomed inst [sn:%lli]\n",
+                (*inst_it)->seqNum);
+
+        if ((*inst_it)->seqNum == loadBarrierSN)
+              loadBarrier = false;
+
+        if ((*inst_it)->seqNum == storeBarrierSN)
+              storeBarrier = false;
+
+        hash_it = memDepHash.find((*inst_it)->seqNum);
+
+        assert(hash_it != memDepHash.end());
+
+        (*hash_it).second->squashed = true;
+
+        (*hash_it).second = NULL;
+
+        memDepHash.erase(hash_it);
+
+        instList[tid].erase(inst_it--);
+    }
+
+    // Tell the dependency predictor to zero Idiom as well.
+    //depPred.zeroIdiomInjectedMicroops(tid, _seqNum);
+
+}
+
+
 template <class MemDepPred, class Impl>
 void
 MemDepUnit<MemDepPred, Impl>::squash(const InstSeqNum &squashed_num,

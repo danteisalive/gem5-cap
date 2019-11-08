@@ -152,6 +152,7 @@ class MemDepUnit
      *  specific thread.
      */
     void squash(const InstSeqNum &squashed_num, ThreadID tid);
+    void zeroIdiomInjectedMicroops(ThreadID tid, InstSeqNum _seqNum);
 
     /** Indicates an ordering violation between a store and a younger load. */
     void violation(DynInstPtr &store_inst, DynInstPtr &violating_load);

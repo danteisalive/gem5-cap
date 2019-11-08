@@ -1304,6 +1304,155 @@ InstructionQueue<Impl>::squash(ThreadID tid)
 
 template <class Impl>
 void
+InstructionQueue<Impl>::zeroIdiomInjectedMicroops(ThreadID tid,
+                                                  InstSeqNum _seqNum)
+{
+  // Start at the tail.
+  ListIt inst_it = instList[tid].end();
+  --inst_it;
+
+  DPRINTF(IQ, "[tid:%i]: Zero Idiom  all injected microops \
+              until sequence number %i!\n",
+          tid, _seqNum);
+
+  // Squash any instructions younger than the squashed sequence number
+  // given.
+  while (inst_it != instList[tid].end() &&
+         (*inst_it)->seqNum > _seqNum) {
+
+      DynInstPtr inst = (*inst_it);
+      // if this is not a bounds check microop, continue
+      if (!inst->isBoundsCheckMicroop()) {
+          --inst_it;
+          continue;
+      }
+
+      // Only handle the instruction if it actually is in the IQ and
+      // hasn't already been squashed in the IQ.
+      if (inst->threadNumber != tid ||
+          inst->isSquashedInIQ()) {
+          --inst_it;
+          continue;
+      }
+
+      if (!inst->isIssued() ||
+          (inst->isMemRef() &&
+           !inst->memOpDone())) {
+
+          DPRINTF(IQ, "[tid:%i]: Instruction [sn:%lli] PC %s
+                       is Zero Idiomed.\n",
+                  tid, inst->seqNum, inst->pcState());
+
+          bool is_acq_rel = inst->isMemBarrier() &&
+                       (inst->isLoad() ||
+                         (inst->isStore() &&
+                           !inst->isStoreConditional()));
+
+          // Remove the instruction from the dependency list.
+          if (is_acq_rel ||
+              (!inst->isNonSpeculative() &&
+               !inst->isStoreConditional() &&
+               !inst->isMemBarrier() &&
+               !inst->isWriteBarrier())) {
+
+              for (int src_reg_idx = 0;
+                   src_reg_idx < inst->numSrcRegs();
+                   src_reg_idx++)
+              {
+                  PhysRegIdPtr src_reg =
+                      inst->renamedSrcRegIdx(src_reg_idx);
+
+                  // Only remove it from the dependency graph if it
+                  // was placed there in the first place.
+
+                  // Instead of doing a linked list traversal, we
+                  // can just remove these squashed instructions
+                  // either at issue time, or when the register is
+                  // overwritten.  The only downside to this is it
+                  // leaves more room for error.
+
+                  if (!inst->isReadySrcRegIdx(src_reg_idx) &&
+                      !src_reg->isFixedMapping()) {
+                      dependGraph.remove(src_reg->flatIndex(),
+                                         inst);
+                  }
+
+
+                  ++iqSquashedOperandsExamined;
+              }
+          } else if (!inst->isStoreConditional() ||
+                     !inst->isCompleted()) {
+              NonSpecMapIt ns_inst_it =
+                  nonSpecInsts.find(inst->seqNum);
+
+              // we remove non-speculative instructions from
+              // nonSpecInsts already when they are ready, and so we
+              // cannot always expect to find them
+              if (ns_inst_it == nonSpecInsts.end()) {
+                  // loads that became ready but stalled on a
+                  // blocked cache are alreayd removed from
+                  // nonSpecInsts, and have not faulted
+                  assert(inst->getFault() != NoFault ||
+                         inst->isMemRef());
+              } else {
+
+                  (*ns_inst_it).second = NULL;
+
+                  nonSpecInsts.erase(ns_inst_it);
+
+                  ++iqSquashedNonSpecRemoved;
+              }
+          }
+
+          // Might want to also clear out the head of the dependency graph.
+
+          // Mark it as squashed within the IQ.
+          inst->setSquashedInIQ();
+          inst->MissPIDSquashType = MisspredictionType::PMAN;
+
+          // @todo: Remove this hack where several statuses are set so the
+          // inst will flow through the rest of the pipeline.
+          inst->setIssued();
+          inst->setCanCommit();
+          inst->clearInIQ();
+
+          //Update Thread IQ Count
+          count[inst->threadNumber]--;
+
+          ++freeEntries;
+      }
+
+      // IQ clears out the heads of the dependency graph only when
+      // instructions reach writeback stage. If an instruction is squashed
+      // before writeback stage, its head of dependency graph would not be
+      // cleared out; it holds the instruction's DynInstPtr. This prevents
+      // freeing the squashed instruction's DynInst.
+      // Thus, we need to manually clear out the squashed instructions' heads
+      // of dependency graph.
+      for (int dest_reg_idx = 0;
+           dest_reg_idx < inst->numDestRegs();
+           dest_reg_idx++)
+      {
+          PhysRegIdPtr dest_reg =
+              inst->renamedDestRegIdx(dest_reg_idx);
+          if (dest_reg->isFixedMapping()){
+              continue;
+          }
+          assert(dependGraph.empty(dest_reg->flatIndex()));
+          dependGraph.clearInst(dest_reg->flatIndex());
+      }
+      instList[tid].erase(inst_it--);
+      ++iqSquashedInstsExamined;
+  }
+
+  // memdep
+  memDepUnit[tid].zeroIdiomInjectedMicroops(tid,_seqNum);
+
+}
+
+
+template <class Impl>
+void
 InstructionQueue<Impl>::doSquash(ThreadID tid)
 {
     // Start at the tail.

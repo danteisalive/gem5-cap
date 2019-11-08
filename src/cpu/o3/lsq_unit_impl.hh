@@ -683,7 +683,7 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
      ThreadContext * tc = cpu->tcBase(tid);
 
      // only check for mememory refrence instuctions
-     checkAccuracy(inst->threadNumber,inst);
+     //checkAccuracy(inst->threadNumber,inst);
 
      // now the address is resolved and check the PID cache
      if (tc->enableCapability &&
@@ -805,7 +805,7 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
     Fault store_fault = store_inst->initiateAcc();
 
-    checkAccuracy(store_inst->threadNumber,store_inst);
+    //checkAccuracy(store_inst->threadNumber,store_inst);
 
 
     if (store_inst->isTranslationDelayed() &&
@@ -1116,6 +1116,7 @@ LSQUnit<Impl>::writebackStores()
 
     assert(stores >= 0 && storesToWB >= 0);
 }
+
 
 
 template <class Impl>
@@ -1531,7 +1532,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                cpu->updateFetchLVPT(inst, pid, false);
                inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
                inst->macroop->setMacroopPid(pid);
-               return false;
+               return true;
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
@@ -1541,7 +1542,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 inst->MissPIDSquashType = Impl::MisspredictionType::PNA0;
 
                 inst->macroop->setMacroopPid(pid);
-                return false;
+                return true;
             }
 
 
