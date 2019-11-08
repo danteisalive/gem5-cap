@@ -1339,7 +1339,7 @@ InstructionQueue<Impl>::zeroIdiomInjectedMicroops(ThreadID tid,
           (inst->isMemRef() &&
            !inst->memOpDone())) {
 
-          DPRINTF(IQ, "[tid:%i]: Instruction [sn:%lli] PC %s
+          DPRINTF(IQ, "[tid:%i]: Instruction [sn:%lli] PC %s\
                        is Zero Idiomed.\n",
                   tid, inst->seqNum, inst->pcState());
 
