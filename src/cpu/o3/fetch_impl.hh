@@ -838,14 +838,21 @@ void
 DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
 {
     ThreadID tid = inst->threadNumber;
-    for (auto it = fetchQueue[tid].begin(); it != fetchQueue[tid].end(); it++){
+    for (auto it = fetchQueue[tid].begin(); it != fetchQueue[tid].end();){
         if ((*it)->threadNumber == tid &&
             (*it)->isBoundsCheckMicroop() &&
             (*it)->seqNum > inst->seqNum)
         {
             std::cout << "ZeroIdiom : Fetch Queue!\n";
+            cpu->removeFrontInst(*it);
+            it = fetchQueue[tid].erase(it);
+        }
+        else
+        {
+           it++;
         }
     }
+
 }
 
 template<class Impl>

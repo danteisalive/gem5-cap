@@ -682,35 +682,35 @@ DefaultIEW<Impl>::zeroIdiomDueToMisspredictedPID(DynInstPtr &inst,ThreadID tid)
      // //ldstQueue.zeroIdiomInjectedMicroops();
      cpu->zeroIdiomMicroops(inst);
 
-     std::queue<DynInstPtr> skidBuffer_t;
-     while (!skidBuffer[tid].empty()) {
-
-         if (!(skidBuffer[tid].front()->isBoundsCheckMicroop() &&
-             skidBuffer[tid].front()->seqNum > inst->seqNum))
-         {
-             std::cout << "Squashed in skidBuffer!" << std::endl;
-             // skidBuffer[tid].front()->setSquashed();
-             // skidBuffer[tid].front()->forwardOldRegs();
-         }
-         skidBuffer_t.push(skidBuffer[tid].front());
-         skidBuffer[tid].pop();
-     }
-     skidBuffer[tid] = skidBuffer_t;
-
-     std::queue<DynInstPtr> insts_t;
-     while (!insts[tid].empty()) {
-
-       if (!(insts[tid].front()->isBoundsCheckMicroop() &&
-           insts[tid].front()->seqNum > inst->seqNum))
-       {
-            std::cout << "Squashed in inst buffer!" << std::endl;
-            // insts[tid].front()->setSquashed();
-            // skidBuffer[tid].front()->forwardOldRegs();
-       }
-       insts_t.push(insts[tid].front());
-       insts[tid].pop();
-     }
-     insts[tid] = insts_t;
+     // std::queue<DynInstPtr> skidBuffer_t;
+     // while (!skidBuffer[tid].empty()) {
+     //
+     //     if (!(skidBuffer[tid].front()->isBoundsCheckMicroop() &&
+     //         skidBuffer[tid].front()->seqNum > inst->seqNum))
+     //     {
+     //         std::cout << "Squashed in skidBuffer!" << std::endl;
+     //         // skidBuffer[tid].front()->setSquashed();
+     //         // skidBuffer[tid].front()->forwardOldRegs();
+     //     }
+     //     skidBuffer_t.push(skidBuffer[tid].front());
+     //     skidBuffer[tid].pop();
+     // }
+     // skidBuffer[tid] = skidBuffer_t;
+     //
+     // std::queue<DynInstPtr> insts_t;
+     // while (!insts[tid].empty()) {
+     //
+     //   if (!(insts[tid].front()->isBoundsCheckMicroop() &&
+     //       insts[tid].front()->seqNum > inst->seqNum))
+     //   {
+     //        std::cout << "Squashed in inst buffer!" << std::endl;
+     //        // insts[tid].front()->setSquashed();
+     //        // skidBuffer[tid].front()->forwardOldRegs();
+     //   }
+     //   insts_t.push(insts[tid].front());
+     //   insts[tid].pop();
+     // }
+     // insts[tid] = insts_t;
 }
 
 template<class Impl>

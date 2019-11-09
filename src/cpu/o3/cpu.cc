@@ -2108,7 +2108,9 @@ template <class Impl>
 void
 FullO3CPU<Impl>::zeroIdiomMicroops(DynInstPtr& inst)
 {
-    decode.zeroIdiomInjectedMicroops(inst);
+
+    fetch.zeroIdiomInjectedMicroops(inst);
+    //decode.zeroIdiomInjectedMicroops(inst);
 }
 
 // Forward declaration of FullO3CPU.
