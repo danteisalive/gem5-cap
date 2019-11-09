@@ -678,33 +678,39 @@ DefaultIEW<Impl>::zeroIdiomDueToMisspredictedPID(DynInstPtr &inst,ThreadID tid)
      // ldstQueue.squash(fromCommit->commitInfo[tid].squashMisspredictionType,
      //                  fromCommit->commitInfo[tid].doneSeqNum, tid);
      // updatedQueues = true;
-     // instQueue.zeroIdiomInjectedMicroops(tid,inst->seqNum);
+     //instQueue.zeroIdiomInjectedMicroops(tid,inst->seqNum);
      // //ldstQueue.zeroIdiomInjectedMicroops();
-     // std::queue<DynInstPtr> skidBuffer_t;
-     // while (!skidBuffer[tid].empty()) {
-     //
-     //     if (!(skidBuffer[tid].front()->isBoundsCheckMicroop() &&
-     //         skidBuffer[tid].front()->seqNum > inst->seqNum))
-     //     {
-     //         skidBuffer_t.push(skidBuffer[tid].front());
-     //     }
-     //
-     //     skidBuffer[tid].pop();
-     // }
-     // skidBuffer[tid] = skidBuffer_t;
-     //
-     // std::queue<DynInstPtr> insts_t;
-     // while (!insts[tid].empty()) {
-     //
-     //   if (!(insts[tid].front()->isBoundsCheckMicroop() &&
-     //       insts[tid].front()->seqNum > inst->seqNum))
-     //   {
-     //       insts_t.push(insts[tid].front());
-     //   }
-     //
-     //   insts[tid].pop();
-     // }
-     // insts[tid] = insts_t;
+     cpu->zeroIdiomMicroops(inst);
+
+     std::queue<DynInstPtr> skidBuffer_t;
+     while (!skidBuffer[tid].empty()) {
+
+         if (!(skidBuffer[tid].front()->isBoundsCheckMicroop() &&
+             skidBuffer[tid].front()->seqNum > inst->seqNum))
+         {
+             std::cout << "Squashed in skidBuffer!" << std::endl;
+             // skidBuffer[tid].front()->setSquashed();
+             // skidBuffer[tid].front()->forwardOldRegs();
+         }
+         skidBuffer_t.push(skidBuffer[tid].front());
+         skidBuffer[tid].pop();
+     }
+     skidBuffer[tid] = skidBuffer_t;
+
+     std::queue<DynInstPtr> insts_t;
+     while (!insts[tid].empty()) {
+
+       if (!(insts[tid].front()->isBoundsCheckMicroop() &&
+           insts[tid].front()->seqNum > inst->seqNum))
+       {
+            std::cout << "Squashed in inst buffer!" << std::endl;
+            // insts[tid].front()->setSquashed();
+            // skidBuffer[tid].front()->forwardOldRegs();
+       }
+       insts_t.push(insts[tid].front());
+       insts[tid].pop();
+     }
+     insts[tid] = insts_t;
 }
 
 template<class Impl>
@@ -1417,6 +1423,7 @@ DefaultIEW<Impl>::executeInsts()
             // Not sure if I should set this here or just let commit try to
             // commit any squashed instructions.  I like the latter a bit more.
             inst->setCanCommit();
+
 
             ++iewExecSquashedInsts;
             if (inst->MissPIDSquashType != MisspredictionType::NONE){

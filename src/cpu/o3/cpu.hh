@@ -593,6 +593,8 @@ class FullO3CPU : public BaseO3CPU
     /** Debug function to print all instructions on the list. */
     void dumpInsts();
 
+    void zeroIdiomMicroops(DynInstPtr& inst);
+
   public:
 #ifndef NDEBUG
     /** Count of total number of dynamic instructions in flight. */

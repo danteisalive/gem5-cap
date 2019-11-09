@@ -152,6 +152,8 @@ class DefaultDecode
      */
     void decodeInsts(ThreadID tid);
 
+    void zeroIdiomInjectedMicroops(DynInstPtr inst);
+
   private:
     /** Inserts a thread's instructions into the skid buffer, to be decoded
      * once decode unblocks.

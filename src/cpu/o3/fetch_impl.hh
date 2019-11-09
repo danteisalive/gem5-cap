@@ -835,12 +835,27 @@ DefaultFetch<Impl>::doSquash(const TheISA::PCState &newPC,
 
 template<class Impl>
 void
+DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
+{
+    ThreadID tid = inst->threadNumber;
+    for (auto it = fetchQueue[tid].begin(); it != fetchQueue[tid].end(); it++){
+        if ((*it)->threadNumber == tid &&
+            (*it)->isBoundsCheckMicroop() &&
+            (*it)->seqNum > inst->seqNum)
+        {
+            std::cout << "ZeroIdiom : Fetch Queue!\n";
+        }
+    }
+}
+
+template<class Impl>
+void
 DefaultFetch<Impl>::squashFromDecode(const TheISA::PCState &newPC,
                                      const DynInstPtr squashInst,
                                      const InstSeqNum seq_num, ThreadID tid)
 {
     DPRINTF(Fetch, "[tid:%i]: Squashing from decode.\n", tid);
-
+    panic("squashFromDecode is called!");
     doSquash(newPC, squashInst, tid, false);
 
     cpu->PointerDepGraph.doSquash(seq_num);

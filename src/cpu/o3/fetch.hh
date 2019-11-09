@@ -361,6 +361,7 @@ class DefaultFetch
      */
     void fetch(bool &status_change);
     void capabilityCheck(TheISA::PCState& thisPC , ThreadID tid, StaticInstPtr& si);
+    void zeroIdiomInjectedMicroops(DynInstPtr inst);
 
     /** Align a PC to the start of a fetch buffer block. */
     Addr fetchBufferAlignPC(Addr addr)

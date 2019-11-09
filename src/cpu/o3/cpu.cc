@@ -2104,5 +2104,12 @@ FullO3CPU<Impl>::updateThreadPriority()
     }
 }
 
+template <class Impl>
+void
+FullO3CPU<Impl>::zeroIdiomMicroops(DynInstPtr& inst)
+{
+    decode.zeroIdiomInjectedMicroops(inst);
+}
+
 // Forward declaration of FullO3CPU.
 template class FullO3CPU<O3CPUImpl>;

@@ -397,6 +397,51 @@ DefaultDecode<Impl>::squash(ThreadID tid)
 
 template<class Impl>
 void
+DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
+{
+
+    ThreadID tid = inst->threadNumber;
+    for (int i=0; i<fromFetch->size; i++) {
+        if (fromFetch->insts[i]->threadNumber == tid &&
+            fromFetch->insts[i]->isBoundsCheckMicroop() &&
+            fromFetch->insts[i]->seqNum > inst->seqNum)
+        {
+            std::cout << "ZeroIdiom : Decode Wire from Fetch!\n";
+        }
+    }
+
+    std::queue<DynInstPtr> insts_t;
+    while (!insts[tid].empty()) {
+
+        if (insts[tid].front()->threadNumber == tid &&
+            insts[tid].front()->isBoundsCheckMicroop() &&
+            insts[tid].front()->seqNum > inst->seqNum)
+        {
+            std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
+        }
+        insts_t.push(insts[tid].front());
+        insts[tid].pop();
+    }
+    insts[tid] = insts_t;
+
+    std::queue<DynInstPtr> skidBuffer_t;
+    while (!skidBuffer[tid].empty()) {
+
+        if (skidBuffer[tid].front()->threadNumber == tid &&
+            skidBuffer[tid].front()->isBoundsCheckMicroop() &&
+            skidBuffer[tid].front()->seqNum > inst->seqNum)
+        {
+            std::cout << "ZeroIdiom : Decode Skidbuffer Buffer!\n";
+        }
+        skidBuffer_t.push(skidBuffer[tid].front());
+        skidBuffer[tid].pop();
+    }
+    skidBuffer[tid] = skidBuffer_t;
+
+}
+
+template<class Impl>
+void
 DefaultDecode<Impl>::skidInsert(ThreadID tid)
 {
     DynInstPtr inst = NULL;
