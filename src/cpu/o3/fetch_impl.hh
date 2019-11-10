@@ -843,7 +843,7 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
             (*it)->isBoundsCheckMicroop() &&
             (*it)->seqNum > inst->seqNum)
         {
-            std::cout << "ZeroIdiom : Fetch Queue!\n";
+            //std::cout << "ZeroIdiom : Fetch Queue!\n";
             cpu->removeFrontInst(*it);
             it = fetchQueue[tid].erase(it);
         }
@@ -851,6 +851,28 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
         {
            it++;
         }
+    }
+
+    DynInstPtr toDecode_insts[Impl::MaxWidth];
+    int size = 0;
+    for (int i=0; i<toDecode->size; i++) {
+        if (toDecode->insts[i]->threadNumber == tid &&
+            toDecode->insts[i]->isBoundsCheckMicroop() &&
+            toDecode->insts[i]->seqNum > inst->seqNum)
+        {
+            // std::cout << "ZeroIdiom : toDecode Wire!\n";
+            cpu->removeFrontInst(toDecode->insts[i]);
+        }
+        else
+        {
+          toDecode_insts[size] = toDecode->insts[i];
+          size++;
+        }
+    }
+
+    toDecode->size = size;
+    for (size_t i = 0; i < size; i++) {
+      toDecode->insts[i] = toDecode_insts[i];
     }
 
 }

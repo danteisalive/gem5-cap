@@ -401,13 +401,28 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
 {
 
     ThreadID tid = inst->threadNumber;
+
+
+    DynInstPtr fromFetch_insts[Impl::MaxWidth];
+    int size = 0;
     for (int i=0; i<fromFetch->size; i++) {
         if (fromFetch->insts[i]->threadNumber == tid &&
             fromFetch->insts[i]->isBoundsCheckMicroop() &&
             fromFetch->insts[i]->seqNum > inst->seqNum)
         {
-            std::cout << "ZeroIdiom : Decode Wire from Fetch!\n";
+            // std::cout << "ZeroIdiom : fromFetch Wire!\n";
+            //cpu->removeFrontInst(fromFetch->insts[i]);
         }
+        else
+        {
+          fromFetch_insts[size] = fromFetch->insts[i];
+          size++;
+        }
+    }
+
+    fromFetch->size = size;
+    for (size_t i = 0; i < size; i++) {
+      fromFetch->insts[i] = fromFetch_insts[i];
     }
 
     std::queue<DynInstPtr> insts_t;
@@ -417,9 +432,13 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
             insts[tid].front()->isBoundsCheckMicroop() &&
             insts[tid].front()->seqNum > inst->seqNum)
         {
-            std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
+            //std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
+            cpu->removeFrontInst(insts[tid].front());
         }
-        insts_t.push(insts[tid].front());
+        else {
+            insts_t.push(insts[tid].front());
+        }
+
         insts[tid].pop();
     }
     insts[tid] = insts_t;
@@ -431,9 +450,14 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
             skidBuffer[tid].front()->isBoundsCheckMicroop() &&
             skidBuffer[tid].front()->seqNum > inst->seqNum)
         {
-            std::cout << "ZeroIdiom : Decode Skidbuffer Buffer!\n";
+            //std::cout << "ZeroIdiom : Decode Skidbuffer Buffer!\n";
+            cpu->removeFrontInst(skidBuffer[tid].front());
         }
-        skidBuffer_t.push(skidBuffer[tid].front());
+        else
+        {
+            skidBuffer_t.push(skidBuffer[tid].front());
+        }
+
         skidBuffer[tid].pop();
     }
     skidBuffer[tid] = skidBuffer_t;
