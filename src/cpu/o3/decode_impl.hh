@@ -402,29 +402,28 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
 
     ThreadID tid = inst->threadNumber;
 
-    if (fromFetch->size != 0){
-        DynInstPtr fromFetch_insts[Impl::MaxWidth];
-        int size = 0;
-        for (int i=0; i<fromFetch->size; i++) {
-            if (fromFetch->insts[i]->threadNumber == tid &&
-                fromFetch->insts[i]->isBoundsCheckMicroop() &&
-                fromFetch->insts[i]->seqNum > inst->seqNum)
-            {
-                // std::cout << "ZeroIdiom : fromFetch Wire!\n";
-                //cpu->removeFrontInst(fromFetch->insts[i]);
-            }
-            else
-            {
-              fromFetch_insts[size] = fromFetch->insts[i];
-              size++;
-            }
-        }
-
-        fromFetch->size = size;
-        for (size_t i = 0; i < size; i++) {
-          fromFetch->insts[i] = fromFetch_insts[i];
-        }
-    }
+    // if (fromFetch->size != 0){
+    //     DynInstPtr fromFetch_insts[Impl::MaxWidth];
+    //     int size = 0;
+    //     for (int i=0; i<fromFetch->size; i++) {
+    //         if (fromFetch->insts[i]->threadNumber == tid &&
+    //             fromFetch->insts[i]->isBoundsCheckMicroop() &&
+    //             fromFetch->insts[i]->seqNum > inst->seqNum)
+    //         {
+    //             //cpu->removeFrontInst(fromFetch->insts[i]);
+    //         }
+    //         else
+    //         {
+    //           fromFetch_insts[size] = fromFetch->insts[i];
+    //           size++;
+    //         }
+    //     }
+    //
+    //     fromFetch->size = size;
+    //     for (size_t i = 0; i < size; i++) {
+    //       fromFetch->insts[i] = fromFetch_insts[i];
+    //     }
+    // }
 
     if (!insts[tid].empty())  {
         std::queue<DynInstPtr> insts_t;
@@ -435,6 +434,7 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
                 insts[tid].front()->seqNum > inst->seqNum)
             {
                 //std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
+                //insts[tid].front()->macroop->undoInjecttion();
                 cpu->removeFrontInst(insts[tid].front());
             }
             else {
@@ -455,6 +455,7 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
               skidBuffer[tid].front()->seqNum > inst->seqNum)
           {
               //std::cout << "ZeroIdiom : Decode Skidbuffer Buffer!\n";
+              //skidBuffer[tid].front()->macroop->undoInjecttion();
               cpu->removeFrontInst(skidBuffer[tid].front());
           }
           else
@@ -467,29 +468,29 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
       skidBuffer[tid] = skidBuffer_t;
     }
 
-    if (toRename->size != 0){
-        DynInstPtr toRename_insts[Impl::MaxWidth];
-        int size = 0;
-        for (int i=0; i<toRename->size; i++) {
-            if (toRename->insts[i]->threadNumber == tid &&
-                toRename->insts[i]->isBoundsCheckMicroop() &&
-                toRename->insts[i]->seqNum > inst->seqNum)
-            {
-                // std::cout << "ZeroIdiom : toDecode Wire!\n";
-                cpu->removeFrontInst(toRename->insts[i]);
-            }
-            else
-            {
-              toRename_insts[size] = toRename->insts[i];
-              size++;
-            }
-        }
-
-        toRename->size = size;
-        for (size_t i = 0; i < size; i++) {
-          toRename->insts[i] = toRename_insts[i];
-        }
-      }
+    // if (toRename->size != 0){
+    //     DynInstPtr toRename_insts[Impl::MaxWidth];
+    //     int size = 0;
+    //     for (int i=0; i<toRename->size; i++) {
+    //         if (toRename->insts[i]->threadNumber == tid &&
+    //             toRename->insts[i]->isBoundsCheckMicroop() &&
+    //             toRename->insts[i]->seqNum > inst->seqNum)
+    //         {
+    //             // std::cout << "ZeroIdiom : toDecode Wire!\n";
+    //             cpu->removeFrontInst(toRename->insts[i]);
+    //         }
+    //         else
+    //         {
+    //           toRename_insts[size] = toRename->insts[i];
+    //           size++;
+    //         }
+    //     }
+    //
+    //     toRename->size = size;
+    //     for (size_t i = 0; i < size; i++) {
+    //       toRename->insts[i] = toRename_insts[i];
+    //     }
+    //   }
 
 }
 
