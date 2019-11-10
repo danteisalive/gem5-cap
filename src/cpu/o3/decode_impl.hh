@@ -425,23 +425,25 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
       fromFetch->insts[i] = fromFetch_insts[i];
     }
 
-    // std::queue<DynInstPtr> insts_t;
-    // while (!insts[tid].empty()) {
-    //
-    //     if (insts[tid].front()->threadNumber == tid &&
-    //         insts[tid].front()->isBoundsCheckMicroop() &&
-    //         insts[tid].front()->seqNum > inst->seqNum)
-    //     {
-    //         //std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
-    //         cpu->removeFrontInst(insts[tid].front());
-    //     }
-    //     else {
-    //         insts_t.push(insts[tid].front());
-    //     }
-    //
-    //     insts[tid].pop();
-    // }
-    // insts[tid] = insts_t;
+    if (!insts[tid].empty())  {
+        std::queue<DynInstPtr> insts_t;
+        while (!insts[tid].empty()) {
+
+            if (insts[tid].front()->threadNumber == tid &&
+                insts[tid].front()->isBoundsCheckMicroop() &&
+                insts[tid].front()->seqNum > inst->seqNum)
+            {
+                //std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
+                cpu->removeFrontInst(insts[tid].front());
+            }
+            else {
+                insts_t.push(insts[tid].front());
+            }
+
+            insts[tid].pop();
+        }
+        insts[tid] = insts_t;
+    }
     //
     // std::queue<DynInstPtr> skidBuffer_t;
     // while (!skidBuffer[tid].empty()) {
