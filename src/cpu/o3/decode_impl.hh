@@ -403,27 +403,27 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
     ThreadID tid = inst->threadNumber;
 
 
-    DynInstPtr fromFetch_insts[Impl::MaxWidth];
-    int size = 0;
-    for (int i=0; i<fromFetch->size; i++) {
-        if (fromFetch->insts[i]->threadNumber == tid &&
-            fromFetch->insts[i]->isBoundsCheckMicroop() &&
-            fromFetch->insts[i]->seqNum > inst->seqNum)
-        {
-            // std::cout << "ZeroIdiom : fromFetch Wire!\n";
-            //cpu->removeFrontInst(fromFetch->insts[i]);
-        }
-        else
-        {
-          fromFetch_insts[size] = fromFetch->insts[i];
-          size++;
-        }
-    }
+    // DynInstPtr fromFetch_insts[Impl::MaxWidth];
+    // int size = 0;
+    // for (int i=0; i<fromFetch->size; i++) {
+    //     if (fromFetch->insts[i]->threadNumber == tid &&
+    //         fromFetch->insts[i]->isBoundsCheckMicroop() &&
+    //         fromFetch->insts[i]->seqNum > inst->seqNum)
+    //     {
+    //         // std::cout << "ZeroIdiom : fromFetch Wire!\n";
+    //         //cpu->removeFrontInst(fromFetch->insts[i]);
+    //     }
+    //     else
+    //     {
+    //       fromFetch_insts[size] = fromFetch->insts[i];
+    //       size++;
+    //     }
+    // }
 
-    fromFetch->size = size;
-    for (size_t i = 0; i < size; i++) {
-      fromFetch->insts[i] = fromFetch_insts[i];
-    }
+    // fromFetch->size = size;
+    // for (size_t i = 0; i < size; i++) {
+    //   fromFetch->insts[i] = fromFetch_insts[i];
+    // }
 
     std::queue<DynInstPtr> insts_t;
     while (!insts[tid].empty()) {
