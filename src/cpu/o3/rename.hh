@@ -201,6 +201,8 @@ class DefaultRename
     /** Debugging function used to dump history buffer of renamings. */
     void dumpHistory();
 
+    void zeroIdiomInjectedMicroops(DynInstPtr inst);
+
   private:
     /** Reset this pipeline stage */
     void resetStage();
