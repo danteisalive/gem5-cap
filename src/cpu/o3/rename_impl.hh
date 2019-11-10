@@ -418,6 +418,36 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
       }
   }
 
+  for (auto it = insts[tid].begin(); it != insts[tid].end();){
+      if ((*it)->threadNumber == tid &&
+          (*it)->isBoundsCheckMicroop() &&
+          (*it)->seqNum > inst->seqNum)
+      {
+          //std::cout << "ZeroIdiom : Fetch Queue!\n";
+          cpu->removeFrontInst(*it);
+          it = insts[tid].erase(it);
+      }
+      else
+      {
+         it++;
+      }
+  }
+
+  for (auto it = skidBuffer[tid].begin(); it != skidBuffer[tid].end();){
+      if ((*it)->threadNumber == tid &&
+          (*it)->isBoundsCheckMicroop() &&
+          (*it)->seqNum > inst->seqNum)
+      {
+          //std::cout << "ZeroIdiom : Fetch Queue!\n";
+          cpu->removeFrontInst(*it);
+          it = skidBuffer[tid].erase(it);
+      }
+      else
+      {
+         it++;
+      }
+  }
+
 }
 
 template <class Impl>
