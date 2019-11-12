@@ -239,6 +239,7 @@ class DefaultIEW
     void collector(ThreadID tid, DynInstPtr &inst);
     void updateAliasTable(ThreadID tid, DynInstPtr &inst);
     bool trackAlias(DynInstPtr inst);
+    void zeroIdiomInjectedMicroops(DynInstPtr inst);
     //void checkAccuracy(ThreadID tid, DynInstPtr &inst);
   private:
     /** Sends commit proper information for a squash due to a branch

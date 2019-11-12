@@ -410,7 +410,9 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
     //             fromFetch->insts[i]->isBoundsCheckMicroop() &&
     //             fromFetch->insts[i]->seqNum > inst->seqNum)
     //         {
-    //             //cpu->removeFrontInst(fromFetch->insts[i]);
+    //             if (fromFetch->insts[i]->seqNum == 14885)
+    //                 std::cout << "inserted here 2\n";
+    //             cpu->insertZeroIdiomInsts(fromFetch->insts[i]);
     //         }
     //         else
     //         {
@@ -434,8 +436,9 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
                 insts[tid].front()->seqNum > inst->seqNum)
             {
                 //std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
-                //insts[tid].front()->macroop->undoInjecttion();
-                cpu->removeFrontInst(insts[tid].front());
+                if (insts[tid].front()->seqNum == 1349963)
+                    std::cout << "inserted here 3\n";
+                cpu->insertZeroIdiomInsts(insts[tid].front());
             }
             else {
                 insts_t.push(insts[tid].front());
@@ -454,9 +457,9 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
               skidBuffer[tid].front()->isBoundsCheckMicroop() &&
               skidBuffer[tid].front()->seqNum > inst->seqNum)
           {
-              //std::cout << "ZeroIdiom : Decode Skidbuffer Buffer!\n";
-              //skidBuffer[tid].front()->macroop->undoInjecttion();
-              cpu->removeFrontInst(skidBuffer[tid].front());
+              if (skidBuffer[tid].front()->seqNum == 1349963)
+                  std::cout << "inserted here 4\n";
+              cpu->insertZeroIdiomInsts(skidBuffer[tid].front());
           }
           else
           {
@@ -476,8 +479,9 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
     //             toRename->insts[i]->isBoundsCheckMicroop() &&
     //             toRename->insts[i]->seqNum > inst->seqNum)
     //         {
-    //             // std::cout << "ZeroIdiom : toDecode Wire!\n";
-    //             cpu->removeFrontInst(toRename->insts[i]);
+    //             if (toRename->insts[i]->seqNum == 14885)
+    //               std::cout << "inserted here 5\n";
+    //             cpu->insertZeroIdiomInsts(toRename->insts[i]);
     //         }
     //         else
     //         {

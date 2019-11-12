@@ -393,7 +393,7 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
 
 
   ThreadID tid = inst->threadNumber;
-
+  //
   // if (fromDecode->size != 0){
   //     DynInstPtr fromDecode_insts[Impl::MaxWidth];
   //     int size = 0;
@@ -402,8 +402,7 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
   //             fromDecode->insts[i]->isBoundsCheckMicroop() &&
   //             fromDecode->insts[i]->seqNum > inst->seqNum)
   //         {
-  //             // std::cout << "ZeroIdiom : fromFetch Wire!\n";
-  //             //cpu->removeFrontInst(fromFetch->insts[i]);
+  //             cpu->insertZeroIdiomInsts(fromDecode->insts[i]);
   //         }
   //         else
   //         {
@@ -418,35 +417,66 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
   //     }
   // }
 
-  for (auto it = insts[tid].begin(); it != insts[tid].end();){
-      if ((*it)->threadNumber == tid &&
-          (*it)->isBoundsCheckMicroop() &&
-          (*it)->seqNum > inst->seqNum)
-      {
-          //std::cout << "ZeroIdiom : Fetch Queue!\n";
-          cpu->removeFrontInst(*it);
-          it = insts[tid].erase(it);
-      }
-      else
-      {
-         it++;
+  if (!insts[tid].empty())  {
+      for (auto it = insts[tid].begin(); it != insts[tid].end();){
+          if ((*it)->threadNumber == tid &&
+              (*it)->isBoundsCheckMicroop() &&
+              (*it)->seqNum > inst->seqNum)
+          {
+              if ((*it)->seqNum == 1349963)
+                  std::cout << "inserted here 5\n";
+              cpu->insertZeroIdiomInsts((*it));
+              it = insts[tid].erase(it);
+          }
+          else
+          {
+             it++;
+          }
       }
   }
 
-  for (auto it = skidBuffer[tid].begin(); it != skidBuffer[tid].end();){
-      if ((*it)->threadNumber == tid &&
-          (*it)->isBoundsCheckMicroop() &&
-          (*it)->seqNum > inst->seqNum)
-      {
-          //std::cout << "ZeroIdiom : Fetch Queue!\n";
-          cpu->removeFrontInst(*it);
-          it = skidBuffer[tid].erase(it);
+
+  if (!skidBuffer[tid].empty())  {
+      for (auto it = skidBuffer[tid].begin(); it != skidBuffer[tid].end();){
+          if ((*it)->threadNumber == tid &&
+              (*it)->isBoundsCheckMicroop() &&
+              (*it)->seqNum > inst->seqNum)
+          {
+              if ((*it)->seqNum == 1349963)
+                  std::cout << "inserted here 6\n";
+              cpu->insertZeroIdiomInsts((*it));
+              it = skidBuffer[tid].erase(it);
+          }
+          else
+          {
+             it++;
+          }
       }
-      else
-      {
-         it++;
-      }
-  }
+    }
+
+
+    // if (toIEW->size != 0){
+    //     DynInstPtr toIEW_insts[Impl::MaxWidth];
+    //     int size = 0;
+    //     for (int i=0; i<toIEW->size; i++) {
+    //         if (toIEW->insts[i]->threadNumber == tid &&
+    //             toIEW->insts[i]->isBoundsCheckMicroop() &&
+    //             toIEW->insts[i]->seqNum > inst->seqNum)
+    //         {
+    //             cpu->insertZeroIdiomInsts(toIEW->insts[i]);
+    //         }
+    //         else
+    //         {
+    //           toIEW_insts[size] = toIEW->insts[i];
+    //           size++;
+    //         }
+    //     }
+    //
+    //     toIEW->size = size;
+    //     for (size_t i = 0; i < size; i++) {
+    //       toIEW->insts[i] = toIEW_insts[i];
+    //     }
+    // }
 
 }
 
@@ -855,13 +885,15 @@ DefaultRename<Impl>::sortInsts()
     int insts_from_decode = fromDecode->size;
     for (int i = 0; i < insts_from_decode; ++i) {
         DynInstPtr inst = fromDecode->insts[i];
+        //if (inst->seqNum == 14885)
+        //    panic("WTF ARE U DOING HERE!");
         insts[inst->threadNumber].push_back(inst);
 #if TRACING_ON
         if (DTRACE(O3PipeView)) {
             inst->renameTick = curTick() - inst->fetchTick;
         }
 #endif
-    inst->renameTick = curTick() - inst->fetchTick;
+        inst->renameTick = curTick() - inst->fetchTick;
     }
 }
 

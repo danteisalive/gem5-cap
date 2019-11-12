@@ -843,10 +843,11 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
             (*it)->isBoundsCheckMicroop() &&
             (*it)->seqNum > inst->seqNum)
         {
-            //std::cout << "ZeroIdiom : Fetch Queue!\n";
-            //(*it)->macroop->undoInjecttion();
-            cpu->removeFrontInst(*it);
+            if ((*it)->seqNum == 1349963)
+                std::cout << "inserted here 0\n!";
+            cpu->insertZeroIdiomInsts(*it);
             it = fetchQueue[tid].erase(it);
+
         }
         else
         {
@@ -862,8 +863,9 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
     //             toDecode->insts[i]->isBoundsCheckMicroop() &&
     //             toDecode->insts[i]->seqNum > inst->seqNum)
     //         {
-    //             // std::cout << "ZeroIdiom : toDecode Wire!\n";
-    //             //cpu->removeFrontInst(toDecode->insts[i]);
+    //             if (toDecode->insts[i]->seqNum == 14885)
+    //                 std::cout << "inserted here 1\n!";
+    //             cpu->insertZeroIdiomInsts(toDecode->insts[i]);
     //         }
     //         else
     //         {

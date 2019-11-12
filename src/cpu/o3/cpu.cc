@@ -1881,9 +1881,64 @@ FullO3CPU<Impl>::removeFrontInst(DynInstPtr &inst)
 
     removeInstsThisCycle = true;
 
+    // a non-injected microo is in the zeroIdiomInsts!
+    if (zeroIdiomInsts.find(inst->seqNum) != zeroIdiomInsts.end())
+    {
+        std::cout << "removeFrontInst: " << inst->seqNum  << " " <<
+                  inst->isBoundsCheckMicroop() << " " <<
+                    inst->isSquashed() << std::endl;
+        panic("removeFrontInst: Double Free called");
+    }
+
     // Remove the front instruction.
     removeList.push(inst->getInstListIt());
 }
+
+template <class Impl>
+void
+FullO3CPU<Impl>::removeZeroIdiomInsts(DynInstPtr &inst)
+{
+    DPRINTF(O3CPU,
+        "Removing Zero Idiom Injected Microops instruction [tid:%i] PC %s "
+            "[sn:%lli]\n",
+            inst->threadNumber, inst->pcState(), inst->seqNum);
+
+
+    for (auto it = zeroIdiomInsts.begin(); it != zeroIdiomInsts.end();)
+    {
+       //a non-injected microo is in the zeroIdiomInsts!
+        if (it->first == inst->seqNum){
+            panic("removeZeroIdiomInsts");
+        }
+        else if (it->first < inst->seqNum){
+            removeList.push(it->second->getInstListIt());
+            it = zeroIdiomInsts.erase(it);
+        }
+        else {
+          it++;
+        }
+    }
+
+
+}
+
+template <class Impl>
+void
+FullO3CPU<Impl>::insertZeroIdiomInsts(DynInstPtr &inst)
+{
+
+  assert(inst->isBoundsCheckMicroop());
+  //check to see if we are not double inserting!
+  if (zeroIdiomInsts.find(inst->seqNum) != zeroIdiomInsts.end())
+  {
+      return;
+  }
+
+  zeroIdiomInsts.insert(std::pair<InstSeqNum, DynInstPtr>(inst->seqNum,inst));
+
+
+}
+
 
 template <class Impl>
 void
@@ -1967,6 +2022,12 @@ FullO3CPU<Impl>::squashInstIt(const ListIt &instIt, ThreadID tid,
                               MisspredictionType _MissPIDSquashType)
 {
     if ((*instIt)->threadNumber == tid) {
+
+        if (zeroIdiomInsts.find((*instIt)->seqNum) != zeroIdiomInsts.end())
+        {
+            zeroIdiomInsts.erase((*instIt)->seqNum);
+        }
+
         DPRINTF(O3CPU, "Squashing instruction, "
                 "[tid:%i] [sn:%lli] PC %s\n",
                 (*instIt)->threadNumber,
@@ -1981,6 +2042,7 @@ FullO3CPU<Impl>::squashInstIt(const ListIt &instIt, ThreadID tid,
         // instructions from the instruction list
         // Remove the instruction from the list.
         removeList.push(instIt);
+
     }
 }
 
@@ -2112,6 +2174,7 @@ FullO3CPU<Impl>::zeroIdiomMicroops(DynInstPtr& inst)
     fetch.zeroIdiomInjectedMicroops(inst);
     decode.zeroIdiomInjectedMicroops(inst);
     rename.zeroIdiomInjectedMicroops(inst);
+  //  iew.zeroIdiomInjectedMicroops(inst);
 }
 
 // Forward declaration of FullO3CPU.

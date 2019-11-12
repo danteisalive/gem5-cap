@@ -594,6 +594,8 @@ class FullO3CPU : public BaseO3CPU
     void dumpInsts();
 
     void zeroIdiomMicroops(DynInstPtr& inst);
+    void removeZeroIdiomInsts(DynInstPtr& inst);
+    void insertZeroIdiomInsts(DynInstPtr &inst);
 
   public:
 #ifndef NDEBUG
@@ -608,6 +610,8 @@ class FullO3CPU : public BaseO3CPU
      *  cycle.
      */
     std::queue<ListIt> removeList;
+
+    std::map<InstSeqNum,DynInstPtr> zeroIdiomInsts;
 
 #ifdef DEBUG
     /** Debug structure to keep track of the sequence numbers still in
