@@ -611,7 +611,7 @@ class FullO3CPU : public BaseO3CPU
      */
     std::queue<ListIt> removeList;
 
-    std::map<InstSeqNum,DynInstPtr> zeroIdiomInsts;
+    std::map<uint64_t,DynInstPtr> zeroIdiomInsts;
 
 #ifdef DEBUG
     /** Debug structure to keep track of the sequence numbers still in

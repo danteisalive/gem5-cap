@@ -1892,6 +1892,43 @@ FullO3CPU<Impl>::removeFrontInst(DynInstPtr &inst)
 
     // Remove the front instruction.
     removeList.push(inst->getInstListIt());
+
+    // remove all the zero idiomed insts from instList
+    for (auto zero_iter = zeroIdiomInsts.begin();
+              zero_iter != zeroIdiomInsts.end();)
+    {
+        if (zero_iter->first < inst->seqNum){
+            //iterate over instList and remove all zero idiomed insts
+            // first check if the inst is there.
+            auto inst_iter = instList.end();
+            for (auto inst_it = instList.begin();
+                      inst_it != instList.end(); inst_it++)
+            {
+                if ((*inst_it)->seqNum == zero_iter->first){
+                  inst_iter = inst_it;
+                  break;
+                }
+            }
+
+            if (inst_iter == instList.end())
+            {
+              std::cout << "removeFrontInst: " <<
+                        zero_iter->second->seqNum  << " " <<
+                        zero_iter->second->isBoundsCheckMicroop() << " " <<
+                          zero_iter->second->isSquashed() << std::endl;
+              panic("removeFrontInst: Can't find zeroIdiomInst in instList!");
+            }
+
+            // now remove the zeroInst from instList
+            instList.erase(zero_iter->second->getInstListIt());
+            zero_iter = zeroIdiomInsts.erase(zero_iter);
+
+        }
+        else {
+          zero_iter++ ;
+        }
+    }
+
 }
 
 template <class Impl>
@@ -1903,7 +1940,7 @@ FullO3CPU<Impl>::removeZeroIdiomInsts(DynInstPtr &inst)
             "[sn:%lli]\n",
             inst->threadNumber, inst->pcState(), inst->seqNum);
 
-
+    assert(0);
     for (auto it = zeroIdiomInsts.begin(); it != zeroIdiomInsts.end();)
     {
        //a non-injected microo is in the zeroIdiomInsts!
@@ -1911,6 +1948,7 @@ FullO3CPU<Impl>::removeZeroIdiomInsts(DynInstPtr &inst)
             panic("removeZeroIdiomInsts");
         }
         else if (it->first < inst->seqNum){
+            removeInstsThisCycle = true;
             removeList.push(it->second->getInstListIt());
             it = zeroIdiomInsts.erase(it);
         }
@@ -2023,6 +2061,7 @@ FullO3CPU<Impl>::squashInstIt(const ListIt &instIt, ThreadID tid,
 {
     if ((*instIt)->threadNumber == tid) {
 
+        // let squashing logic handles this instructions
         if (zeroIdiomInsts.find((*instIt)->seqNum) != zeroIdiomInsts.end())
         {
             zeroIdiomInsts.erase((*instIt)->seqNum);
@@ -2056,7 +2095,6 @@ FullO3CPU<Impl>::cleanUpRemovedInsts()
                 (*removeList.front())->threadNumber,
                 (*removeList.front())->seqNum,
                 (*removeList.front())->pcState());
-
         instList.erase(removeList.front());
 
         removeList.pop();

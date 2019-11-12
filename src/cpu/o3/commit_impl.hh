@@ -1483,9 +1483,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     // Finally clear the head ROB entry.
     rob->retireHead(tid);
-    if (tc->enableCapability){
-        cpu->removeZeroIdiomInsts(head_inst);
-    }
 
 
 
