@@ -1303,19 +1303,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                     head_inst->seqNum, head_inst->pcState(),
                     si->disassemble(head_inst->pcState().pc())
                   );
-   // if (head_inst->isDirectCtrl() ||
-   //    head_inst->isIndirectCtrl() ||
-   //    head_inst->isCondCtrl() ||
-   //    head_inst->isUncondCtrl())
-   //  {
-   //    std::cout << head_inst->seqNum << " " << head_inst->pcState() <<
-   //              " " << si->disassemble(head_inst->pcState().pc()) << " " <<
-   //                 head_inst->isControl() <<
-   //                 head_inst->isDirectCtrl() <<
-   //                 head_inst->isIndirectCtrl() <<
-   //                 head_inst->isCondCtrl() <<
-   //                 head_inst->isUncondCtrl() << std::endl;
-   //  }
 
     if (tc->enableCapability){
       cpu->updatePIDHistory(head_inst);

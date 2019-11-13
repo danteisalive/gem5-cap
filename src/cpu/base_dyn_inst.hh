@@ -139,6 +139,7 @@ class BaseDynInst : public ExecContext, public RefCounted
         IsStrictlyOrdered,
         ReqMade,
         MemOpDone,
+        ZeroIdiomed,
         CapabilityFetched,
         CapabilityChecked,
         AliasFetchStarted,
@@ -359,7 +360,13 @@ class BaseDynInst : public ExecContext, public RefCounted
     void hitExternalSnoop(bool f) { instFlags[HitExternalSnoop] = f; }
 
     //change me!
-
+    bool isZeroIdiomed() const
+    {
+        return instFlags[ZeroIdiomed];
+    }
+    void setZeroIdiomed() {
+        instFlags[ZeroIdiomed] = true;
+    }
     bool isCapabilityChecked() const
     {
         return instFlags[CapabilityChecked];

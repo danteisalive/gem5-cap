@@ -693,7 +693,11 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         // first find the correct PID
         setBoundsCheckPID(inst->threadNumber,inst);
         // if the it's not PID(0) then go to the PID cache
-        if (inst->dyn_pid != TheISA::PointerID(0))
+        if (inst->isZeroIdiomed()){
+            inst->setCapFetched();
+            inst->setCapabilityChecked();
+        }
+        else if (inst->dyn_pid != TheISA::PointerID(0))
         {
           bool hit =
               tc->LRUPidCache.LRUPIDCache_Access(inst->dyn_pid.getPID());

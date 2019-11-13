@@ -2220,7 +2220,7 @@ FullO3CPU<Impl>::zeroIdiomMicroops(DynInstPtr& inst)
     fetch.zeroIdiomInjectedMicroops(inst);
     decode.zeroIdiomInjectedMicroops(inst);
     rename.zeroIdiomInjectedMicroops(inst);
-  //  iew.zeroIdiomInjectedMicroops(inst);
+    iew.zeroIdiomInjectedMicroops(inst);
 }
 
 // Forward declaration of FullO3CPU.

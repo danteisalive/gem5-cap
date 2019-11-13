@@ -688,37 +688,49 @@ void
 DefaultIEW<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
 {
 
-    // ThreadID tid = inst->threadNumber;
-    //
-    // std::queue<DynInstPtr> skidBuffer_t;
-    // while (!skidBuffer[tid].empty()) {
-    //
-    //     if (!(skidBuffer[tid].front()->isBoundsCheckMicroop() &&
-    //         skidBuffer[tid].front()->seqNum > inst->seqNum))
-    //     {
-    //         std::cout << "Squashed in skidBuffer!" << std::endl;
-    //         // skidBuffer[tid].front()->setSquashed();
-    //         // skidBuffer[tid].front()->forwardOldRegs();
-    //     }
-    //     skidBuffer_t.push(skidBuffer[tid].front());
-    //     skidBuffer[tid].pop();
-    // }
-    // skidBuffer[tid] = skidBuffer_t;
-    //
-    // std::queue<DynInstPtr> insts_t;
-    // while (!insts[tid].empty()) {
-    //
-    //   if (!(insts[tid].front()->isBoundsCheckMicroop() &&
-    //       insts[tid].front()->seqNum > inst->seqNum))
-    //   {
-    //        std::cout << "Squashed in inst buffer!" << std::endl;
-    //        // insts[tid].front()->setSquashed();
-    //        // skidBuffer[tid].front()->forwardOldRegs();
-    //   }
-    //   insts_t.push(insts[tid].front());
-    //   insts[tid].pop();
-    // }
-    // insts[tid] = insts_t;
+    ThreadID tid = inst->threadNumber;
+
+    std::queue<DynInstPtr> skidBuffer_t;
+    while (!skidBuffer[tid].empty()) {
+
+        if ((skidBuffer[tid].front()->isBoundsCheckMicroop() &&
+            skidBuffer[tid].front()->seqNum > inst->seqNum))
+        {
+            //std::cout << "Squashed in skidBuffer!" << std::endl;
+            skidBuffer[tid].front()->setZeroIdiomed();
+        }
+        skidBuffer_t.push(skidBuffer[tid].front());
+        skidBuffer[tid].pop();
+    }
+    skidBuffer[tid] = skidBuffer_t;
+
+    std::queue<DynInstPtr> insts_t;
+    while (!insts[tid].empty()) {
+
+      if ((insts[tid].front()->isBoundsCheckMicroop() &&
+          insts[tid].front()->seqNum > inst->seqNum))
+      {
+           //std::cout << "Squashed in inst buffer!" << std::endl;
+           insts[tid].front()->setZeroIdiomed();
+      }
+      insts_t.push(insts[tid].front());
+      insts[tid].pop();
+    }
+    insts[tid] = insts_t;
+
+    // go through all the instructions in the rob and zeroIdiom them
+    // as commit tick() function is called after this, it's easier to zeroIdiom
+    // the rob with fromRename wire. All the instructions in fromRename will
+    // be in in the ROB
+    int insts_from_rename = fromRename->size;
+    for (int i = 0; i < insts_from_rename; ++i) {
+        if (fromRename->insts[i]->isBoundsCheckMicroop() &&
+            fromRename->insts[i]->seqNum > inst->seqNum)
+        {
+          fromRename->insts[i]->setZeroIdiomed();
+        }
+    }
+
 }
 
 
