@@ -843,8 +843,6 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
             (*it)->isBoundsCheckMicroop() &&
             (*it)->seqNum > inst->seqNum)
         {
-            if ((*it)->seqNum == 1349963)
-                std::cout << "inserted here 0\n!";
             cpu->insertZeroIdiomInsts(*it);
             it = fetchQueue[tid].erase(it);
 
@@ -856,6 +854,32 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
     }
 
 
+}
+
+template<class Impl>
+void
+DefaultFetch<Impl>::removeMicroopFromFetchQueue(DynInstPtr inst)
+{
+    ThreadID tid = inst->threadNumber;
+
+    assert(inst->isBoundsCheckMicroop());
+
+    auto microop_it = fetchQueue[tid].begin();
+    for (microop_it = fetchQueue[tid].begin();
+        microop_it != fetchQueue[tid].end(); microop_it++)
+    {
+        if ((*microop_it)->seqNum == inst->seqNum)
+        {
+            cpu->insertZeroIdiomInsts(*microop_it);
+            break;
+        }
+    }
+
+    if (microop_it == fetchQueue[tid].end()){
+       panic("Can't find bounds check microop!");
+    }
+
+    fetchQueue[tid].erase(microop_it);
 }
 
 template<class Impl>
@@ -1260,8 +1284,15 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
               if (si->injectCheckMicroops(
                     cpu->PointerDepGraph.getFetchArchRegsPidArray()))
               {
-                si->injectMicroops(tc, thisPC,
+                  si->injectMicroops(tc, thisPC,
                                    TheISA::CheckType::AP_BOUNDS_INJECT);
+              }
+              else {
+                //check to see if there is injecteion from before
+                // if (si->hasInjection()){
+                //     si->setMacroopPid(TheISA::PointerID(0));
+                //     std::cout << "hasInjection\n";
+                // }
               }
 
 
@@ -1554,6 +1585,19 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 quiesce = true;
                 break;
             }
+
+            // zeroIdiom unneccesary check
+            if (instruction->isBoundsCheckMicroop() &&
+                (instruction->macroop->getMacroopPid() ==
+                                              TheISA::PointerID(0)) &&
+                instruction->macroop->hasInjection())
+            {
+                //std::cout << "hasInjection\n";
+                //remove it form fetchQueue
+                removeMicroopFromFetchQueue(instruction);
+                numInst--;
+            }
+
         } while ((curMacroop || decoder[tid]->instReady()) &&
                  numInst < fetchWidth &&
                  fetchQueue[tid].size() < fetchQueueSize);

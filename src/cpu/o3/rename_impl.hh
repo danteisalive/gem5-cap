@@ -401,8 +401,8 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
               (*it)->isBoundsCheckMicroop() &&
               (*it)->seqNum > inst->seqNum)
           {
-              if ((*it)->seqNum == 1349963)
-                  std::cout << "inserted here 5\n";
+              // if ((*it)->seqNum == 1349963)
+              //     std::cout << "inserted here 5\n";
               cpu->insertZeroIdiomInsts((*it));
               it = insts[tid].erase(it);
           }
@@ -420,8 +420,8 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
               (*it)->isBoundsCheckMicroop() &&
               (*it)->seqNum > inst->seqNum)
           {
-              if ((*it)->seqNum == 1349963)
-                  std::cout << "inserted here 6\n";
+              // if ((*it)->seqNum == 1349963)
+              //     std::cout << "inserted here 6\n";
               cpu->insertZeroIdiomInsts((*it));
               it = skidBuffer[tid].erase(it);
           }
