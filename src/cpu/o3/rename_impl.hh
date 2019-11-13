@@ -393,29 +393,7 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
 
 
   ThreadID tid = inst->threadNumber;
-  //
-  // if (fromDecode->size != 0){
-  //     DynInstPtr fromDecode_insts[Impl::MaxWidth];
-  //     int size = 0;
-  //     for (int i=0; i<fromDecode->size; i++) {
-  //         if (fromDecode->insts[i]->threadNumber == tid &&
-  //             fromDecode->insts[i]->isBoundsCheckMicroop() &&
-  //             fromDecode->insts[i]->seqNum > inst->seqNum)
-  //         {
-  //             cpu->insertZeroIdiomInsts(fromDecode->insts[i]);
-  //         }
-  //         else
-  //         {
-  //           fromDecode_insts[size] = fromDecode->insts[i];
-  //           size++;
-  //         }
-  //     }
-  //
-  //     fromDecode->size = size;
-  //     for (size_t i = 0; i < size; i++) {
-  //       fromDecode->insts[i] = fromDecode_insts[i];
-  //     }
-  // }
+
 
   if (!insts[tid].empty())  {
       for (auto it = insts[tid].begin(); it != insts[tid].end();){
@@ -455,28 +433,6 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
     }
 
 
-    // if (toIEW->size != 0){
-    //     DynInstPtr toIEW_insts[Impl::MaxWidth];
-    //     int size = 0;
-    //     for (int i=0; i<toIEW->size; i++) {
-    //         if (toIEW->insts[i]->threadNumber == tid &&
-    //             toIEW->insts[i]->isBoundsCheckMicroop() &&
-    //             toIEW->insts[i]->seqNum > inst->seqNum)
-    //         {
-    //             cpu->insertZeroIdiomInsts(toIEW->insts[i]);
-    //         }
-    //         else
-    //         {
-    //           toIEW_insts[size] = toIEW->insts[i];
-    //           size++;
-    //         }
-    //     }
-    //
-    //     toIEW->size = size;
-    //     for (size_t i = 0; i < size; i++) {
-    //       toIEW->insts[i] = toIEW_insts[i];
-    //     }
-    // }
 
 }
 

@@ -855,30 +855,6 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
         }
     }
 
-    // if (toDecode->size != 0){
-    //     DynInstPtr toDecode_insts[Impl::MaxWidth];
-    //     int size = 0;
-    //     for (int i=0; i<toDecode->size; i++) {
-    //         if (toDecode->insts[i]->threadNumber == tid &&
-    //             toDecode->insts[i]->isBoundsCheckMicroop() &&
-    //             toDecode->insts[i]->seqNum > inst->seqNum)
-    //         {
-    //             if (toDecode->insts[i]->seqNum == 14885)
-    //                 std::cout << "inserted here 1\n!";
-    //             cpu->insertZeroIdiomInsts(toDecode->insts[i]);
-    //         }
-    //         else
-    //         {
-    //           toDecode_insts[size] = toDecode->insts[i];
-    //           size++;
-    //         }
-    //     }
-    //
-    //     toDecode->size = size;
-    //     for (size_t i = 0; i < size; i++) {
-    //       toDecode->insts[i] = toDecode_insts[i];
-    //     }
-    // }
 
 }
 

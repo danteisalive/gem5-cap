@@ -1910,7 +1910,8 @@ FullO3CPU<Impl>::removeFrontInst(DynInstPtr &inst)
                 }
             }
 
-            if (inst_iter == instList.end())
+            if (inst_iter == instList.end() &&
+                !zero_iter->second->isSquashed())
             {
               std::cout << "removeFrontInst: " <<
                         zero_iter->second->seqNum  << " " <<
@@ -1918,6 +1919,13 @@ FullO3CPU<Impl>::removeFrontInst(DynInstPtr &inst)
                           zero_iter->second->isSquashed() << std::endl;
               panic("removeFrontInst: Can't find zeroIdiomInst in instList!");
             }
+            else if (inst_iter == instList.end() &&
+                    zero_iter->second->isSquashed())
+            {
+                zero_iter = zeroIdiomInsts.erase(zero_iter);
+                continue;
+            }
+
 
             // now remove the zeroInst from instList
             instList.erase(zero_iter->second->getInstListIt());
