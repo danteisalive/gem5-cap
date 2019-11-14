@@ -143,16 +143,16 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
       warn("cannot read symtab!");
     }
 
-    // UWord keyW, valW;
-    // VG_initIterFM(threadContexts[0]->FunctionSymbols);
-    // while (
-    //     VG_nextIterFM(threadContexts[0]->FunctionSymbols, &keyW, &valW )) {
-    //    Block* bk = (Block*)keyW;
-    //    assert(valW == 0);
-    //    assert(bk);
-    //    std::cout << std::hex << bk->payload << " " << bk->name << std::endl;
-    // }
-    // VG_doneIterFM( threadContexts[0]->FunctionSymbols );
+    UWord keyW, valW;
+    VG_initIterFM(threadContexts[0]->FunctionSymbols);
+    while (
+        VG_nextIterFM(threadContexts[0]->FunctionSymbols, &keyW, &valW )) {
+       Block* bk = (Block*)keyW;
+       assert(valW == 0);
+       assert(bk);
+       std::cout << std::hex << bk->payload << " " << bk->name << std::endl;
+    }
+    VG_doneIterFM( threadContexts[0]->FunctionSymbols );
 }
 
 
@@ -764,9 +764,14 @@ AtomicSimpleCPU::tick()
                       max_insts_any_thread - 1) &&
                       curStaticInst->isLastMicroop()){
 
-                    for (auto& elem : debug_function_calls){
-                        std::cout << elem.first << ": " <<
-                                     elem.second << std::endl;
+                    for (auto& elem1 : debug_function_calls){
+                        std::cout << elem1.first << ": " << std::endl;
+                        for (auto& elem2 : elem1.second) {
+                            std::cout << std::hex << elem2.first << " => ";
+                            for (auto& elem3 : elem2.second)
+                                std::cout << std::dec << elem3 << ",";
+                            std::cout << std::endl;
+                        }
                     }
                   }
                 }
@@ -1526,7 +1531,8 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
                                          &foundkey, &foundval, (UWord)&fake );
             if (found) {
                 Block* bk = (Block*)foundkey;
-                debug_function_calls[bk->name]++;
+                debug_function_calls[bk->name][pcState.pc()].push_back(
+                                                  it_lv2->second.getPID());
             }
           }
       }

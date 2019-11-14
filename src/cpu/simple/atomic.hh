@@ -101,7 +101,9 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     WordFM* interval_tree = NULL;  /* WordFM* Block* void */
     std::map<Addr, std::vector<Block>> PIDLogs;
-    std::map<std::string, Addr> debug_function_calls;
+            // Function Name       // PC            //PIDs
+    std::map<std::string, std::map<uint64_t, std::vector<uint64_t>>>
+                                                debug_function_calls;
     uint64_t max_insts_any_thread;
     uint64_t numOfMemRefs;
     uint64_t numOfHeapAccesses;
