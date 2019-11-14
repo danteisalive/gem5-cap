@@ -403,6 +403,7 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
           {
               // if ((*it)->seqNum == 1349963)
               //     std::cout << "inserted here 5\n";
+              (*it)->staticInst->isSquashedAfterInjection = true;
               cpu->insertZeroIdiomInsts((*it));
               it = insts[tid].erase(it);
           }
@@ -422,6 +423,7 @@ DefaultRename<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst){
           {
               // if ((*it)->seqNum == 1349963)
               //     std::cout << "inserted here 6\n";
+              (*it)->staticInst->isSquashedAfterInjection = true;
               cpu->insertZeroIdiomInsts((*it));
               it = skidBuffer[tid].erase(it);
           }

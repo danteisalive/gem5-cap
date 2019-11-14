@@ -414,6 +414,8 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
                 //std::cout << "ZeroIdiom : Decode Insts Buffer!\n";
                 // if (insts[tid].front()->seqNum == 1349963)
                 //     std::cout << "inserted here 3\n";
+                insts[tid].front()->staticInst->isSquashedAfterInjection =
+                                                                      true;
                 cpu->insertZeroIdiomInsts(insts[tid].front());
             }
             else {
@@ -435,6 +437,8 @@ DefaultDecode<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
           {
               // if (skidBuffer[tid].front()->seqNum == 1349963)
               //     std::cout << "inserted here 4\n";
+              skidBuffer[tid].front()->staticInst->isSquashedAfterInjection =
+                                                                        true;
               cpu->insertZeroIdiomInsts(skidBuffer[tid].front());
           }
           else

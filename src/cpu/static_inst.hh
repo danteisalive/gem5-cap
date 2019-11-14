@@ -110,7 +110,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isInjected;
 
   public:
-    //bool isSquashedAfterInjection;
+    bool isSquashedAfterInjection;
     /// @name Register information.
     /// The sum of numFPDestRegs(), numIntDestRegs(), numVecDestRegs() and
     /// numVecelemDestRegs() equals numDestRegs().  The former two functions
@@ -309,6 +309,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     { isInjected = false; /*checked = false;*/ atomic_vaddr = 0;
       PredictionConfidenceLevel = -1;
       PredictionPointerRefillConfidence = -1;
+      isSquashedAfterInjection = false;
     }
 
   public:

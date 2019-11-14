@@ -844,6 +844,7 @@ DefaultFetch<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
             (*it)->seqNum > inst->seqNum)
         {
             cpu->insertZeroIdiomInsts(*it);
+            (*it)->staticInst->isSquashedAfterInjection = true;
             it = fetchQueue[tid].erase(it);
 
         }
@@ -1588,9 +1589,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
             // zeroIdiom unneccesary check
             if (instruction->isBoundsCheckMicroop() &&
-                (instruction->macroop->getMacroopPid() ==
-                                              TheISA::PointerID(0)) &&
-                instruction->macroop->hasInjection())
+                instruction->staticInst->isSquashedAfterInjection)
             {
                 //std::cout << "hasInjection\n";
                 //remove it form fetchQueue

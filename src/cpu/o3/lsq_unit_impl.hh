@@ -1509,6 +1509,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
     if (inst->macroop->getMacroopPid() != pid)
     {
+            inst->staticInst->isSquashedAfterInjection = true;
             if (ENABLE_PREDICTOR_DEBUG){
                std::cout << std::hex <<
                           "EXECUTE: False Prediction Load Instruction: " <<

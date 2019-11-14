@@ -697,6 +697,8 @@ DefaultIEW<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
             skidBuffer[tid].front()->seqNum > inst->seqNum))
         {
             //std::cout << "Squashed in skidBuffer!" << std::endl;
+            skidBuffer[tid].front()->staticInst->isSquashedAfterInjection =
+                                                                        true;
             skidBuffer[tid].front()->setZeroIdiomed();
         }
         skidBuffer_t.push(skidBuffer[tid].front());
@@ -711,6 +713,7 @@ DefaultIEW<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
           insts[tid].front()->seqNum > inst->seqNum))
       {
            //std::cout << "Squashed in inst buffer!" << std::endl;
+           insts[tid].front()->staticInst->isSquashedAfterInjection = true;
            insts[tid].front()->setZeroIdiomed();
       }
       insts_t.push(insts[tid].front());
@@ -727,6 +730,7 @@ DefaultIEW<Impl>::zeroIdiomInjectedMicroops(DynInstPtr inst)
         if (fromRename->insts[i]->isBoundsCheckMicroop() &&
             fromRename->insts[i]->seqNum > inst->seqNum)
         {
+          fromRename->insts[i]->staticInst->isSquashedAfterInjection = true;
           fromRename->insts[i]->setZeroIdiomed();
         }
     }
