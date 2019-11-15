@@ -1608,16 +1608,17 @@ DefaultIEW<Impl>::executeInsts()
                 mispredictedInst = ldstQueue.getMemWithWrongPID(tid);
                 assert(mispredictedInst);
 
-                if (mispredictedInst->MissPIDSquashType ==
-                    MisspredictionType::P0AN)
-                {
+                switch (mispredictedInst->MissPIDSquashType) {
+                  case   MisspredictionType::P0AN:
+                  case   MisspredictionType::PMAN:
+                  case   MisspredictionType::PNA0:
                     fetchRedirect[tid] = true;
                     squashDueToMispredictedPID(mispredictedInst, tid);
-                }
-                else {
+                    break;
+                  default:
                     zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
+                    break;
                 }
-
 
             }
 

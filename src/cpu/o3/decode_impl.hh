@@ -151,11 +151,23 @@ DefaultDecode<Impl>::regStats()
         .desc("Number of squashed instructions handled by decode")
         .prereq(decodeSquashedInsts);
 
-    decodeSquashedInstsDueToMissPID
-        .name(name() + ".decodeSquashedInstsDueToMissPID")
+    decodeSquashedInstsDueToMissPID_P0AN
+        .name(name() + ".decodeSquashedInstsDueToMissPID_P0AN")
         .desc("Number of squashed instructions handled by decode due to \
                Mispredicted PID")
-        .prereq(decodeSquashedInstsDueToMissPID);
+        .prereq(decodeSquashedInstsDueToMissPID_P0AN);
+
+    decodeSquashedInstsDueToMissPID_PMAN
+        .name(name() + ".decodeSquashedInstsDueToMissPID_PMAN")
+        .desc("Number of squashed instructions handled by decode due to \
+                   Mispredicted PID")
+        .prereq(decodeSquashedInstsDueToMissPID_PMAN);
+
+    decodeSquashedInstsDueToMissPID_PNA0
+        .name(name() + ".decodeSquashedInstsDueToMissPID_PNA0")
+        .desc("Number of squashed instructions handled by decode due to \
+                       Mispredicted PID")
+        .prereq(decodeSquashedInstsDueToMissPID_PNA0);
 }
 
 template<class Impl>
@@ -743,8 +755,20 @@ DefaultDecode<Impl>::decodeInsts(ThreadID tid)
 
             ++decodeSquashedInsts;
 
-            if (inst->MissPIDSquashType != MisspredictionType::NONE){
-                ++decodeSquashedInstsDueToMissPID;
+
+            switch (inst->MissPIDSquashType) {
+                case MisspredictionType::P0AN:
+                  ++decodeSquashedInstsDueToMissPID_P0AN;
+                  break;
+                case MisspredictionType::PMAN:
+                  ++decodeSquashedInstsDueToMissPID_PMAN;
+                  break;
+                case MisspredictionType::PNA0:
+                  ++decodeSquashedInstsDueToMissPID_PNA0;
+                  break;
+
+                default:
+                  break;
             }
 
             --insts_available;

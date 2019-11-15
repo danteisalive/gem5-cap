@@ -1423,7 +1423,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             cpu->NumOfExecutedBoundsCheck = 0;
             cpu->numOfCommitedMemRefs = 0;
 
-            cpu->dumpCapabilityStats();
+            //cpu->dumpCapabilityStats();
 
         }
     }

@@ -1874,9 +1874,12 @@ FullO3CPU<Impl>::instDone(ThreadID tid, DynInstPtr &inst)
         comInstEventQueue[tid]->serviceEvents(thread[tid]->numInst);
         system->instEventQueue.serviceEvents(system->totalNumInsts);
     }
-    thread[tid]->numOp++;
-    thread[tid]->numOps++;
-    committedOps[tid]++;
+    if (inst->isZeroIdiomed())
+    {
+      thread[tid]->numOp++;
+      thread[tid]->numOps++;
+      committedOps[tid]++;
+    }
 
     probeInstCommit(inst->staticInst);
 }

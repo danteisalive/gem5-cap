@@ -320,7 +320,9 @@ class DefaultDecode
     Stats::Scalar decodeDecodedInsts;
     /** Stat for total number of squashed instructions. */
     Stats::Scalar decodeSquashedInsts;
-    Stats::Scalar decodeSquashedInstsDueToMissPID;
+    Stats::Scalar decodeSquashedInstsDueToMissPID_P0AN;
+    Stats::Scalar decodeSquashedInstsDueToMissPID_PMAN;
+    Stats::Scalar decodeSquashedInstsDueToMissPID_PNA0;
 };
 
 #endif // __CPU_O3_DECODE_HH__
