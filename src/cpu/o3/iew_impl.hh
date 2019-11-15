@@ -592,7 +592,6 @@ DefaultIEW<Impl>::squashDueToMispredictedPID(DynInstPtr &inst, ThreadID tid)
 
         TheISA::PCState pc = inst->pcState();
 
-        cpu->LVPTMissPredict++;
         // we never squash on macroops which have injected microops!
         // if (inst->macroop->hasInjection()){
         //     inst->macroop->isSquashedAfterInjection = true;

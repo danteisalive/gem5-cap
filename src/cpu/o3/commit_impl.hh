@@ -1393,11 +1393,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             cpu->ExeAliasCache->print_stats();
 
             // final stats
-            //cpu->numOfAliasTableAccess += cpu->NumOfAliasTableAccess;
-            //cpu->LVPTMissPredictPmAn += cpu->PmAn;
-            //cpu->LVPTMissPredictP0An += cpu->P0An;
-            //cpu->LVPTMissPredictPnA0 += cpu->PnA0;
-            //cpu->LVPTMissPredict += cpu->FalsePredict;
             cpu->numOfCapabilityCheckMicroops += cpu->NumOfCommitedBoundsCheck;
 
             cpu->numOutStandingCapabilityCacheAccesses =

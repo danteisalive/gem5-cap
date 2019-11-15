@@ -247,8 +247,11 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
                                        predict, lvptHistory,
                                        tid, lvpt_idx
                                      );
+    if (target.getPID() == 0)
+        predict_record.targetPID = lvpt[lvpt_idx].target;
+    else
+        predict_record.targetPID = target;
 
-    predict_record.targetPID = target;
 
     //predHist[tid].push_front(predict_record);
     predHist[tid].insert(std::pair<InstSeqNum,PIDPredictorHistory>
@@ -280,7 +283,11 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
      }
     }
 
-    update(instPC, target, tid, predict);
+    if (target.getPID() == 0)
+        update(instPC, lvpt[lvpt_idx].target, tid, predict);
+    else
+        update(instPC, target, tid, predict);
+
 
 }
 

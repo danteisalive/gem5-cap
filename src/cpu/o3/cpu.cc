@@ -1874,7 +1874,7 @@ FullO3CPU<Impl>::instDone(ThreadID tid, DynInstPtr &inst)
         comInstEventQueue[tid]->serviceEvents(thread[tid]->numInst);
         system->instEventQueue.serviceEvents(system->totalNumInsts);
     }
-    if (inst->isZeroIdiomed())
+    if (!inst->isZeroIdiomed())
     {
       thread[tid]->numOp++;
       thread[tid]->numOps++;

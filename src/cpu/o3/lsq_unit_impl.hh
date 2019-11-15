@@ -1509,7 +1509,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
     if (inst->macroop->getMacroopPid() != pid)
     {
-            cpu->LVPTMissPredictP0An++;
+
             inst->staticInst->isSquashedAfterInjection = true;
             if (ENABLE_PREDICTOR_DEBUG){
                std::cout << std::hex <<
@@ -1521,10 +1521,12 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             }
 
             cpu->FalsePredict++;
+            cpu->LVPTMissPredict++;
             if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
                 pid != TheISA::PointerID(0))
             {
                 cpu->P0An++;
+                cpu->LVPTMissPredictP0An++;
                 cpu->updateFetchLVPT(inst, pid,
                                      inst->macroop->getMacroopPid(), false);
                 inst->MissPIDSquashType = Impl::MisspredictionType::P0AN;
@@ -1543,6 +1545,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                      pid != TheISA::PointerID(0))
             {
                cpu->PmAn++;
+               cpu->LVPTMissPredictPmAn++;
                cpu->updateFetchLVPT(inst, pid,
                                     inst->macroop->getMacroopPid(), false);
                inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
@@ -1560,6 +1563,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                      pid == TheISA::PointerID(0))
             {
                 cpu->PnA0++;
+                cpu->LVPTMissPredictPnA0++;
                 cpu->updateFetchLVPT(inst, pid,
                                     inst->macroop->getMacroopPid() ,false);
                 inst->MissPIDSquashType = Impl::MisspredictionType::PNA0;
