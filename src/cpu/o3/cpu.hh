@@ -535,6 +535,7 @@ class FullO3CPU : public BaseO3CPU
 
     void updateFetchLVPT(
                       DynInstPtr &inst, TheISA::PointerID& _new_pid,
+                      const TheISA::PointerID& _predicted_pid,
                       bool predict
                       );
     void dumpCapabilityStats();

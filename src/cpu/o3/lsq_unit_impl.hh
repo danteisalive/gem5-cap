@@ -1525,7 +1525,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 pid != TheISA::PointerID(0))
             {
                 cpu->P0An++;
-                cpu->updateFetchLVPT(inst, pid, false);
+                cpu->updateFetchLVPT(inst, pid,
+                                     inst->macroop->getMacroopPid(), false);
                 inst->MissPIDSquashType = Impl::MisspredictionType::P0AN;
 
                 if (inst->macroop->PredictionConfidenceLevel < 12)
@@ -1542,7 +1543,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                      pid != TheISA::PointerID(0))
             {
                cpu->PmAn++;
-               cpu->updateFetchLVPT(inst, pid, false);
+               cpu->updateFetchLVPT(inst, pid,
+                                    inst->macroop->getMacroopPid(), false);
                inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
 
                if (inst->macroop->PredictionConfidenceLevel < 12)
@@ -1558,7 +1560,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                      pid == TheISA::PointerID(0))
             {
                 cpu->PnA0++;
-                cpu->updateFetchLVPT(inst, pid, false);
+                cpu->updateFetchLVPT(inst, pid,
+                                    inst->macroop->getMacroopPid() ,false);
                 inst->MissPIDSquashType = Impl::MisspredictionType::PNA0;
 
                 if (inst->macroop->PredictionConfidenceLevel < 12)
@@ -1585,7 +1588,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                           "Predicted: " << inst->macroop->getMacroopPid() <<
                           " " << "Actual: " << pid << std::endl;
             }
-            cpu->updateFetchLVPT(inst, pid, true);
+            cpu->updateFetchLVPT(inst, pid, pid, true);
             return false;
       }
 

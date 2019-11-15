@@ -212,12 +212,16 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
                     const InstSeqNum &seqNum,
                     Addr instPC,
                     const TheISA::PointerID &target,
+                    const TheISA::PointerID &predicted_pid,
                     ThreadID tid, bool predict,
                     ThreadContext* tc
                    )
 {
 
-
+    if (predict){
+      panic_if(predicted_pid.getPID() != target.getPID(),
+              "Inequal PID when Prediction is True!");
+    }
     unsigned lvpt_idx = getIndex(instPC, tid);
 
     assert(lvpt_idx < numEntries);
@@ -269,8 +273,10 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
                                   &foundkey, &foundval, (UWord)&fake );
      if (found) {
          Block* bk = (Block*)foundkey;
-         predictorMissHistory[lvpt_idx][bk->name][instPC].push_back(
-                                                          target.getPID());
+         std::string str =
+            std::to_string(target.getPID()) +
+                    "(" + std::to_string(predicted_pid.getPID()) + ")";
+         predictorMissHistory[lvpt_idx][bk->name][instPC].push_back(str);
      }
     }
 

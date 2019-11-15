@@ -1744,6 +1744,7 @@ template <class Impl>
 void
 FullO3CPU<Impl>::updateFetchLVPT(
                       DynInstPtr &inst, TheISA::PointerID& _new_pid,
+                      const TheISA::PointerID& _predicted_pid,
                       bool predict)
 {
     fetch.getFetchLVPT()->updateAndSnapshot(
@@ -1751,6 +1752,7 @@ FullO3CPU<Impl>::updateFetchLVPT(
                     inst->seqNum,
                     inst->pcState().instAddr(),
                     _new_pid,
+                    _predicted_pid,
                     inst->threadNumber,
                     predict,
                     tcBase(inst->threadNumber)

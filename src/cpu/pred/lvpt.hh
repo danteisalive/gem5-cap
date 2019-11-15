@@ -103,6 +103,7 @@ class DefaultLVPT
                         const InstSeqNum &seqNum,
                         Addr instPC,
                         const TheISA::PointerID &target,
+                        const TheISA::PointerID &predicted_pid,
                         ThreadID tid, bool predict,
                         ThreadContext* tc
                       );
@@ -143,10 +144,11 @@ class DefaultLVPT
       );
 
       for (auto &idx : result) {
+            std::cout << std::dec << "INDEX[" << idx << "]: " << std::endl;
             for (auto& elem1 : predictorMissHistory[idx]){
-                std::cout << elem1.first << ": " << std::endl;
+                std::cout << "FUNCTION[" <<elem1.first << "]: " << std::endl;
                 for (auto& elem2 : elem1.second) {
-                    std::cout << std::hex << elem2.first << " => ";
+                    std::cout << std::hex <<"["<< elem2.first << "] => ";
                     for (auto& elem3 : elem2.second)
                         std::cout << std::dec << elem3 << ",";
                     std::cout << std::endl;
@@ -207,7 +209,7 @@ class DefaultLVPT
 
     typedef std::map<InstSeqNum,PIDPredictorHistory> History;
 
-    typedef std::map<std::string, std::map<uint64_t, std::vector<uint64_t>>>
+    typedef std::map<std::string, std::map<uint64_t, std::vector<std::string>>>
                                                 EntryMissHistoty;
 
     std::vector<History> predHist;
