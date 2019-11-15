@@ -31,6 +31,8 @@
 #ifndef __CPU_PRED_LVPT_HH__
 #define __CPU_PRED_LVPT_HH__
 
+#include <algorithm>
+#include <numeric>
 
 #include "arch/types.hh"
 #include "base/logging.hh"
@@ -101,7 +103,8 @@ class DefaultLVPT
                         const InstSeqNum &seqNum,
                         Addr instPC,
                         const TheISA::PointerID &target,
-                        ThreadID tid, bool predict
+                        ThreadID tid, bool predict,
+                        ThreadContext* tc
                       );
 
     void update(Addr instPC,
@@ -126,6 +129,31 @@ class DefaultLVPT
         }
 
         return avg/numEntries;
+    }
+
+    void dumpStat(){
+      auto v = predictorMissCount;
+      std::vector<std::size_t> result(v.size());
+      std::iota(std::begin(result), std::end(result), 0);
+      std::sort(std::begin(result), std::end(result),
+              [&v](const uint64_t & lhs, const uint64_t & rhs)
+              {
+                  return v[lhs] > v[rhs];
+              }
+      );
+
+      for (auto &idx : result) {
+            for (auto& elem1 : predictorMissHistory[idx]){
+                std::cout << elem1.first << ": " << std::endl;
+                for (auto& elem2 : elem1.second) {
+                    std::cout << std::hex << elem2.first << " => ";
+                    for (auto& elem3 : elem2.second)
+                        std::cout << std::dec << elem3 << ",";
+                    std::cout << std::endl;
+                }
+            }
+      }
+
     }
 
   private:
@@ -179,6 +207,9 @@ class DefaultLVPT
 
     typedef std::map<InstSeqNum,PIDPredictorHistory> History;
 
+    typedef std::map<std::string, std::map<uint64_t, std::vector<uint64_t>>>
+                                                EntryMissHistoty;
+
     std::vector<History> predHist;
     /** Returns the index into the LVPT, based on the branch's PC.
      *  @param inst_PC The branch to look up.
@@ -198,6 +229,9 @@ class DefaultLVPT
     std::vector<SatCounter> localCtrs;
     std::vector<SatCounter> confLevel;
     std::vector<SatCounter> localPointerPredictor;
+    std::vector<EntryMissHistoty> predictorMissHistory;
+    std::vector<uint64_t> predictorMissCount;;
+
     /** The number of entries in the LVPT. */
     unsigned numEntries;
 

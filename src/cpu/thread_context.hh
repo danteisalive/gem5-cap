@@ -123,6 +123,7 @@ class ThreadContext
                                                     ShadowMemoryAliasTable;
 
 
+
     enum COLLECTOR_STATUS
     {
       NONE, MALLOC_SIZE, CALLOC_SIZE, REALLOC_SIZE, FREE_CALL

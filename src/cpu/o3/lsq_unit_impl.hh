@@ -1509,6 +1509,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
     if (inst->macroop->getMacroopPid() != pid)
     {
+            cpu->LVPTMissPredictP0An++;
             inst->staticInst->isSquashedAfterInjection = true;
             if (ENABLE_PREDICTOR_DEBUG){
                std::cout << std::hex <<
@@ -1526,6 +1527,13 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 cpu->P0An++;
                 cpu->updateFetchLVPT(inst, pid, false);
                 inst->MissPIDSquashType = Impl::MisspredictionType::P0AN;
+
+                if (inst->macroop->PredictionConfidenceLevel < 12)
+                  cpu->LVPTMissPredictP0ANLowConfidence++;
+
+                if (inst->macroop->PredictionPointerRefillConfidence < 12)
+                  cpu->LVPTMissPredictP0ANPointerLowConfidence++;
+
                 inst->macroop->setMacroopPid(pid);
                 return true;
 
@@ -1536,6 +1544,13 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                cpu->PmAn++;
                cpu->updateFetchLVPT(inst, pid, false);
                inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
+
+               if (inst->macroop->PredictionConfidenceLevel < 12)
+                 cpu->LVPTMissPredictPMANLowConfidence++;
+
+               if (inst->macroop->PredictionPointerRefillConfidence < 12)
+                 cpu->LVPTMissPredictPMANPointerLowConfidence++;
+
                inst->macroop->setMacroopPid(pid);
                return true;
             }
@@ -1546,10 +1561,15 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 cpu->updateFetchLVPT(inst, pid, false);
                 inst->MissPIDSquashType = Impl::MisspredictionType::PNA0;
 
+                if (inst->macroop->PredictionConfidenceLevel < 12)
+                  cpu->LVPTMissPredictPNA0LowConfidence++;
+
+                if (inst->macroop->PredictionPointerRefillConfidence < 12)
+                    cpu->LVPTMissPredictPNA0PointerLowConfidence++;
+
                 inst->macroop->setMacroopPid(pid);
                 return true;
             }
-
 
 
 

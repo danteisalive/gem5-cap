@@ -90,6 +90,12 @@ DefaultLVPT::DefaultLVPT(unsigned _numEntries,
         localPointerPredictor[i].reset();
     }
 
+    predictorMissHistory.resize(numEntries);
+    predictorMissCount.resize(numEntries);
+    for (size_t i = 0; i < numEntries; i++) {
+      predictorMissCount[i] = 0;
+    }
+
 
 
 }
@@ -206,7 +212,8 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
                     const InstSeqNum &seqNum,
                     Addr instPC,
                     const TheISA::PointerID &target,
-                    ThreadID tid, bool predict
+                    ThreadID tid, bool predict,
+                    ThreadContext* tc
                    )
 {
 
@@ -246,6 +253,26 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
 
     DPRINTF(Capability, "[tid:%i]: [sn:%i]: History entry added."
             "predHist.size(): %i\n", tid, seqNum, predHist[tid].size());
+
+    //Capture prediction Miss History
+    if (!predict){
+      predictorMissCount[lvpt_idx]++;
+      //add it to the debug_function_calls
+      // find the function which loaded a pointer
+      Block fake;
+      fake.payload = instPC;
+      fake.req_szB = 1;
+      UWord foundkey = 1;
+      UWord foundval = 1;
+      unsigned char found =
+             VG_lookupFM(tc->FunctionSymbols,
+                                  &foundkey, &foundval, (UWord)&fake );
+     if (found) {
+         Block* bk = (Block*)foundkey;
+         predictorMissHistory[lvpt_idx][bk->name][instPC].push_back(
+                                                          target.getPID());
+     }
+    }
 
     update(instPC, target, tid, predict);
 

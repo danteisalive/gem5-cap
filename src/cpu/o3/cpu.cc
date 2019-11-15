@@ -1752,8 +1752,16 @@ FullO3CPU<Impl>::updateFetchLVPT(
                     inst->pcState().instAddr(),
                     _new_pid,
                     inst->threadNumber,
-                    predict
+                    predict,
+                    tcBase(inst->threadNumber)
                     );
+}
+
+template <class Impl>
+void
+FullO3CPU<Impl>::dumpCapabilityStats(){
+
+    fetch.getFetchLVPT()->dumpStat();
 }
 
 template <class Impl>

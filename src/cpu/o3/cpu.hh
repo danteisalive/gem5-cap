@@ -537,6 +537,7 @@ class FullO3CPU : public BaseO3CPU
                       DynInstPtr &inst, TheISA::PointerID& _new_pid,
                       bool predict
                       );
+    void dumpCapabilityStats();
     float getLVPTAveConfidenceLevel()
     {
         return fetch.getFetchLVPT()->getAverageConfidenceLevel();

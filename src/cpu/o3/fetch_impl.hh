@@ -1587,15 +1587,15 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 break;
             }
 
-            // zeroIdiom unneccesary check
-            if (instruction->isBoundsCheckMicroop() &&
-                instruction->staticInst->isSquashedAfterInjection)
-            {
-                //std::cout << "hasInjection\n";
-                //remove it form fetchQueue
-                removeMicroopFromFetchQueue(instruction);
-                numInst--;
-            }
+            // // zeroIdiom unneccesary check
+            // if (instruction->isBoundsCheckMicroop() &&
+            //     instruction->staticInst->isSquashedAfterInjection)
+            // {
+            //     //std::cout << "hasInjection\n";
+            //     //remove it form fetchQueue
+            //     removeMicroopFromFetchQueue(instruction);
+            //     numInst--;
+            // }
 
         } while ((curMacroop || decoder[tid]->instReady()) &&
                  numInst < fetchWidth &&
