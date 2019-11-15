@@ -1609,13 +1609,17 @@ DefaultIEW<Impl>::executeInsts()
 
                 switch (mispredictedInst->MissPIDSquashType) {
                   case   MisspredictionType::P0AN:
+                    zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
+                    break;
                   case   MisspredictionType::PMAN:
+                    zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
+                    break;
                   case   MisspredictionType::PNA0:
                     fetchRedirect[tid] = true;
                     squashDueToMispredictedPID(mispredictedInst, tid);
                     break;
                   default:
-                    zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
+                    assert(0);
                     break;
                 }
 
