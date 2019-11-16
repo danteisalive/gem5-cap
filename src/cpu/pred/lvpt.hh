@@ -231,8 +231,15 @@ class DefaultLVPT
     std::vector<SatCounter> localCtrs;
     std::vector<SatCounter> confLevel;
     std::vector<SatCounter> localPointerPredictor;
+
+    // use predictor execpt for these addresses
+    std::vector<std::map<uint64_t,uint64_t>> banList;
+
+    //for logs
     std::vector<EntryMissHistoty> predictorMissHistory;
-    std::vector<uint64_t> predictorMissCount;;
+    std::vector<uint64_t> predictorMissCount;
+
+
 
     /** The number of entries in the LVPT. */
     unsigned numEntries;
