@@ -164,12 +164,14 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
       {
           switch (localCtrs[lvpt_idx].read()) {
             case 0x0:
-              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
-                                       localBiases[lvpt_idx]);
+              //pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+              //                         localBiases[lvpt_idx]);
+              pred_pid = lvpt[lvpt_idx].target;
               break;
             case 0x1:
-              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
-                                       localBiases[lvpt_idx]);
+              //pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+            //                           localBiases[lvpt_idx]);
+              pred_pid = lvpt[lvpt_idx].target;
               break;
             case 0x2:
             case 0x3:
@@ -332,8 +334,7 @@ DefaultLVPT::update(Addr instPC,
     // std::cout << std::hex << "Inst. " << instPC << " updated the LVPT." <<
     // " Before: " <<   lvpt[lvpt_idx].target << " After: " << target << "\n";
 
-    //localBiases[lvpt_idx] = target.getPID() - lvpt[lvpt_idx].target.getPID();
-    localBiases[lvpt_idx] = 0;
+    localBiases[lvpt_idx] = target.getPID() - lvpt[lvpt_idx].target.getPID();
     lvpt[lvpt_idx].tid = tid;
     lvpt[lvpt_idx].valid = true;
     lvpt[lvpt_idx].target = target;
