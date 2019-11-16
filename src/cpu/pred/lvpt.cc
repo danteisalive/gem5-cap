@@ -164,14 +164,13 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
       {
           switch (localCtrs[lvpt_idx].read()) {
             case 0x0:
-              //pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
-              //                         localBiases[lvpt_idx]);
-              pred_pid = lvpt[lvpt_idx].target;
+              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+                                      localBiases[lvpt_idx]);
               break;
             case 0x1:
-              //pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
-            //                           localBiases[lvpt_idx]);
-              pred_pid = lvpt[lvpt_idx].target;
+              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+                                      localBiases[lvpt_idx]);
+
               break;
             case 0x2:
             case 0x3:
@@ -249,10 +248,10 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
                                        predict, lvptHistory,
                                        tid, lvpt_idx
                                      );
-    if (target.getPID() == 0)
-        predict_record.targetPID = lvpt[lvpt_idx].target;
-    else
-        predict_record.targetPID = target;
+    // if (target.getPID() == 0)
+    //     predict_record.targetPID = lvpt[lvpt_idx].target;
+    // else
+    predict_record.targetPID = target;
 
 
     //predHist[tid].push_front(predict_record);
@@ -285,9 +284,9 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
      }
     }
 
-    if (target.getPID() == 0)
-        update(instPC, lvpt[lvpt_idx].target, tid, predict);
-    else
+    // if (target.getPID() == 0)
+    //     update(instPC, lvpt[lvpt_idx].target, tid, predict);
+    // else
         update(instPC, target, tid, predict);
 
 
