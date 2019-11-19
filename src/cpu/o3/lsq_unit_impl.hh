@@ -712,7 +712,7 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         }
         else {
           // this bounds check microop is cheked
-          inst->setZeroIdiomed();
+          //inst->setZeroIdiomed();
           inst->setCapFetched();
           inst->setCapabilityChecked();
         }
