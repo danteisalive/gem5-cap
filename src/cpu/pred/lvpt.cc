@@ -403,7 +403,7 @@ DefaultLVPT::squashAndUpdate(const InstSeqNum &squashed_sn,
 
     pred_hist.erase(pred_hist_it);
     //now update with correct pid
-    if (corr_pid != TheISA::PointerID(0))
+    //if (corr_pid != TheISA::PointerID(0))
       update(pc.instAddr(), corr_pid, tid, true);
 
 }
