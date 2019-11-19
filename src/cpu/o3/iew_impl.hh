@@ -635,18 +635,7 @@ DefaultIEW<Impl>::zeroIdiomDueToMisspredictedPID(DynInstPtr &inst,ThreadID tid)
 {
      // first find all the dependent instructions
      cpu->PointerDepGraph.doUpdate(inst);
-     // loop through skidBuffer and rename buffer to squash any injected
-     // microop with seqNum > inst->seqNum
-     // squash any injected microop in the instQueue and ldstQueue with
-     // seqNum > inst->seqNum. This will squash
-     // instQueue.squash(tid);
-     //
-     // // Tell the LDSTQ to start squashing.
-     // ldstQueue.squash(fromCommit->commitInfo[tid].squashMisspredictionType,
-     //                  fromCommit->commitInfo[tid].doneSeqNum, tid);
-     // updatedQueues = true;
-     //instQueue.zeroIdiomInjectedMicroops(tid,inst->seqNum);
-     // //ldstQueue.zeroIdiomInjectedMicroops();
+
      cpu->zeroIdiomMicroops(inst);
 }
 
@@ -1609,10 +1598,14 @@ DefaultIEW<Impl>::executeInsts()
 
                 switch (mispredictedInst->MissPIDSquashType) {
                   case   MisspredictionType::PNA0:
-                    zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
+                    fetchRedirect[tid] = true;
+                    squashDueToMispredictedPID(mispredictedInst, tid);
+                    //zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
                     break;
                   case   MisspredictionType::PMAN:
-                    zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
+                    fetchRedirect[tid] = true;
+                    squashDueToMispredictedPID(mispredictedInst, tid);
+                    //zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
                     break;
                   case   MisspredictionType::P0AN:
                     fetchRedirect[tid] = true;

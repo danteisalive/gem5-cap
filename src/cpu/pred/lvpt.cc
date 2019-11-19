@@ -155,9 +155,9 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
     unsigned lvpt_idx = getIndex(instPC, tid);
 
     // if the instPC is in the banList then just return zero;
-    if (banList[lvpt_idx].find(instPC) != banList[lvpt_idx].end()){
-        return TheISA::PointerID(0);
-    }
+    // if (banList[lvpt_idx].find(instPC) != banList[lvpt_idx].end()){
+    //     return TheISA::PointerID(0);
+    // }
 
     //Addr inst_tag = getTag(instPC);
 
@@ -294,11 +294,11 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
 
     //we dont want to pullote our cache with non refill loads but we need to
     // have the history
-    if (target.getPID() == 0){
+    //if (target.getPID() == 0){
         //either predicted true or false
-        banList[lvpt_idx][instPC]++;
-        return;
-    }
+    //    banList[lvpt_idx][instPC]++;
+        //return;
+    //}
 
     update(instPC, target, tid, predict);
 
@@ -390,14 +390,14 @@ DefaultLVPT::squashAndUpdate(const InstSeqNum &squashed_sn,
 
     assert(pred_hist_it->second.lvptIdx == lvpt_idx);
 
-    if (pred_hist_it->second.targetPID.getPID() != 0){
+    //if (pred_hist_it->second.targetPID.getPID() != 0){
       lvpt[lvpt_idx].tag = history->lvptEntry.tag;
       lvpt[lvpt_idx].tid = history->lvptEntry.tid;
       lvpt[lvpt_idx].valid = history->lvptEntry.valid;
       lvpt[lvpt_idx].target = history->lvptEntry.target;
       localCtrs[lvpt_idx].write(history->localCtrEntry.read());
       localBiases[lvpt_idx] = history->localBiasEntry;
-    }
+    //}
 
     delete history;
 
@@ -429,15 +429,15 @@ DefaultLVPT::squash(const InstSeqNum &squashed_sn, ThreadID tid)
 
           uint64_t lvpt_idx = pred_hist_it->second.lvptIdx;
 
-          if (pred_hist_it->second.targetPID.getPID() != 0)
-          {
+          //if (pred_hist_it->second.targetPID.getPID() != 0)
+          //{
               lvpt[lvpt_idx].tag = history->lvptEntry.tag;
               lvpt[lvpt_idx].tid = history->lvptEntry.tid;
               lvpt[lvpt_idx].valid = history->lvptEntry.valid;
               lvpt[lvpt_idx].target = history->lvptEntry.target;
               localCtrs[lvpt_idx].write(history->localCtrEntry.read());
               localBiases[lvpt_idx] = history->localBiasEntry;
-          }
+          //}
 
           delete history;
 
