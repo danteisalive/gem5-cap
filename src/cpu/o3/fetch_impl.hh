@@ -1285,8 +1285,8 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
               if (si->injectCheckMicroops(
                     cpu->PointerDepGraph.getFetchArchRegsPidArray()))
               {
-                  si->injectMicroops(tc, thisPC,
-                                   TheISA::CheckType::AP_BOUNDS_INJECT);
+                  // si->injectMicroops(tc, thisPC,
+                  //                  TheISA::CheckType::AP_BOUNDS_INJECT);
               }
               else {
                 //check to see if there is injecteion from before

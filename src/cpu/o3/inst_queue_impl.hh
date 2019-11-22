@@ -1215,10 +1215,10 @@ InstructionQueue<Impl>::getBlockedCapInstToExecute()
 {
     for (ListIt it = deferredCapInsts.begin(); it != deferredCapInsts.end();
          ++it) {
-        if ((*it)->isCapabilityCheckCompleted() ||
+        if ((*it)->isCapFetchComplete() ||
             (*it)->isSquashed())
         {
-            if ((*it)->isCapabilityCheckCompleted() &&
+            if ((*it)->isCapFetchComplete() &&
                 !(*it)->isSquashed()){
               DPRINTF(IQ, "CapacityFetchComplete: %s, [sn:%lli]\n",
                 (*it)->pcState(), (*it)->seqNum);

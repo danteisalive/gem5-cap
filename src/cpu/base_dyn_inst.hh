@@ -140,8 +140,8 @@ class BaseDynInst : public ExecContext, public RefCounted
         ReqMade,
         MemOpDone,
         ZeroIdiomed,
-        CapabilityFetched,
-        CapabilityChecked,
+        CapFetchStarted,
+        CapFetchComplete,
         AliasFetchStarted,
         AliasFetchComplete,
         MaxFlags
@@ -244,7 +244,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     int16_t sqIdx;
 
     //bool capFetched;
-    uint64_t capFetchCycle;
+    uint64_t capFetchStartCycle;
     uint64_t aliasFetchStartCycle;
 
     /////////////////////// TLB Miss //////////////////////
@@ -317,6 +317,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     }
 
     bool isAliasCacheMissed(Addr vaddr);
+    bool isCapCacheMissed(Addr vaddr);
     Fault initiateMemRead(Addr addr, unsigned size, Request::Flags flags);
 
     Fault writeMem(uint8_t *data, unsigned size, Addr addr,
@@ -367,90 +368,82 @@ class BaseDynInst : public ExecContext, public RefCounted
     void setZeroIdiomed() {
         instFlags[ZeroIdiomed] = true;
     }
-    bool isCapabilityChecked() const
-    {
-        return instFlags[CapabilityChecked];
-    }
-    void setCapabilityChecked() {
-        instFlags[CapabilityChecked] = true;
-    }
-    bool isCapFetched() const {return  instFlags[CapabilityFetched]; }
-    void setCapFetched(){ instFlags[CapabilityFetched] = true; }
 
-    // only used by inst queue to see whther miss is handled or not
-    bool isCapabilityCheckCompleted()
-    {
-      //return true;
-      if (isCapFetched()){
-          setCapabilityChecked();
-          return true;
-      }
-      else {
-          assert(cpu->curCycle() >= capFetchCycle);
-          if ((cpu->curCycle() - capFetchCycle) > 100){ // wait for 100 cycles
-            setCapFetched();
-            setCapabilityChecked();
-            return true;
-          }
-          else {
-            return false;
-          }
-      }
-    }
-
-
-    bool needAliasCacheAccess() const {
+    bool needCapCacheAccess() const {
       //return false;
-      if (instFlags[AliasFetchStarted]) return false;
+      if (instFlags[CapFetchStarted]) return false;
       if (!trackAlias()) return false;
       if (isMicroopInjected()) return false;
       if (isBoundsCheckMicroop()) return false;
+      return true;
+    }
 
-      // datasize should be 8 bytes othersiwe it's not a base address
-      if (staticInst->getDataSize() != 8) return false;
+    bool needAliasCacheAccess() const {
 
-      assert(isLoad());
-      assert(staticInst->numDestRegs() < 2); // are we sure?
+        //return false;
+        if (instFlags[AliasFetchStarted]) return false;
+        if (!trackAlias()) return false;
+        if (isMicroopInjected()) return false;
+        if (isBoundsCheckMicroop()) return false;
 
-      if (staticInst->destRegIdx(0).isIntReg()){
-         int  dest = staticInst->destRegIdx(0).index();
-         if (dest > X86ISA::NUM_INTREGS + 15){
-              return false;
+        // datasize should be 8 bytes othersiwe it's not a base address
+        if (staticInst->getDataSize() != 8) return false;
+
+        assert(isLoad());
+        assert(staticInst->numDestRegs() < 2); // are we sure?
+
+        if (staticInst->destRegIdx(0).isIntReg()){
+           int  dest = staticInst->destRegIdx(0).index();
+           if (dest > X86ISA::NUM_INTREGS + 15){
+                return false;
+          }
+          else {
+               return true;
+          }
         }
         else {
-             return true;
+          return false;
         }
-      }
-      else {
-        return false;
-      }
 
    }
 
    bool isAliasFetchComplete(){
+       assert(instFlags[AliasFetchStarted]);
 
-     // by now we should have started fteching in the case of a miss
-     // if (!instFlags[AliasFetchStarted]){
-     //   std::cout << std::dec << "Assert: " << cpu->curCycle() <<
-     //               " " << staticInst->disassemble(pcState().pc()) <<
-     //               " [" << seqNum << "]" << std::endl;
-     // }
-     assert(instFlags[AliasFetchStarted]);
+       if (instFlags[AliasFetchComplete])
+       {
+         return true;
+       }
+       else {
 
-     if (instFlags[AliasFetchComplete])
+         assert(cpu->curCycle() >= aliasFetchStartCycle); // to make sure
+         // wait for 100 cycles
+         if ((cpu->curCycle() - aliasFetchStartCycle) > 250){
+           instFlags[AliasFetchComplete] = true;
+           return true;
+         }
+         else {
+           return false;
+         }
+
+       }
+
+   }
+
+   bool isCapFetchComplete(){
+
+     assert(instFlags[CapFetchStarted]);
+
+     if (instFlags[CapFetchComplete])
      {
        return true;
      }
      else {
 
-       assert(cpu->curCycle() >= aliasFetchStartCycle); // to make sure
+       assert(cpu->curCycle() >= capFetchStartCycle); // to make sure
        // wait for 100 cycles
-       if ((cpu->curCycle() - aliasFetchStartCycle) > 250){
-         // std::cout << std::dec << "Alias Fetch Completed at: " <<
-         //              cpu->curCycle() <<
-         //              " " << staticInst->disassemble(pcState().pc()) <<
-         //              " [" << seqNum << "]" <<  std::endl;
-         instFlags[AliasFetchComplete] = true;
+       if ((cpu->curCycle() - capFetchStartCycle) > 100){
+         instFlags[CapFetchComplete] = true;
          return true;
        }
        else {
@@ -460,7 +453,6 @@ class BaseDynInst : public ExecContext, public RefCounted
      }
 
    }
-
 
     bool trackAlias() const{
 
@@ -1072,6 +1064,33 @@ class BaseDynInst : public ExecContext, public RefCounted
     { return cpu->getCpuAddrMonitor(threadNumber); }
 };
 
+
+template<class Impl>
+bool
+BaseDynInst<Impl>::isCapCacheMissed(Addr vaddr){
+
+    assert(!instFlags[CapFetchStarted]);
+    ThreadContext * tc =  cpu->tcBase(threadNumber);
+    Block* bk = cpu->find_Block_containing(vaddr,threadNumber);
+    if (bk){
+        assert(bk->pid != 0);
+        bool hit =
+            tc->LRUPidCache.LRUPIDCache_Access(bk->pid);
+        if (hit){
+          instFlags[CapFetchComplete] = true;
+          return false;
+        }
+        else {
+          instFlags[CapFetchComplete] = false;
+          return true;
+        }
+    }
+    else {
+        instFlags[CapFetchComplete] = true;
+        return false;
+    }
+}
+
 template<class Impl>
 bool
 BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
@@ -1171,6 +1190,25 @@ BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
     // this is a check to see if this load needs to access alias
     if (tc->enableCapability)
     {
+        if (needCapCacheAccess()){
+            if (isCapCacheMissed(addr)){
+
+                  capFetchStartCycle = cpu->curCycle();
+                  instFlags[CapFetchStarted] = true;
+                  return NoFault;
+            }
+            else
+            {
+                  instFlags[CapFetchComplete] = true;
+                  instFlags[CapFetchStarted] = true;
+            }
+        }
+        else {
+            // no need to check alias cache for this load
+            instFlags[CapFetchComplete] = true;
+            instFlags[CapFetchStarted] = true;
+        }
+
         if (needAliasCacheAccess()){
 
             if (isAliasCacheMissed(addr)){

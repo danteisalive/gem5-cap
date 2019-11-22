@@ -131,6 +131,16 @@ def template MicroLoadInitiateAcc {{
 
         // for bounds check microops we dont initiateMemRead
         // look at the initiateMemRead fucntion to see how we handle it
+        //ThreadContext * tc = xc->tcBase();
+      //  Block fake;
+        //fake.payload = EA;
+        //fake.req_szB = 1;
+        //UWord foundkey = 1;
+        //UWord foundval = 1;
+        //unsigned char found = VG_lookupFM( tc->interval_tree,
+        //                            &foundkey, &foundval, (UWord)&fake );
+        //found  = found;
+
         fault = initiateMemRead(xc, traceData, EA,
                                 %(memDataSize)s, memFlags);
 

@@ -98,10 +98,12 @@ BaseDynInst<Impl>::initVars()
     instFlags[RecordResult] = true;
     instFlags[Predicate] = true;
 
-    capFetchCycle = 0;
+    capFetchStartCycle = 0;
     aliasFetchStartCycle = 0;
     instFlags[AliasFetchComplete] = false;
     instFlags[AliasFetchStarted] = false;
+    instFlags[CapFetchStarted] = false;
+    instFlags[CapFetchComplete] = false;
     MissPIDSquashType = MisspredictionType::NONE;
     instFlags[ZeroIdiomed] = false;
 

@@ -1434,32 +1434,31 @@ DefaultIEW<Impl>::executeInsts()
                 fault = ldstQueue.executeLoad(inst);
 
 
-                if (tc->enableCapability &&
-                  inst->isBoundsCheckMicroop() &&
-                  fault == NoFault){
-
-                    if (!inst->isCapabilityChecked())
-                    {
-                        DPRINTF(IEW, "Execute: Delayed capability check, "
-                              "Deferring inst due to capability$ miss.\n");
-                        instQueue.deferCapInst(inst);
-                        continue;
-                    }
-                 }
-
                  if (tc->enableCapability &&
                      !inst->isBoundsCheckMicroop() &&
                      fault == NoFault){
 
-                    if (!inst->isAliasFetchComplete())
-                    {
-                        DPRINTF(IEW, "Execute: Delayed alias check, "
-                        "Deferring inst due to alias$ miss.: %s, [sn:%lli]\n",
-                        inst->pcState(), inst->seqNum);
+                      if (!inst->isCapFetchComplete())
+                         {
+                             DPRINTF(IEW, "Execute: Delayed alias check, "
+                             "Deferring inst due to alias$ miss.:\
+                                %s, [sn:%lli]\n",
+                             inst->pcState(), inst->seqNum);
 
-                        instQueue.deferAliasInst(inst);
-                        continue;
-                    }
+                             instQueue.deferCapInst(inst);
+                             continue;
+                      }
+
+                      if (!inst->isAliasFetchComplete())
+                      {
+                            DPRINTF(IEW, "Execute: Delayed alias check, "
+                            "Deferring inst due to alias$ miss.:\
+                             %s, [sn:%lli]\n",
+                            inst->pcState(), inst->seqNum);
+
+                            instQueue.deferAliasInst(inst);
+                            continue;
+                      }
                  }
 
                 if (inst->isTranslationDelayed() &&

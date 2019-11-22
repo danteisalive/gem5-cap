@@ -686,58 +686,19 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
      //checkAccuracy(inst->threadNumber,inst);
 
      // now the address is resolved and check the PID cache
-     if (tc->enableCapability &&
-        inst->isBoundsCheckMicroop() &&
-        !inst->isCapabilityChecked())
-     {
-        // first find the correct PID
-        setBoundsCheckPID(inst->threadNumber,inst);
-        // if the it's not PID(0) then go to the PID cache
-        if (inst->isZeroIdiomed()){
-            inst->setCapFetched();
-            inst->setCapabilityChecked();
-        }
-        else if (inst->dyn_pid != TheISA::PointerID(0))
-        {
-          bool hit =
-              tc->LRUPidCache.LRUPIDCache_Access(inst->dyn_pid.getPID());
 
-          inst->capFetchCycle = cpu->curCycle();
-
-          if (hit)
-          {
-            inst->setCapFetched();
-            inst->setCapabilityChecked();
-          }
-        }
-        else {
-          // this bounds check microop is cheked
-          //inst->setZeroIdiomed();
-          inst->setCapFetched();
-          inst->setCapabilityChecked();
-        }
-     }
-
-    if (tc->enableCapability &&
-       inst->isBoundsCheckMicroop() &&
-       load_fault == NoFault){
-
-          if (inst->isCapabilityChecked())
-          {
-              inst->setReqMade(false);
-          }
-          else {
-            // there is a miss for this cap
-            // we need to defer it for now
-            return load_fault;
-          }
-    }
 
     if (tc->enableCapability &&
        !inst->isBoundsCheckMicroop() &&
        load_fault == NoFault)
     {
-        if (!inst->isAliasFetchComplete())
+        if (!inst->isCapFetchComplete())
+        {
+          DPRINTF(LSQUnit, "Cap Fetch is not completed: %s, [sn:%lli]\n",
+                   inst->pcState(), inst->seqNum);
+          return load_fault;
+        }
+        else if (!inst->isAliasFetchComplete())
         {
            DPRINTF(LSQUnit, "Alias Fetch is not completed: %s, [sn:%lli]\n",
                     inst->pcState(), inst->seqNum);
