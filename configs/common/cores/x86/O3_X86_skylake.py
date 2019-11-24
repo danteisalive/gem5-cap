@@ -76,8 +76,8 @@ class O3_X86_skylake_FP(FUDesc):
 
 # Load/Store Units
 class O3_X86_skylake_Load(FUDesc):
-    opList = [ OpDesc(opClass='MemRead',opLat=4),
-               OpDesc(opClass='FloatMemRead',opLat=4) ]
+    opList = [ OpDesc(opClass='MemRead',opLat=5),
+               OpDesc(opClass='FloatMemRead',opLat=5) ]
     count = 2
 
 class O3_X86_skylake_Store(FUDesc):
