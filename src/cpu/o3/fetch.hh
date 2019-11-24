@@ -430,6 +430,9 @@ class DefaultFetch
 
     TheISA::PCState pc[Impl::MaxThreads];
 
+    int additionalByte[Impl::MaxThreads];
+    int waitForAdditionlCycles[Impl::MaxThreads];
+
     Addr fetchOffset[Impl::MaxThreads];
 
     StaticInstPtr macroop[Impl::MaxThreads];

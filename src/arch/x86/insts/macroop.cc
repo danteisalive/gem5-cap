@@ -348,8 +348,8 @@ MacroopBase::injectAPFreeRet(ThreadContext * _tc, PCState &nextPC){
                           (1ULL << StaticInst::IsMicroop) |
                           (1ULL << StaticInst::IsFirstMicroop) |
                           (1ULL << StaticInst::IsMicroopInjected)|
-                          (1ULL << StaticInst::IsSerializing)|
-                          (1ULL << StaticInst::IsSerializeBefore)|
+                          //(1ULL << StaticInst::IsSerializing)|
+                          //(1ULL << StaticInst::IsSerializeBefore)|
                           (1ULL << StaticInst::IsFreeRetMicroop),
                           InstRegIndex(X86ISA::NUM_INTREGS+17),
                           InstRegIndex(X86ISA::INTREG_RDI),
@@ -398,8 +398,8 @@ if (numMicroops > 0 && !isInjected){
                         (1ULL << StaticInst::IsMicroop) |
                         (1ULL << StaticInst::IsFirstMicroop) |
                         (1ULL << StaticInst::IsMicroopInjected)|
-                        (1ULL << StaticInst::IsSerializing)|
-                        (1ULL << StaticInst::IsSerializeBefore)|
+                        //(1ULL << StaticInst::IsSerializing)|
+                        //(1ULL << StaticInst::IsSerializeBefore)|
                         (1ULL << StaticInst::IsFreeCallMicroop),
                         InstRegIndex(X86ISA::INTREG_RDI),
                         InstRegIndex(X86ISA::INTREG_RDI),

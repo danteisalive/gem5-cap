@@ -151,6 +151,8 @@ DefaultFetch<Impl>::DefaultFetch(O3CPU *_cpu, DerivO3CPUParams *params)
         fetchBuffer[i] = NULL;
         fetchBufferPC[i] = 0;
         fetchBufferValid[i] = false;
+        additionalByte[i] = 0;
+        waitForAdditionlCycles[i] = 0;
     }
 
     branchPred = params->branchPred;
@@ -365,6 +367,8 @@ DefaultFetch<Impl>::resetStage()
         fetchStatus[tid] = Running;
         pc[tid] = cpu->pcState(tid);
         fetchOffset[tid] = 0;
+        additionalByte[tid] = 0;
+        waitForAdditionlCycles[tid] = 0;
         macroop[tid] = NULL;
 
         delayedCommit[tid] = false;
@@ -1392,6 +1396,22 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i]: Fetch is stalled!\n", tid);
             return;
         }
+        else if (additionalByte[tid] >= 3){
+
+            additionalByte[tid] = 0;
+            waitForAdditionlCycles[tid] = 2;
+            ++icacheStallCycles;
+            return;
+        }
+        else if (waitForAdditionlCycles[tid] > 0)
+        {
+          waitForAdditionlCycles[tid]--;
+          panic_if(waitForAdditionlCycles[tid] < 0,
+                  "waitForAdditionlCycles[tid] < 0");
+           ++icacheStallCycles;
+          return;
+        }
+
     } else {
         if (fetchStatus[tid] == Idle) {
             ++fetchIdleCycles;
@@ -1551,6 +1571,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (tc->enableCapability && instruction->isBoundsCheckMicroop())
             {
                 cpu->NumOfInjectedBoundsCheck++;
+                additionalByte[instruction->threadNumber]++;
                 //instruction->setPredicate(false);
             }
 
