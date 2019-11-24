@@ -1481,7 +1481,7 @@ template <class Impl>
 bool
 LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 {
-
+   return false;
     #define ENABLE_PREDICTOR_DEBUG 0
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;

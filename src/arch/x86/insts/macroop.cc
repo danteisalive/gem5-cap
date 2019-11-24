@@ -97,7 +97,9 @@ bool MacroopBase::injectCheckMicroops(
       int i;
       for (i = 0; i < numMicroops; ++i)
       {
-
+          //always inject
+          if (microops[i]->isMemRef())
+              return true;
           // for all the load and stores inject check microop,
           if (microops[i]->isLoad() || microops[i]->isStore())
           {

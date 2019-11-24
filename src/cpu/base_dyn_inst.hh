@@ -387,7 +387,7 @@ class BaseDynInst : public ExecContext, public RefCounted
       }
       else {
           assert(cpu->curCycle() >= capFetchCycle);
-          if ((cpu->curCycle() - capFetchCycle) > 100){ // wait for 100 cycles
+          if ((cpu->curCycle() - capFetchCycle) > 250){ // wait for 100 cycles
             setCapFetched();
             setCapabilityChecked();
             return true;

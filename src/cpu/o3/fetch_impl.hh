@@ -1396,7 +1396,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i]: Fetch is stalled!\n", tid);
             return;
         }
-        else if (additionalByte[tid] >= 3){
+        else if (additionalByte[tid] >= 16){
 
             additionalByte[tid] = 0;
             waitForAdditionlCycles[tid] = 2;
