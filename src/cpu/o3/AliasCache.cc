@@ -320,7 +320,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 return true;
             }
             else {
-              panic("Commiting a store which cannot be found!");
+              //panic("Commiting a store which cannot be found!");
             }
       }
       return false;
