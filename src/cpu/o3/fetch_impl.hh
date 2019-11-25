@@ -1396,21 +1396,21 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i]: Fetch is stalled!\n", tid);
             return;
         }
-        else if (additionalByte[tid] >= 16){
-
-            additionalByte[tid] = 0;
-            waitForAdditionlCycles[tid] = 2;
-            ++icacheStallCycles;
-            return;
-        }
-        else if (waitForAdditionlCycles[tid] > 0)
-        {
-          waitForAdditionlCycles[tid]--;
-          panic_if(waitForAdditionlCycles[tid] < 0,
-                  "waitForAdditionlCycles[tid] < 0");
-           ++icacheStallCycles;
-          return;
-        }
+        // else if (additionalByte[tid] >= 16){
+        //
+        //     additionalByte[tid] = 0;
+        //     waitForAdditionlCycles[tid] = 2;
+        //     ++icacheStallCycles;
+        //     return;
+        // }
+        // else if (waitForAdditionlCycles[tid] > 0)
+        // {
+        //   waitForAdditionlCycles[tid]--;
+        //   panic_if(waitForAdditionlCycles[tid] < 0,
+        //           "waitForAdditionlCycles[tid] < 0");
+        //    ++icacheStallCycles;
+        //   return;
+        // }
 
     } else {
         if (fetchStatus[tid] == Idle) {
