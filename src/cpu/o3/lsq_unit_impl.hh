@@ -1481,7 +1481,7 @@ template <class Impl>
 bool
 LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 {
-   return false;
+   //return false;
     #define ENABLE_PREDICTOR_DEBUG 0
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
@@ -1539,7 +1539,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                   cpu->LVPTMissPredictP0ANPointerLowConfidence++;
 
                 inst->macroop->setMacroopPid(pid);
-                return true;
+                return false;
 
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
@@ -1558,7 +1558,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                  cpu->LVPTMissPredictPMANPointerLowConfidence++;
 
                inst->macroop->setMacroopPid(pid);
-               return true;
+               return false;
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
@@ -1576,7 +1576,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                     cpu->LVPTMissPredictPNA0PointerLowConfidence++;
 
                 inst->macroop->setMacroopPid(pid);
-                return true;
+                return false;
             }
 
 
