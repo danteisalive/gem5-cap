@@ -387,7 +387,7 @@ class BaseDynInst : public ExecContext, public RefCounted
       }
       else {
           assert(cpu->curCycle() >= capFetchCycle);
-          if ((cpu->curCycle() - capFetchCycle) > 250){ // wait for 100 cycles
+          if ((cpu->curCycle() - capFetchCycle) > 100){ // wait for 100 cycles
             setCapFetched();
             setCapabilityChecked();
             return true;
@@ -445,7 +445,7 @@ class BaseDynInst : public ExecContext, public RefCounted
 
        assert(cpu->curCycle() >= aliasFetchStartCycle); // to make sure
        // wait for 100 cycles
-       if ((cpu->curCycle() - aliasFetchStartCycle) > 250){
+       if ((cpu->curCycle() - aliasFetchStartCycle) > 100){
          // std::cout << std::dec << "Alias Fetch Completed at: " <<
          //              cpu->curCycle() <<
          //              " " << staticInst->disassemble(pcState().pc()) <<
