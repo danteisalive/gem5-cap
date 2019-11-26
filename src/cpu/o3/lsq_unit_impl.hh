@@ -1539,7 +1539,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                   cpu->LVPTMissPredictP0ANPointerLowConfidence++;
 
                 inst->macroop->setMacroopPid(pid);
-                return false;
+                return true;
 
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
@@ -1558,7 +1558,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                  cpu->LVPTMissPredictPMANPointerLowConfidence++;
 
                inst->macroop->setMacroopPid(pid);
-               return false;
+               return true;
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
@@ -1576,7 +1576,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                     cpu->LVPTMissPredictPNA0PointerLowConfidence++;
 
                 inst->macroop->setMacroopPid(pid);
-                return false;
+                return true;
             }
 
 

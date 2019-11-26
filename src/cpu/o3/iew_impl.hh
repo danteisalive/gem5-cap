@@ -1592,7 +1592,7 @@ DefaultIEW<Impl>::executeInsts()
             else if (tc->enableCapability &&
                     ldstQueue.checkPIDMisprediction(tid))
             {
-                assert(0);
+                //assert(0);
                 DynInstPtr mispredictedInst;
                 mispredictedInst = ldstQueue.getMemWithWrongPID(tid);
                 assert(mispredictedInst);
