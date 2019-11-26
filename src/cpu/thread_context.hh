@@ -139,7 +139,7 @@ class ThreadContext
     TheISA::PointerID                           PID = TheISA::PointerID(0);
     uint64_t                                PointerTracker[TheISA::NumIntRegs];
     ShadowMemoryAliasTable                      ShadowMemory;
-    TheISA::LRUPIDCache                         LRUPidCache{64};
+    TheISA::LRUPIDCache                         LRUPidCache{128};
     COLLECTOR_STATUS                            Collector_Status;
 
     WordFM*                                     FunctionSymbols = NULL;
