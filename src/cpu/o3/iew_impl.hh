@@ -2226,7 +2226,8 @@ DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
   Block* bk = cpu->find_Block_containing(dataRegContent,tid);
   if (bk && (bk->payload <= dataRegContent &&
     ((bk->payload + bk->req_szB)>dataRegContent)))
-    assert(bk->pid != 0);
+  {
+      assert(bk->pid != 0);
     _pid = TheISA::PointerID(bk->pid);
 
   }
