@@ -45,8 +45,9 @@ class PathSearchFunc(object):
         if self._sys_paths is None:
             try:
                 paths = os.environ['M5_PATH'].split(':')
+
             except KeyError:
-                paths = [ '/dist/m5/system', '/n/poolfs/z/dist/m5/system' ]
+                paths = [ '/dist/m5/system', '/home/dante/gem5-cap/nginx' ]
 
             # expand '~' and '~user' in paths
             paths = map(os.path.expanduser, paths)

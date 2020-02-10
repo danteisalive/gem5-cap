@@ -104,6 +104,23 @@ class AtomicSimpleCPU : public BaseSimpleCPU
             // Function Name       // PC            //PIDs
     std::map<std::string, std::map<uint64_t, std::vector<uint64_t>>>
                                                 debug_function_calls;
+
+    struct Pattern {
+      uint64_t pid_num;
+      uint64_t count;
+
+      Pattern(uint64_t _pid, uint64_t _count){
+        pid_num = _pid; count = _count;
+      }
+
+    };
+
+    std::map<std::string, std::map<uint64_t, std::vector<Pattern>>>
+                                                debug_pid_patterns;
+    // Function Name       // PC            //PIDs
+    std::map<std::string, std::map<uint64_t, std::string>>
+                                                debug_pid_regex;
+
     uint64_t max_insts_any_thread;
     uint64_t numOfMemRefs;
     uint64_t numOfHeapAccesses;

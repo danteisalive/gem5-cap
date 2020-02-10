@@ -606,7 +606,7 @@ void
 AtomicSimpleCPU::tick()
 {
 
-    #define ENABLE_LOGGING 1
+    #define ENABLE_LOGGING 0
     DPRINTF(SimpleCPU, "Tick\n");
 
     // Change thread if multi-threaded
@@ -723,8 +723,8 @@ AtomicSimpleCPU::tick()
                     {
                        if (ENABLE_LOGGING)
                           updateAliasTableWithStack(threadContexts[0],pcState);
-                       // else
-                       //    updateAliasTable(threadContexts[0],pcState);
+                        else
+                           updateAliasTable(threadContexts[0],pcState);
                     }
               }
               // if (threadContexts[0]->enableCapability &&
@@ -764,16 +764,150 @@ AtomicSimpleCPU::tick()
                       max_insts_any_thread - 1) &&
                       curStaticInst->isLastMicroop()){
 
-                    for (auto& elem1 : debug_function_calls){
-                        std::cout << elem1.first << ": " << std::endl;
-                        for (auto& elem2 : elem1.second) {
-                            std::cout << std::hex << elem2.first << " => ";
-                            for (auto& elem3 : elem2.second)
-                                std::cout << std::dec << elem3 << ",";
-                            std::cout << std::endl;
-                        }
+                      for (auto& elem1 : debug_function_calls){
+                          std::cout << elem1.first << ": " << std::endl;
+                          for (auto& elem2 : elem1.second) {
+                              std::cout << std::hex << elem2.first << " => ";
+                              for (auto& elem3 : elem2.second)
+                                  std::cout << std::dec << elem3 << ",";
+                              std::cout << std::endl;
+                          }
+                      }
+
+                      for (auto& elem1 : debug_pid_patterns){
+                          std::cout << elem1.first << ": " << std::endl;
+                          for (auto& elem2 : elem1.second) {
+                              std::cout << std::hex << elem2.first << " => ";
+                              for (auto& elem3 : elem2.second)
+                                  std::cout << std::dec <<
+                                  "(" <<  elem3.pid_num << "," <<
+                                  elem3.count << ")" << ",";
+                              std::cout << std::endl;
+                          }
+                      }
+                      // let's get the regex patterns one by one for each PC
+                      std::vector<uint64_t> stride_pool;
+  for (auto& elem1 : debug_pid_patterns){
+      for (auto& elem2 : elem1.second) {
+
+          for (auto& elem3 : elem2.second)
+          {
+              if (elem3.count >= 3){
+              debug_pid_regex[elem1.first][elem2.first] += "C";
+              if (!stride_pool.empty())
+              {
+                  if (stride_pool.size() < 3){
+                    for (size_t i = 0; i < stride_pool.size(); i++) {
+                      debug_pid_regex[elem1.first][elem2.first] += "R";
                     }
                   }
+                  else {
+                      debug_pid_regex[elem1.first][elem2.first] += "S" +
+                                  std::to_string(stride_pool.size());
+                  }
+                  stride_pool.clear();
+              }
+              }
+              else if (elem3.count == 2){
+                  debug_pid_regex[elem1.first][elem2.first] += "R";
+                  if (!stride_pool.empty())
+                  {
+                      if (stride_pool.size() < 3){
+                    for (size_t i = 0; i < stride_pool.size(); i++) {
+                  debug_pid_regex[elem1.first][elem2.first] += "R";
+                      }
+                }
+                else {
+                  debug_pid_regex[elem1.first][elem2.first] += "S"+
+              std::to_string(stride_pool.size());
+                }
+                stride_pool.clear();
+                }
+                }
+                else {
+
+              if (stride_pool.size() < 2)
+                                      {
+            if (elem2.first == 0xc8f87b){
+            //std::cout << "HERE0 " << elem3.pid_num << std::endl;
+                                        }
+            stride_pool.push_back(elem3.pid_num);
+                                      }
+        else if (stride_pool.size() == 2)
+                {
+            stride_pool.push_back(elem3.pid_num);
+          int s = stride_pool[1] - stride_pool[0];
+            if (elem2.first == 0xc8f87b){
+
+            }
+            // stride found in 3 elements
+          if ((stride_pool[2] - stride_pool[1]) == s)
+            continue;
+            //no stride found for 3 elements
+            // remove first one and add a "R" to stream for it
+            debug_pid_regex[elem1.first][elem2.first] += "R";
+            debug_pid_regex.erase(debug_pid_regex.begin());
+
+            }
+            else {
+                //at least the 3 first elements are on a stride
+              // lets check the next one
+              stride_pool.push_back(elem3.pid_num);
+        int s1 = stride_pool.end()[-1] - stride_pool.end()[-2];
+  int s2 = stride_pool.end()[-2] - stride_pool.end()[-3];
+                    //on stride
+                      if (s2 == s1)
+                          {
+                  if (elem2.first == 0xc8f87b){
+                          }
+                                          }
+          else {
+      // first remove all previous elements
+
+
+                                            // add a new stride
+        debug_pid_regex[elem1.first][elem2.first] += "S" +
+        std::to_string(stride_pool.size());
+            stride_pool.clear();
+  stride_pool.push_back(elem3.pid_num);
+          if (elem2.first == 0xc8f87b){
+
+                                            }
+                                          }
+                                      }
+
+                                  }
+                              }
+
+                              // we need to stride_pool.size() != 0 here
+  if (!stride_pool.empty())
+        {
+                if (stride_pool.size() < 3){
+            for (size_t i = 0; i < stride_pool.size(); i++) {
+              debug_pid_regex[elem1.first][elem2.first] += "R";
+                  }
+                         }
+                                  else {
+            debug_pid_regex[elem1.first][elem2.first] += "S"+
+            std::to_string(stride_pool.size());
+                                  }
+                                  stride_pool.clear();
+                              }
+                          }
+                      }
+
+                      for (auto& elem1 : debug_pid_regex){
+                          std::cout << elem1.first << ": " << std::endl;
+                          for (auto& elem2 : elem1.second) {
+                              std::cout << std::hex << elem2.first <<
+                              " => " <<
+                              elem2.second << std::endl;
+                          }
+                      }
+                  }
+
+
+
                 }
                 // dump stats
 
@@ -1533,6 +1667,28 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
                 Block* bk = (Block*)foundkey;
                 debug_function_calls[bk->name][pcState.pc()].push_back(
                                                   it_lv2->second.getPID());
+                //std::cout << "HERE0!" << endl;
+                // pattern collection - first pattern for this PC
+                if (debug_pid_patterns[bk->name][pcState.pc()].empty())
+                {
+                  //std::cout << "HERE1!" << endl;
+                    debug_pid_patterns[bk->name][pcState.pc()].push_back(
+                                  Pattern(it_lv2->second.getPID(), 1));
+                }
+                // different pattern for the same PC
+                else if (
+                  debug_pid_patterns[bk->name][pcState.pc()].back().pid_num !=
+                          it_lv2->second.getPID())
+                {
+                    //std::cout << "HERE2!" << endl;
+                    debug_pid_patterns[bk->name][pcState.pc()].push_back(
+                                Pattern(it_lv2->second.getPID(), 1));
+                }
+                else
+                {
+                  //std::cout << "HERE!3" << endl;
+                    debug_pid_patterns[bk->name][pcState.pc()].back().count++;
+                }
             }
           }
       }
