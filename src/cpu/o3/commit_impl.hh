@@ -1493,7 +1493,7 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
 {
 
   #define ENABLE_COMMIT_ALIAS_TABLE_DEBUG 0
-
+  //std::cout << "here2!";
   ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = head_inst->staticInst;
 

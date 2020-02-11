@@ -98,7 +98,7 @@ bool MacroopBase::injectCheckMicroops(
       for (i = 0; i < numMicroops; ++i)
       {
           //always inject
-          if (microops[i]->isMemRef())
+          if (microops[i]->isMemRef() && microops[i]->getDataSize() == 8)
               return true;
           // for all the load and stores inject check microop,
           if (microops[i]->isLoad() || microops[i]->isStore())
@@ -180,14 +180,14 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
               microops[0]->clearFirstMicroop();
 
               StaticInstPtr * microopTemp =
-                                  new StaticInstPtr[numMicroops + 1];
+                                  new StaticInstPtr[numMicroops + 2];
 
               for (int i=0; i < numMicroops; i++)
-                  microopTemp[i+1] = microops[i];
+                  microopTemp[i+2] = microops[i];
 
               StaticInstPtr micro_0 = (microops[idx]->getDataSize() >= 4) ?
                       (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
-                        "AP_BOUNDS_CHECK_INJECT",
+                        "AP_BOUNDS_CHECK_INJECT_1",
                         (1ULL << StaticInst::IsMicroop) |
                         (1ULL << StaticInst::IsFirstMicroop) |
                         (1ULL << StaticInst::IsMicroopInjected)|
@@ -202,7 +202,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                         microops[idx]->getAddressSize(),
                         0)) :
                     (StaticInstPtr)(new X86ISAInst::Ld(machInst,
-                        "AP_BOUNDS_CHECK_INJECT",
+                        "AP_BOUNDS_CHECK_INJECT_1",
                         (1ULL << StaticInst::IsMicroop) |
                         (1ULL << StaticInst::IsFirstMicroop) |
                         (1ULL << StaticInst::IsMicroopInjected)|
@@ -219,9 +219,41 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                         );
               microopTemp[0] = micro_0;
 
+              StaticInstPtr micro_1 = (microops[idx]->getDataSize() >= 4) ?
+                      (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
+                        "AP_BOUNDS_CHECK_INJECT_2",
+                        (1ULL << StaticInst::IsMicroop) |
+                        (1ULL << StaticInst::IsMicroopInjected)|
+                        (1ULL << StaticInst::IsBoundsCheckMicroop),
+                        microops[idx]->getScale(),
+                        InstRegIndex(microops[idx]->getIndex()),
+                        InstRegIndex(microops[idx]->getBase()),
+                        microops[idx]->getDisp(),
+                        InstRegIndex(microops[idx]->getSegment()),
+                        InstRegIndex(microops[idx]->getBase()),
+                        microops[idx]->getDataSize(),
+                        microops[idx]->getAddressSize(),
+                        0)) :
+                    (StaticInstPtr)(new X86ISAInst::Ld(machInst,
+                        "AP_BOUNDS_CHECK_INJECT_2",
+                        (1ULL << StaticInst::IsMicroop) |
+                        (1ULL << StaticInst::IsMicroopInjected)|
+                        (1ULL << StaticInst::IsBoundsCheckMicroop),
+                        microops[idx]->getScale(),
+                        InstRegIndex(microops[idx]->getIndex()),
+                        InstRegIndex(microops[idx]->getBase()),
+                        microops[idx]->getDisp(),
+                        InstRegIndex(microops[idx]->getSegment()),
+                        InstRegIndex(microops[idx]->getBase()),
+                        microops[idx]->getDataSize(),
+                        microops[idx]->getAddressSize(),
+                        0)
+                        );
+              microopTemp[1] = micro_1;
+
               delete [] microops;
               microops = microopTemp;
-              numMicroops = numMicroops + 1;
+              numMicroops = numMicroops + 2;
               isInjected = true;
               break;
             }
@@ -232,14 +264,14 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                 microops[0]->clearFirstMicroop();
 
                 StaticInstPtr * microopTemp =
-                                    new StaticInstPtr[numMicroops + 1];
+                                    new StaticInstPtr[numMicroops + 2];
 
                 for (int i=0; i < numMicroops; i++)
-                    microopTemp[i+1] = microops[i];
+                    microopTemp[i + 2] = microops[i];
 
                 StaticInstPtr micro_0 = (microops[idx]->getDataSize() >= 4) ?
                             (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
-                              "AP_BOUNDS_CHECK_INJECT",
+                              "AP_BOUNDS_CHECK_INJECT_1",
                               (1ULL << StaticInst::IsMicroop) |
                               (1ULL << StaticInst::IsFirstMicroop) |
                               (1ULL << StaticInst::IsMicroopInjected)|
@@ -254,7 +286,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                               microops[idx]->getAddressSize(),
                               0)) :
                           (StaticInstPtr)(new X86ISAInst::Ld(machInst,
-                              "AP_BOUNDS_CHECK_INJECT",
+                              "AP_BOUNDS_CHECK_INJECT_1",
                               (1ULL << StaticInst::IsMicroop) |
                               (1ULL << StaticInst::IsFirstMicroop) |
                               (1ULL << StaticInst::IsMicroopInjected)|
@@ -271,9 +303,40 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                               );
                 microopTemp[0] = micro_0;
 
+                StaticInstPtr micro_1 = (microops[idx]->getDataSize() >= 4) ?
+                            (StaticInstPtr)(new X86ISAInst::LdBig(machInst,
+                              "AP_BOUNDS_CHECK_INJECT_2",
+                              (1ULL << StaticInst::IsMicroop) |
+                              (1ULL << StaticInst::IsMicroopInjected)|
+                              (1ULL << StaticInst::IsBoundsCheckMicroop),
+                              microops[idx]->getScale(),
+                              InstRegIndex(microops[idx]->getIndex()),
+                              InstRegIndex(microops[idx]->getBase()),
+                              microops[idx]->getDisp(),
+                              InstRegIndex(microops[idx]->getSegment()),
+                              InstRegIndex(microops[idx]->getBase()),
+                              microops[idx]->getDataSize(),
+                              microops[idx]->getAddressSize(),
+                              0)) :
+                          (StaticInstPtr)(new X86ISAInst::Ld(machInst,
+                              "AP_BOUNDS_CHECK_INJECT_2",
+                              (1ULL << StaticInst::IsMicroop) |
+                              (1ULL << StaticInst::IsMicroopInjected)|
+                              (1ULL << StaticInst::IsBoundsCheckMicroop),
+                              microops[idx]->getScale(),
+                              InstRegIndex(microops[idx]->getIndex()),
+                              InstRegIndex(microops[idx]->getBase()),
+                              microops[idx]->getDisp(),
+                              InstRegIndex(microops[idx]->getSegment()),
+                              InstRegIndex(microops[idx]->getBase()),
+                              microops[idx]->getDataSize(),
+                              microops[idx]->getAddressSize(),
+                              0)
+                              );
+                microopTemp[1] = micro_1;
                 delete [] microops;
                 microops = microopTemp;
-                numMicroops = numMicroops + 1;
+                numMicroops = numMicroops + 2;
                 isInjected = true;
                 break;
             }

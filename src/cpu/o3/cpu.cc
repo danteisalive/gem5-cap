@@ -457,11 +457,11 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
             seglist.push_back(segment);
          }
 
-         // if (params->enable_capability){
-         //   if (!readSymTab(seglist[seglist.size()-1].c_str(),o3_tc)){
-         //     warn("cannot read symtab!");
-         //   }
-         // }
+         if (params->enable_capability){
+           if (!readSymTab(seglist[seglist.size()-1].c_str(),o3_tc)){
+             warn("cannot read symtab!");
+           }
+         }
 
          // UWord keyW, valW;
          // VG_initIterFM(o3_tc->FunctionSymbols);

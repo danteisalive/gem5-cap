@@ -291,6 +291,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                                     uint64_t storeSeqNum, ThreadContext* tc){
       // here commit the youngest entry of the ExeAliasBuffer to shadow memory
       // which is actually the CommitAliasTable
+
       for (auto it = ExeAliasTableBuffer.cbegin(), next_it = it;
                     it != ExeAliasTableBuffer.cend();
                     it = next_it)
@@ -306,13 +307,13 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 // if this page has no alias and wb_pid is zero
                 // do not send it for commit just remove it
                 TheISA::PointerID writeback_pid = it->second;
-                Process *p = tc->getProcessPtr();
-                Addr vaddr_vpn = p->pTable->pageAlign(vaddr);
-                auto sm_it = tc->ShadowMemory.find(vaddr_vpn);
-
-                if (writeback_pid != TheISA::PointerID(0) &&
-                    sm_it != tc->ShadowMemory.end())
+                //Process *p = tc->getProcessPtr();
+                //Addr vaddr_vpn = p->pTable->pageAlign(vaddr);
+                //auto sm_it = tc->ShadowMemory.find(vaddr_vpn);
+                //std::cout << writeback_pid;
+                if (writeback_pid != TheISA::PointerID(0))
                 {
+                  //std::cout << "here!1";
                   Commit(it->first.second, tc, writeback_pid);
                 }
                 //delete from alias store buffer
@@ -320,7 +321,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 return true;
             }
             else {
-              //panic("Commiting a store which cannot be found!");
+              //std::cout << "here!";
+              panic("Commiting a store which cannot be found!");
             }
       }
       return false;
